@@ -5,7 +5,13 @@ import { render as renderEmployees }    from './views/employeeListView.js';
 import { render as renderPayroll }      from './views/payrollView.js';
 import { render as renderSettings }     from './views/settingsView.js';
 import { initStore }                    from './data/store.js';
-import { onAuthChanged, signInWithGoogle, signOutUser } from './auth.js';
+import { onAuthChanged, signInWithGoogle, signInWithMicrosoft, signOutUser } from './auth.js';
+
+// Only these emails are allowed to access the app
+const ALLOWED_EMAILS = [
+  'raedelkady@gmail.com',
+  'servicefinancier2@lycee-montaigne.edu.lb'
+];
 
 // Register all routes
 register('#dashboard', () => renderDashboard('#app-content'));
@@ -67,10 +73,21 @@ document.addEventListener('DOMContentLoaded', () => {
   initModal();
   initMobileSidebar();
 
-  // Sign-in button
+  // Sign-in buttons
   document.getElementById('google-signin-btn').addEventListener('click', async () => {
     try {
+      document.getElementById('login-error').textContent = '';
       await signInWithGoogle();
+    } catch (e) {
+      console.error('Sign-in failed', e);
+      document.getElementById('login-error').textContent = 'Sign-in failed. Please try again.';
+    }
+  });
+
+  document.getElementById('microsoft-signin-btn').addEventListener('click', async () => {
+    try {
+      document.getElementById('login-error').textContent = '';
+      await signInWithMicrosoft();
     } catch (e) {
       console.error('Sign-in failed', e);
       document.getElementById('login-error').textContent = 'Sign-in failed. Please try again.';
@@ -86,6 +103,14 @@ document.addEventListener('DOMContentLoaded', () => {
   let appInitialized = false;
   onAuthChanged(async user => {
     if (user) {
+      // Check if email is allowed
+      if (!ALLOWED_EMAILS.includes(user.email)) {
+        document.getElementById('login-error').textContent =
+          `Access denied. This account (${user.email}) is not authorized.`;
+        await signOutUser();
+        return;
+      }
+
       showLoader();
       try {
         await initStore();

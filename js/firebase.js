@@ -2,14 +2,13 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 import { getAuth } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
-// ⚠️  Paste YOUR Firebase config here (Project Settings → Your apps → SDK setup)
 const firebaseConfig = {
-  apiKey:            "YOUR_API_KEY",
-  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId:         "YOUR_PROJECT_ID",
-  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId:             "YOUR_APP_ID"
+  apiKey:            "AIzaSyAbJK1C9RcPZfMTNljPSz4raBC6gUeFPf8",
+  authDomain:        "payroll-10a48.firebaseapp.com",
+  projectId:         "payroll-10a48",
+  storageBucket:     "payroll-10a48.firebasestorage.app",
+  messagingSenderId: "265030239911",
+  appId:             "1:265030239911:web:e85f53b1b6a04b97647d82"
 };
 
 const app  = initializeApp(firebaseConfig);

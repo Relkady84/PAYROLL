@@ -1,15 +1,21 @@
 import { auth } from './firebase.js';
 import {
   GoogleAuthProvider,
+  OAuthProvider,
   signInWithPopup,
   signOut,
   onAuthStateChanged
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
-const provider = new GoogleAuthProvider();
+const googleProvider    = new GoogleAuthProvider();
+const microsoftProvider = new OAuthProvider('microsoft.com');
 
 export function signInWithGoogle() {
-  return signInWithPopup(auth, provider);
+  return signInWithPopup(auth, googleProvider);
+}
+
+export function signInWithMicrosoft() {
+  return signInWithPopup(auth, microsoftProvider);
 }
 
 export function signOutUser() {
