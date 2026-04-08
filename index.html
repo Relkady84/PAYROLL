@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payroll System</title>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/responsive.css">
+
+  <!-- CDN Libraries -->
+  <!-- SheetJS (Excel) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- jsPDF -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <!-- jsPDF AutoTable plugin -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+  <!-- PapaParse (CSV) -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">💼</div>
+      <div class="sidebar-logo-text">
+        <span class="sidebar-logo-title">Payroll System</span>
+        <span class="sidebar-logo-sub">Lebanon</span>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Main</span>
+      <a href="#dashboard" class="nav-link active">
+        <span class="nav-link-icon">📊</span>
+        Dashboard
+      </a>
+      <a href="#employees" class="nav-link">
+        <span class="nav-link-icon">👥</span>
+        Employees
+      </a>
+      <a href="#payroll" class="nav-link">
+        <span class="nav-link-icon">💰</span>
+        Payroll Report
+      </a>
+
+      <span class="nav-section-label" style="margin-top:12px;">Configuration</span>
+      <a href="#settings" class="nav-link">
+        <span class="nav-link-icon">⚙️</span>
+        Settings
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      Payroll System &copy; 2026
+    </div>
+  </aside>
+
+  <!-- Mobile sidebar overlay -->
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- ── Main Content ── -->
+  <main class="main-content">
+    <div id="app-content"></div>
+  </main>
+
+</div>
+
+<!-- Mobile menu toggle (rendered into content header by views) -->
+<button class="menu-toggle" id="menu-toggle" aria-label="Open menu">☰</button>
+
+<!-- ── Modal ── -->
+<div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">Dialog</span>
+      <button class="modal-close" id="modal-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer" id="modal-footer">
+      <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="modal-confirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast Container ── -->
+<div id="toast-container" aria-live="polite"></div>
+
+<!-- ── App Entry Point ── -->
+<script type="module" src="js/main.js"></script>
+
+</body>
+</html>
