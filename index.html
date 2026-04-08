@@ -13,20 +13,219 @@
   <link rel="stylesheet" href="css/responsive.css">
 
   <!-- CDN Libraries -->
-  <!-- SheetJS (Excel) -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <!-- jsPDF -->
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <!-- jsPDF AutoTable plugin -->
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-  <!-- PapaParse (CSV) -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <style>
+    /* ── Login Screen ── */
+    #login-screen {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+
+    .login-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 48px 40px;
+      width: 100%;
+      max-width: 380px;
+      text-align: center;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+    }
+
+    .login-logo {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .login-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 4px;
+    }
+
+    .login-sub {
+      font-size: 0.875rem;
+      color: #64748b;
+      margin-bottom: 32px;
+    }
+
+    #google-signin-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      padding: 12px 20px;
+      background: #fff;
+      border: 2px solid #e2e8f0;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #1e293b;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      font-family: inherit;
+    }
+
+    #google-signin-btn:hover {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+    }
+
+    .google-icon {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    #login-error {
+      margin-top: 12px;
+      font-size: 0.8rem;
+      color: #dc2626;
+      min-height: 18px;
+    }
+
+    /* ── App Loader ── */
+    #app-loader {
+      position: fixed;
+      inset: 0;
+      background: rgba(15,23,42,0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9998;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .loader-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255,255,255,0.2);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #loader-msg {
+      color: #fff;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    /* ── User info in sidebar footer ── */
+    .sidebar-user {
+      padding: 12px 16px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .sidebar-user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+      display: none;
+      flex-shrink: 0;
+    }
+
+    .sidebar-user-avatar-placeholder {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #334155;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .sidebar-user-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .sidebar-user-name {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sidebar-user-email {
+      font-size: 0.65rem;
+      color: #64748b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #signout-btn {
+      padding: 4px 8px;
+      font-size: 0.7rem;
+      border-radius: 6px;
+      background: transparent;
+      border: 1px solid #334155;
+      color: #64748b;
+      cursor: pointer;
+      white-space: nowrap;
+      font-family: inherit;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    #signout-btn:hover {
+      background: #334155;
+      color: #e2e8f0;
+    }
+  </style>
 </head>
 <body>
 
-<div class="app-shell">
+<!-- ── Login Screen ── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">💼</div>
+    <div class="login-title">Payroll System</div>
+    <div class="login-sub">Lebanon — Sign in to access payroll data</div>
+    <button id="google-signin-btn">
+      <svg class="google-icon" viewBox="0 0 48 48">
+        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+      </svg>
+      Sign in with Google
+    </button>
+    <div id="login-error"></div>
+  </div>
+</div>
 
-  <!-- ── Sidebar ── -->
+<!-- ── App Loader ── -->
+<div id="app-loader">
+  <div class="loader-spinner"></div>
+  <div id="loader-msg">Loading payroll data…</div>
+</div>
+
+<!-- ── App Shell (hidden until logged in) ── -->
+<div class="app-shell" id="app-shell" style="display:none;">
+
+  <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
       <div class="sidebar-logo-icon">💼</div>
@@ -50,7 +249,6 @@
         <span class="nav-link-icon">💰</span>
         Payroll Report
       </a>
-
       <span class="nav-section-label" style="margin-top:12px;">Configuration</span>
       <a href="#settings" class="nav-link">
         <span class="nav-link-icon">⚙️</span>
@@ -58,25 +256,32 @@
       </a>
     </nav>
 
-    <div class="sidebar-footer">
-      Payroll System &copy; 2026
+    <!-- User info + sign out -->
+    <div class="sidebar-user">
+      <img id="user-avatar" class="sidebar-user-avatar" src="" alt="">
+      <div class="sidebar-user-avatar-placeholder" id="user-avatar-placeholder">👤</div>
+      <div class="sidebar-user-info">
+        <div class="sidebar-user-name" id="user-name">—</div>
+        <div class="sidebar-user-email" id="user-email">—</div>
+      </div>
+      <button id="signout-btn" title="Sign out">Out</button>
     </div>
   </aside>
 
   <!-- Mobile sidebar overlay -->
   <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
-  <!-- ── Main Content ── -->
+  <!-- Main Content -->
   <main class="main-content">
     <div id="app-content"></div>
   </main>
 
 </div>
 
-<!-- Mobile menu toggle (rendered into content header by views) -->
+<!-- Mobile menu toggle -->
 <button class="menu-toggle" id="menu-toggle" aria-label="Open menu">☰</button>
 
-<!-- ── Modal ── -->
+<!-- Modal -->
 <div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true">
   <div class="modal">
     <div class="modal-header">
@@ -91,10 +296,10 @@
   </div>
 </div>
 
-<!-- ── Toast Container ── -->
+<!-- Toast Container -->
 <div id="toast-container" aria-live="polite"></div>
 
-<!-- ── App Entry Point ── -->
+<!-- App Entry Point -->
 <script type="module" src="js/main.js"></script>
 
 </body>

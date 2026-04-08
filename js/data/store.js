@@ -1,78 +1,95 @@
 import { DEFAULT_SETTINGS } from './defaults.js';
+import { db } from '../firebase.js';
+import {
+  collection, doc,
+  getDoc, getDocs,
+  setDoc, updateDoc, deleteDoc,
+  writeBatch
+} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
-const SETTINGS_KEY = 'payroll_settings';
-const EMPLOYEES_KEY = 'payroll_employees';
+// ── In-memory cache (populated once at login) ─────────────
+let _employees = [];
+let _settings  = structuredClone(DEFAULT_SETTINGS);
 
-// ── Settings ──────────────────────────────────────────────
-export function getSettings() {
+// ── Startup: load everything from Firestore ───────────────
+export async function initStore() {
+  await Promise.all([_loadSettings(), _loadEmployees()]);
+}
+
+async function _loadSettings() {
   try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (!raw) return structuredClone(DEFAULT_SETTINGS);
-    const stored = JSON.parse(raw);
-    // Deep merge to ensure all keys exist (handles old saved data missing new keys)
-    return {
-      ...DEFAULT_SETTINGS,
-      ...stored,
-      taxRates: { ...DEFAULT_SETTINGS.taxRates, ...stored.taxRates },
-      nfsRates: { ...DEFAULT_SETTINGS.nfsRates, ...stored.nfsRates }
-    };
-  } catch {
-    return structuredClone(DEFAULT_SETTINGS);
+    const snap = await getDoc(doc(db, 'settings', 'config'));
+    if (snap.exists()) {
+      const stored = snap.data();
+      _settings = {
+        ...DEFAULT_SETTINGS,
+        ...stored,
+        taxRates: { ...DEFAULT_SETTINGS.taxRates, ...stored.taxRates },
+        nfsRates: { ...DEFAULT_SETTINGS.nfsRates, ...stored.nfsRates }
+      };
+    }
+  } catch (e) {
+    console.warn('Could not load settings:', e);
   }
 }
 
+async function _loadEmployees() {
+  try {
+    const snap = await getDocs(collection(db, 'employees'));
+    _employees  = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+  } catch (e) {
+    console.warn('Could not load employees:', e);
+  }
+}
+
+// ── Settings ──────────────────────────────────────────────
+export function getSettings() {
+  return structuredClone(_settings);
+}
+
 export function saveSettings(settings) {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  _settings = { ...settings };
+  setDoc(doc(db, 'settings', 'config'), settings).catch(console.error);
 }
 
 export function resetSettings() {
-  localStorage.removeItem(SETTINGS_KEY);
+  _settings = structuredClone(DEFAULT_SETTINGS);
+  setDoc(doc(db, 'settings', 'config'), DEFAULT_SETTINGS).catch(console.error);
 }
 
 // ── Employees ─────────────────────────────────────────────
 export function getEmployees() {
-  try {
-    const raw = localStorage.getItem(EMPLOYEES_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
-}
-
-export function saveEmployees(employees) {
-  localStorage.setItem(EMPLOYEES_KEY, JSON.stringify(employees));
+  return [..._employees];
 }
 
 export function addEmployee(employee) {
-  const employees = getEmployees();
-  employees.push(employee);
-  saveEmployees(employees);
+  _employees.push(employee);
+  setDoc(doc(db, 'employees', employee.id), employee).catch(console.error);
 }
 
 export function updateEmployee(id, changes) {
-  const employees = getEmployees();
-  const idx = employees.findIndex(e => e.id === id);
+  const idx = _employees.findIndex(e => e.id === id);
   if (idx === -1) return false;
-  employees[idx] = { ...employees[idx], ...changes };
-  saveEmployees(employees);
+  _employees[idx] = { ..._employees[idx], ...changes };
+  setDoc(doc(db, 'employees', id), _employees[idx]).catch(console.error);
   return true;
 }
 
 export function deleteEmployee(id) {
-  saveEmployees(getEmployees().filter(e => e.id !== id));
+  _employees = _employees.filter(e => e.id !== id);
+  deleteDoc(doc(db, 'employees', id)).catch(console.error);
 }
 
 export function mergeEmployees(incoming) {
-  const existing = getEmployees();
-  const map = new Map(existing.map(e => [e.id, e]));
+  const map   = new Map(_employees.map(e => [e.id, e]));
+  const batch = writeBatch(db);
+
   for (const emp of incoming) {
-    if (emp.id) {
-      map.set(emp.id, { ...map.get(emp.id), ...emp });
-    } else {
-      // No id — treat as new
-      map.set(emp._tempKey || Math.random().toString(36).slice(2), emp);
-    }
+    const merged = { ...(map.get(emp.id) ?? {}), ...emp };
+    map.set(emp.id, merged);
+    batch.set(doc(db, 'employees', emp.id), merged);
   }
-  saveEmployees([...map.values()]);
+
+  _employees = [...map.values()];
+  batch.commit().catch(console.error);
 }
