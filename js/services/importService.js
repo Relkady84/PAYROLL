@@ -41,19 +41,22 @@ function mapRow(rawRow) {
   return out;
 }
 
-function processRows(rawRows, onSuccess, onError) {
+// forceType: if set ('Teacher' or 'Admin'), overrides the type column in every row.
+// This lets users import a CSV that has no "Type" column at all.
+function processRows(rawRows, onSuccess, onError, forceType = null) {
   if (!rawRows.length) {
     onError('The file appears to be empty.');
     return;
   }
 
-  const errors   = [];
-  const valid    = [];
+  const errors = [];
+  const valid  = [];
 
   rawRows.forEach((raw, i) => {
     if (!raw || Object.values(raw).every(v => !v)) return; // skip blank rows
     const mapped = mapRow(raw);
-    const errs   = validateEmployee(mapped);
+    if (forceType) mapped.employeeType = forceType;
+    const errs = validateEmployee(mapped);
     if (errs.length) {
       errors.push(`Row ${i + 2}: ${errs.join(' ')}`);
     } else {
@@ -77,20 +80,20 @@ function processRows(rawRows, onSuccess, onError) {
   }
 }
 
-export function importCSV(file, onSuccess, onError) {
+export function importCSV(file, onSuccess, onError, forceType = null) {
   if (!window.Papa) {
     onError('CSV library not loaded. Check your internet connection.');
     return;
   }
   window.Papa.parse(file, {
-    header:          true,
-    skipEmptyLines:  true,
-    complete: result => processRows(result.data, onSuccess, onError),
-    error:    err    => onError('CSV parse error: ' + err.message)
+    header:         true,
+    skipEmptyLines: true,
+    complete: result => processRows(result.data, onSuccess, onError, forceType),
+    error:    err   => onError('CSV parse error: ' + err.message)
   });
 }
 
-export function importExcel(file, onSuccess, onError) {
+export function importExcel(file, onSuccess, onError, forceType = null) {
   if (!window.XLSX) {
     onError('Excel library not loaded. Check your internet connection.');
     return;
@@ -103,7 +106,7 @@ export function importExcel(file, onSuccess, onError) {
       const wb    = window.XLSX.read(data, { type: 'array' });
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const rows  = window.XLSX.utils.sheet_to_json(sheet, { defval: '' });
-      processRows(rows, onSuccess, onError);
+      processRows(rows, onSuccess, onError, forceType);
     } catch (err) {
       onError('Excel parse error: ' + err.message);
     }
