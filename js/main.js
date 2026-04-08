@@ -103,10 +103,12 @@ document.addEventListener('DOMContentLoaded', () => {
   let appInitialized = false;
   onAuthChanged(async user => {
     if (user) {
-      // Check if email is allowed
-      if (!ALLOWED_EMAILS.includes(user.email)) {
+      // Check if email is allowed (case-insensitive)
+      const userEmail = (user.email || '').toLowerCase().trim();
+      const allowed   = ALLOWED_EMAILS.map(e => e.toLowerCase().trim());
+      if (!allowed.includes(userEmail)) {
         document.getElementById('login-error').textContent =
-          `Access denied. This account (${user.email}) is not authorized.`;
+          `Access denied: ${user.email} is not authorized.`;
         await signOutUser();
         return;
       }
