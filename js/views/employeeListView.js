@@ -3,6 +3,7 @@ import { getSettings } from '../data/store.js';
 import { openAddModal, openEditModal } from './employeeFormView.js';
 import { openModal, closeModal } from './components/modal.js';
 import { showToast } from './components/toast.js';
+import { importCSV } from '../services/importService.js';
 
 let _filterType   = 'all';
 let _searchQuery  = '';
@@ -40,6 +41,17 @@ export function render(selector) {
               <option value="Admin">Administrators</option>
             </select>
           </div>
+          <div class="toolbar-right">
+            <span style="font-size:var(--font-size-xs);color:var(--color-text-muted);font-weight:500;">IMPORT CSV:</span>
+            <label class="btn btn-secondary btn-sm badge-teacher" style="cursor:pointer;" title="Import Teachers from CSV">
+              📂 Teachers
+              <input type="file" class="file-input-hidden" id="import-teacher-csv" accept=".csv">
+            </label>
+            <label class="btn btn-secondary btn-sm badge-admin" style="cursor:pointer;" title="Import Administrators from CSV">
+              📂 Administrators
+              <input type="file" class="file-input-hidden" id="import-admin-csv" accept=".csv">
+            </label>
+          </div>
         </div>
         <div class="table-wrapper">
           <table class="data-table" id="emp-table">
@@ -66,6 +78,30 @@ export function render(selector) {
   // Add employee
   document.getElementById('add-employee-btn').addEventListener('click', () => {
     openAddModal(() => renderRows(container));
+  });
+
+  // Import Teachers CSV
+  document.getElementById('import-teacher-csv').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    importCSV(file,
+      count => { showToast(`${count} teacher(s) imported.`, 'success'); renderRows(container); },
+      err   => showToast(err, 'error'),
+      'Teacher'
+    );
+    e.target.value = '';
+  });
+
+  // Import Administrators CSV
+  document.getElementById('import-admin-csv').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    importCSV(file,
+      count => { showToast(`${count} administrator(s) imported.`, 'success'); renderRows(container); },
+      err   => showToast(err, 'error'),
+      'Admin'
+    );
+    e.target.value = '';
   });
 
   // Search
