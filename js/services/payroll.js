@@ -21,14 +21,11 @@ export function getFuelPriceInLBP(settings) {
  *   minimum       = minimumTransportUSD × exchangeRate
  *   result        = max(monthly, minimum)
  */
-export function calculateTransport(employee, settings, daysWorked) {
+/** Transport cost per day (round trip) — no minimum applied here. */
+export function calculateTransport(employee, settings) {
   const fuelPriceLBP  = getFuelPriceInLBP(settings);
   const litersNeeded  = employee.kmDistance / 7.5;
-  const dailyCost     = litersNeeded * fuelPriceLBP;
-  const days          = daysWorked ?? settings.workingDaysPerMonth;
-  const monthly       = dailyCost * days * 2;
-  const minimumLBP    = settings.minimumTransportUSD * settings.exchangeRate;
-  return Math.max(monthly, minimumLBP);
+  return litersNeeded * fuelPriceLBP * 2;
 }
 
 /** Tax deduction — rate differs by employee type. */
@@ -45,26 +42,27 @@ export function calculateNFS(employee, settings) {
 
 /** Full payroll breakdown for one employee. */
 export function calculateNetSalary(employee, settings, daysWorked) {
-  const days             = daysWorked ?? settings.workingDaysPerMonth;
-  const salaryBalanceLBP = employee.baseSalaryLBP * (days / settings.workingDaysPerMonth);
-  const transportLBP     = calculateTransport(employee, settings, daysWorked);
-  const taxLBP           = calculateTax(employee, settings);
-  const nfsLBP           = calculateNFS(employee, settings);
-  const netLBP           = salaryBalanceLBP + transportLBP - taxLBP - nfsLBP;
+  const days               = daysWorked ?? settings.workingDaysPerMonth;
+  const transportPerDayLBP = calculateTransport(employee, settings);
+  const minimumLBP         = settings.minimumTransportUSD * settings.exchangeRate;
+  const totalTransportLBP  = Math.max(transportPerDayLBP * days, minimumLBP);
+  const taxLBP             = calculateTax(employee, settings);
+  const nfsLBP             = calculateNFS(employee, settings);
+  const netLBP             = employee.baseSalaryLBP + totalTransportLBP - taxLBP - nfsLBP;
 
   return {
-    baseSalaryLBP:    employee.baseSalaryLBP,
-    baseSalaryUSD:    employee.baseSalaryLBP / settings.exchangeRate,
-    salaryBalanceLBP,
-    salaryBalanceUSD: salaryBalanceLBP / settings.exchangeRate,
-    transportLBP,
-    transportUSD:     transportLBP / settings.exchangeRate,
+    baseSalaryLBP:      employee.baseSalaryLBP,
+    baseSalaryUSD:      employee.baseSalaryLBP / settings.exchangeRate,
+    transportPerDayLBP,
+    transportPerDayUSD: transportPerDayLBP / settings.exchangeRate,
+    totalTransportLBP,
+    totalTransportUSD:  totalTransportLBP / settings.exchangeRate,
     taxLBP,
-    taxUSD:           taxLBP / settings.exchangeRate,
+    taxUSD:             taxLBP / settings.exchangeRate,
     nfsLBP,
-    nfsUSD:           nfsLBP / settings.exchangeRate,
-    netSalaryLBP:     netLBP,
-    netSalaryUSD:     netLBP / settings.exchangeRate
+    nfsUSD:             nfsLBP / settings.exchangeRate,
+    netSalaryLBP:       netLBP,
+    netSalaryUSD:       netLBP / settings.exchangeRate
   };
 }
 
@@ -83,22 +81,22 @@ export function calculatePayroll(employees, settings, daysWorkedMap = {}) {
 /** Totals row across all calculated employees. */
 export function calculateTotals(rows) {
   return rows.reduce((acc, row) => ({
-    baseSalaryLBP:    acc.baseSalaryLBP    + row.baseSalaryLBP,
-    baseSalaryUSD:    acc.baseSalaryUSD    + row.baseSalaryUSD,
-    salaryBalanceLBP: acc.salaryBalanceLBP + row.salaryBalanceLBP,
-    salaryBalanceUSD: acc.salaryBalanceUSD + row.salaryBalanceUSD,
-    transportLBP:     acc.transportLBP     + row.transportLBP,
-    transportUSD:     acc.transportUSD     + row.transportUSD,
-    taxLBP:           acc.taxLBP           + row.taxLBP,
-    taxUSD:           acc.taxUSD           + row.taxUSD,
-    nfsLBP:           acc.nfsLBP           + row.nfsLBP,
-    nfsUSD:           acc.nfsUSD           + row.nfsUSD,
-    netSalaryLBP:     acc.netSalaryLBP     + row.netSalaryLBP,
-    netSalaryUSD:     acc.netSalaryUSD     + row.netSalaryUSD
+    baseSalaryLBP:      acc.baseSalaryLBP      + row.baseSalaryLBP,
+    baseSalaryUSD:      acc.baseSalaryUSD      + row.baseSalaryUSD,
+    transportPerDayLBP: acc.transportPerDayLBP + row.transportPerDayLBP,
+    transportPerDayUSD: acc.transportPerDayUSD + row.transportPerDayUSD,
+    totalTransportLBP:  acc.totalTransportLBP  + row.totalTransportLBP,
+    totalTransportUSD:  acc.totalTransportUSD  + row.totalTransportUSD,
+    taxLBP:             acc.taxLBP             + row.taxLBP,
+    taxUSD:             acc.taxUSD             + row.taxUSD,
+    nfsLBP:             acc.nfsLBP             + row.nfsLBP,
+    nfsUSD:             acc.nfsUSD             + row.nfsUSD,
+    netSalaryLBP:       acc.netSalaryLBP       + row.netSalaryLBP,
+    netSalaryUSD:       acc.netSalaryUSD       + row.netSalaryUSD
   }), {
     baseSalaryLBP: 0, baseSalaryUSD: 0,
-    salaryBalanceLBP: 0, salaryBalanceUSD: 0,
-    transportLBP:  0, transportUSD:  0,
+    transportPerDayLBP: 0, transportPerDayUSD: 0,
+    totalTransportLBP:  0, totalTransportUSD:  0,
     taxLBP:        0, taxUSD:        0,
     nfsLBP:        0, nfsUSD:        0,
     netSalaryLBP:  0, netSalaryUSD:  0

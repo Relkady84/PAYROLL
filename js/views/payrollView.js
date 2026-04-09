@@ -60,10 +60,10 @@ export function render(selector) {
                 <th>Days Worked</th>
                 <th class="sortable" data-key="baseSalaryLBP">Base Salary (LBP) <span class="sort-icon">↕</span></th>
                 <th>Base Salary (USD)</th>
-                <th>Salary Balance (LBP)</th>
-                <th>Salary Balance (USD)</th>
-                <th>Transport (LBP)</th>
-                <th>Transport (USD)</th>
+                <th>Transport/Day (LBP)</th>
+                <th>Transport/Day (USD)</th>
+                <th>Total Transport (LBP)</th>
+                <th>Total Transport (USD)</th>
                 <th>Tax (LBP)</th>
                 <th>NFS (LBP)</th>
                 <th class="sortable" data-key="netSalaryLBP">Net Salary (LBP) <span class="sort-icon">↕</span></th>
@@ -223,10 +223,10 @@ function renderRows(container) {
       <td><input type="number" class="days-input" min="0" max="31" data-emp-id="${esc(r.id)}" value="${r.daysWorked}" style="width:56px;text-align:center;"></td>
       <td class="num-lbp">${fmt(r.baseSalaryLBP)} ل.ل</td>
       <td>${fmtUSD(r.baseSalaryUSD)}</td>
-      <td class="num-lbp">${fmt(r.salaryBalanceLBP)} ل.ل</td>
-      <td>${fmtUSD(r.salaryBalanceUSD)}</td>
-      <td class="num-lbp">${fmt(r.transportLBP)} ل.ل</td>
-      <td>${fmtUSD(r.transportUSD)}</td>
+      <td class="num-lbp">${fmt(r.transportPerDayLBP)} ل.ل</td>
+      <td>${fmtUSD(r.transportPerDayUSD)}</td>
+      <td class="num-lbp">${fmt(r.totalTransportLBP)} ل.ل</td>
+      <td>${fmtUSD(r.totalTransportUSD)}</td>
       <td style="color:var(--color-danger)">- ${fmt(r.taxLBP)} ل.ل</td>
       <td style="color:var(--color-danger)">- ${fmt(r.nfsLBP)} ل.ل</td>
       <td><strong>${fmt(r.netSalaryLBP)} ل.ل</strong></td>
@@ -241,10 +241,10 @@ function renderRows(container) {
       <td colspan="3"><strong>TOTALS (${rows.length})</strong></td>
       <td>${fmt(totals.baseSalaryLBP)} ل.ل</td>
       <td>${fmtUSD(totals.baseSalaryUSD)}</td>
-      <td>${fmt(totals.salaryBalanceLBP)} ل.ل</td>
-      <td>${fmtUSD(totals.salaryBalanceUSD)}</td>
-      <td>${fmt(totals.transportLBP)} ل.ل</td>
-      <td>${fmtUSD(totals.transportUSD)}</td>
+      <td>${fmt(totals.transportPerDayLBP)} ل.ل</td>
+      <td>${fmtUSD(totals.transportPerDayUSD)}</td>
+      <td>${fmt(totals.totalTransportLBP)} ل.ل</td>
+      <td>${fmtUSD(totals.totalTransportUSD)}</td>
       <td style="color:var(--color-danger)">- ${fmt(totals.taxLBP)} ل.ل</td>
       <td style="color:var(--color-danger)">- ${fmt(totals.nfsLBP)} ل.ل</td>
       <td>${fmt(totals.netSalaryLBP)} ل.ل</td>
