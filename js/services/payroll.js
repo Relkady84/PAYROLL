@@ -21,12 +21,18 @@ export function getFuelPriceInLBP(settings) {
  *   minimum       = minimumTransportUSD × exchangeRate
  *   result        = max(monthly, minimum)
  */
-/** Transport cost per day (round trip) — minimum per day applied. */
+/** Transport cost per day (round trip).
+ *  ≤ 20 km → fixed at minimum (e.g. $5/day).
+ *  > 20 km → distance formula, with minimum as floor.
+ */
 export function calculateTransport(employee, settings) {
-  const fuelPriceLBP  = getFuelPriceInLBP(settings);
-  const litersNeeded  = employee.kmDistance / 7.5;
-  const dailyCost     = litersNeeded * fuelPriceLBP * 2;
-  const minimumLBP    = settings.minimumTransportUSD * settings.exchangeRate;
+  const minimumLBP = settings.minimumTransportUSD * settings.exchangeRate;
+  if (employee.kmDistance <= 20) {
+    return minimumLBP;
+  }
+  const fuelPriceLBP = getFuelPriceInLBP(settings);
+  const litersNeeded = employee.kmDistance / 7.5;
+  const dailyCost    = litersNeeded * fuelPriceLBP * 2;
   return Math.max(dailyCost, minimumLBP);
 }
 
