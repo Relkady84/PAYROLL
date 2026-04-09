@@ -215,6 +215,7 @@ function renderRows(container) {
     <tr>
       <td>
         <strong>${esc(e.firstName)} ${esc(e.lastName)}</strong>
+        ${e.email ? `<br><span style="font-size:var(--font-size-xs);color:var(--color-text-muted);">${esc(e.email)}</span>` : ''}
       </td>
       <td>
         <span class="badge badge-${e.employeeType === 'Teacher' ? 'teacher' : 'admin'}">

@@ -13,8 +13,8 @@ function handleRoute() {
   const handler = routes.get(hash) ?? routes.get('#dashboard');
   if (handler) handler();
 
-  // Sync active state on sidebar nav links
-  document.querySelectorAll('.nav-link').forEach(link => {
+  // Sync active state on sidebar nav links and mobile bottom nav
+  document.querySelectorAll('.nav-link, .mobile-nav-item').forEach(link => {
     link.classList.toggle('active', link.getAttribute('href') === hash);
   });
 }

@@ -30,7 +30,7 @@
   }
 
   .content-header {
-    padding: 0 16px;
+    padding: 0 16px 0 58px; /* left offset clears the fixed hamburger button */
   }
 
   .page-body {
@@ -118,5 +118,55 @@
 @media (max-width: 768px) {
   .sidebar-overlay.active {
     display: block;
+  }
+}
+
+/* ── Mobile Bottom Navigation Bar ── */
+.mobile-bottom-nav {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: var(--color-sidebar-bg);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    z-index: 150;
+  }
+
+  .mobile-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    color: var(--color-sidebar-text);
+    text-decoration: none;
+    font-size: 10px;
+    font-weight: 500;
+    transition: color 0.15s;
+  }
+
+  .mobile-nav-item span:first-child {
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  .mobile-nav-item.active {
+    color: var(--color-primary);
+  }
+
+  .mobile-nav-item:hover {
+    color: #fff;
+  }
+
+  .page-body {
+    padding-bottom: 76px; /* prevent content hiding behind bottom nav */
   }
 }

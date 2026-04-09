@@ -28,7 +28,10 @@ const COLUMN_MAP = {
   'distance':         'kmDistance',
   'kmdistance':       'kmDistance',
   'km':               'kmDistance',
-  'id':               'id'
+  'id':               'id',
+  'email':            'email',
+  'e-mail':           'email',
+  'email address':    'email'
 };
 
 function mapRow(rawRow) {

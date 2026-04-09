@@ -9,7 +9,8 @@ export function createEmployee(data) {
     homeLocation:  String(data.homeLocation || '').trim(),
     employeeType:  EMPLOYEE_TYPES.includes(data.employeeType) ? data.employeeType : 'Teacher',
     baseSalaryLBP: parseFloat(data.baseSalaryLBP) || 0,
-    kmDistance:    parseFloat(data.kmDistance)    || 0
+    kmDistance:    parseFloat(data.kmDistance)    || 0,
+    email:         String(data.email        || '').trim().toLowerCase()
   };
 }
 
@@ -32,6 +33,11 @@ export function validateEmployee(data) {
 
   const km = parseFloat(data.kmDistance);
   if (isNaN(km) || km < 0)                      errors.push('Distance must be a non-negative number.');
+
+  const email = String(data.email || '').trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errors.push('Email address is not valid.');
+  }
 
   return errors;
 }

@@ -36,6 +36,11 @@ function buildFormHTML(employee = null) {
           <input class="form-control" id="ef-homeLocation" name="homeLocation"
             type="text" placeholder="e.g. Jounieh, Beirut" value="${esc(e.homeLocation)}">
         </div>
+        <div class="form-group form-full">
+          <label class="form-label" for="ef-email">Email Address</label>
+          <input class="form-control" id="ef-email" name="email"
+            type="email" placeholder="e.g. ahmad@example.com" value="${esc(e.email)}">
+        </div>
         <div class="form-group">
           <label class="form-label" for="ef-baseSalaryLBP">Base Salary (LBP) <span class="required">*</span></label>
           <div class="input-group">
@@ -92,7 +97,8 @@ function handleSubmit(existingId, onSaved) {
     homeLocation:  form.querySelector('#ef-homeLocation').value,
     employeeType:  form.querySelector('#ef-employeeType').value,
     baseSalaryLBP: form.querySelector('#ef-baseSalaryLBP').value,
-    kmDistance:    form.querySelector('#ef-kmDistance').value
+    kmDistance:    form.querySelector('#ef-kmDistance').value,
+    email:         form.querySelector('#ef-email').value
   };
 
   const errors = validateEmployee(data);
