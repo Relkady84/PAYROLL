@@ -45,14 +45,18 @@ export function calculateNFS(employee, settings) {
 
 /** Full payroll breakdown for one employee. */
 export function calculateNetSalary(employee, settings, daysWorked) {
+  const days          = daysWorked ?? settings.workingDaysPerMonth;
+  const actualBaseLBP = employee.baseSalaryLBP * (days / settings.workingDaysPerMonth);
   const transportLBP  = calculateTransport(employee, settings, daysWorked);
-  const taxLBP        = calculateTax(employee, settings);
-  const nfsLBP        = calculateNFS(employee, settings);
-  const netLBP        = employee.baseSalaryLBP + transportLBP - taxLBP - nfsLBP;
+  const taxRate       = settings.taxRates[employee.employeeType] ?? 0;
+  const nfsRate       = settings.nfsRates[employee.employeeType] ?? 0;
+  const taxLBP        = actualBaseLBP * taxRate;
+  const nfsLBP        = actualBaseLBP * nfsRate;
+  const netLBP        = actualBaseLBP + transportLBP - taxLBP - nfsLBP;
 
   return {
-    baseSalaryLBP:  employee.baseSalaryLBP,
-    baseSalaryUSD:  employee.baseSalaryLBP / settings.exchangeRate,
+    baseSalaryLBP:  actualBaseLBP,
+    baseSalaryUSD:  actualBaseLBP / settings.exchangeRate,
     transportLBP,
     transportUSD:   transportLBP / settings.exchangeRate,
     taxLBP,
