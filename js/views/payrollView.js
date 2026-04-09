@@ -57,7 +57,7 @@ export function render(selector) {
               <tr>
                 <th class="sortable" data-key="firstName">Name <span class="sort-icon">↕</span></th>
                 <th>Type</th>
-                <th>Days Worked</th>
+                <th>Transport Days</th>
                 <th class="sortable" data-key="baseSalaryLBP">Base Salary (LBP) <span class="sort-icon">↕</span></th>
                 <th>Base Salary (USD)</th>
                 <th>Transport/Day (LBP)</th>
@@ -80,14 +80,14 @@ export function render(selector) {
 
   renderRows(container);
 
-  document.getElementById('payroll-table').addEventListener('input', e => {
+  document.getElementById('payroll-table').addEventListener('change', e => {
     const input = e.target.closest('.days-input');
     if (!input) return;
-    const val = parseInt(input.value, 10);
-    if (!isNaN(val) && val >= 0) {
-      _daysWorked[input.dataset.empId] = val;
-      renderRows(container);
-    }
+    let val = parseInt(input.value, 10);
+    if (isNaN(val) || val < 0) val = 0;
+    if (val > 31) val = 31;
+    _daysWorked[input.dataset.empId] = val;
+    renderRows(container);
   });
 
   // Filter
@@ -220,7 +220,7 @@ function renderRows(container) {
     <tr>
       <td><strong>${esc(r.firstName)} ${esc(r.lastName)}</strong></td>
       <td><span class="badge badge-${r.employeeType === 'Teacher' ? 'teacher' : 'admin'}">${r.employeeType === 'Admin' ? 'Admin' : 'Teacher'}</span></td>
-      <td><input type="number" class="days-input" min="0" max="31" data-emp-id="${esc(r.id)}" value="${r.daysWorked}" style="width:56px;text-align:center;"></td>
+      <td><input type="number" class="days-input" min="0" max="31" data-emp-id="${esc(r.id)}" value="${r.daysWorked}" style="width:52px;text-align:center;" oninput="if(this.value.length>2)this.value=this.value.slice(0,2)"></td>
       <td class="num-lbp">${fmt(r.baseSalaryLBP)} ل.ل</td>
       <td>${fmtUSD(r.baseSalaryUSD)}</td>
       <td class="num-lbp">${fmt(r.transportPerDayLBP)} ل.ل</td>

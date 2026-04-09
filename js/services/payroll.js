@@ -21,11 +21,13 @@ export function getFuelPriceInLBP(settings) {
  *   minimum       = minimumTransportUSD × exchangeRate
  *   result        = max(monthly, minimum)
  */
-/** Transport cost per day (round trip) — no minimum applied here. */
+/** Transport cost per day (round trip) — minimum per day applied. */
 export function calculateTransport(employee, settings) {
   const fuelPriceLBP  = getFuelPriceInLBP(settings);
   const litersNeeded  = employee.kmDistance / 7.5;
-  return litersNeeded * fuelPriceLBP * 2;
+  const dailyCost     = litersNeeded * fuelPriceLBP * 2;
+  const minimumLBP    = settings.minimumTransportUSD * settings.exchangeRate;
+  return Math.max(dailyCost, minimumLBP);
 }
 
 /** Tax deduction — rate differs by employee type. */
@@ -44,8 +46,7 @@ export function calculateNFS(employee, settings) {
 export function calculateNetSalary(employee, settings, daysWorked) {
   const days               = daysWorked ?? settings.workingDaysPerMonth;
   const transportPerDayLBP = calculateTransport(employee, settings);
-  const minimumLBP         = settings.minimumTransportUSD * settings.exchangeRate;
-  const totalTransportLBP  = Math.max(transportPerDayLBP * days, minimumLBP);
+  const totalTransportLBP  = transportPerDayLBP * days;
   const taxLBP             = calculateTax(employee, settings);
   const nfsLBP             = calculateNFS(employee, settings);
   const netLBP             = employee.baseSalaryLBP + totalTransportLBP - taxLBP - nfsLBP;
