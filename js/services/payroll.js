@@ -45,26 +45,26 @@ export function calculateNFS(employee, settings) {
 
 /** Full payroll breakdown for one employee. */
 export function calculateNetSalary(employee, settings, daysWorked) {
-  const days          = daysWorked ?? settings.workingDaysPerMonth;
-  const actualBaseLBP = employee.baseSalaryLBP * (days / settings.workingDaysPerMonth);
-  const transportLBP  = calculateTransport(employee, settings, daysWorked);
-  const taxRate       = settings.taxRates[employee.employeeType] ?? 0;
-  const nfsRate       = settings.nfsRates[employee.employeeType] ?? 0;
-  const taxLBP        = actualBaseLBP * taxRate;
-  const nfsLBP        = actualBaseLBP * nfsRate;
-  const netLBP        = actualBaseLBP + transportLBP - taxLBP - nfsLBP;
+  const days             = daysWorked ?? settings.workingDaysPerMonth;
+  const salaryBalanceLBP = employee.baseSalaryLBP * (days / settings.workingDaysPerMonth);
+  const transportLBP     = calculateTransport(employee, settings, daysWorked);
+  const taxLBP           = calculateTax(employee, settings);
+  const nfsLBP           = calculateNFS(employee, settings);
+  const netLBP           = salaryBalanceLBP + transportLBP - taxLBP - nfsLBP;
 
   return {
-    baseSalaryLBP:  actualBaseLBP,
-    baseSalaryUSD:  actualBaseLBP / settings.exchangeRate,
+    baseSalaryLBP:    employee.baseSalaryLBP,
+    baseSalaryUSD:    employee.baseSalaryLBP / settings.exchangeRate,
+    salaryBalanceLBP,
+    salaryBalanceUSD: salaryBalanceLBP / settings.exchangeRate,
     transportLBP,
-    transportUSD:   transportLBP / settings.exchangeRate,
+    transportUSD:     transportLBP / settings.exchangeRate,
     taxLBP,
-    taxUSD:         taxLBP / settings.exchangeRate,
+    taxUSD:           taxLBP / settings.exchangeRate,
     nfsLBP,
-    nfsUSD:         nfsLBP / settings.exchangeRate,
-    netSalaryLBP:   netLBP,
-    netSalaryUSD:   netLBP / settings.exchangeRate
+    nfsUSD:           nfsLBP / settings.exchangeRate,
+    netSalaryLBP:     netLBP,
+    netSalaryUSD:     netLBP / settings.exchangeRate
   };
 }
 
@@ -83,18 +83,21 @@ export function calculatePayroll(employees, settings, daysWorkedMap = {}) {
 /** Totals row across all calculated employees. */
 export function calculateTotals(rows) {
   return rows.reduce((acc, row) => ({
-    baseSalaryLBP:  acc.baseSalaryLBP  + row.baseSalaryLBP,
-    baseSalaryUSD:  acc.baseSalaryUSD  + row.baseSalaryUSD,
-    transportLBP:   acc.transportLBP   + row.transportLBP,
-    transportUSD:   acc.transportUSD   + row.transportUSD,
-    taxLBP:         acc.taxLBP         + row.taxLBP,
-    taxUSD:         acc.taxUSD         + row.taxUSD,
-    nfsLBP:         acc.nfsLBP         + row.nfsLBP,
-    nfsUSD:         acc.nfsUSD         + row.nfsUSD,
-    netSalaryLBP:   acc.netSalaryLBP   + row.netSalaryLBP,
-    netSalaryUSD:   acc.netSalaryUSD   + row.netSalaryUSD
+    baseSalaryLBP:    acc.baseSalaryLBP    + row.baseSalaryLBP,
+    baseSalaryUSD:    acc.baseSalaryUSD    + row.baseSalaryUSD,
+    salaryBalanceLBP: acc.salaryBalanceLBP + row.salaryBalanceLBP,
+    salaryBalanceUSD: acc.salaryBalanceUSD + row.salaryBalanceUSD,
+    transportLBP:     acc.transportLBP     + row.transportLBP,
+    transportUSD:     acc.transportUSD     + row.transportUSD,
+    taxLBP:           acc.taxLBP           + row.taxLBP,
+    taxUSD:           acc.taxUSD           + row.taxUSD,
+    nfsLBP:           acc.nfsLBP           + row.nfsLBP,
+    nfsUSD:           acc.nfsUSD           + row.nfsUSD,
+    netSalaryLBP:     acc.netSalaryLBP     + row.netSalaryLBP,
+    netSalaryUSD:     acc.netSalaryUSD     + row.netSalaryUSD
   }), {
     baseSalaryLBP: 0, baseSalaryUSD: 0,
+    salaryBalanceLBP: 0, salaryBalanceUSD: 0,
     transportLBP:  0, transportUSD:  0,
     taxLBP:        0, taxUSD:        0,
     nfsLBP:        0, nfsUSD:        0,

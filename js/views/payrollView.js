@@ -60,6 +60,8 @@ export function render(selector) {
                 <th>Days Worked</th>
                 <th class="sortable" data-key="baseSalaryLBP">Base Salary (LBP) <span class="sort-icon">↕</span></th>
                 <th>Base Salary (USD)</th>
+                <th>Salary Balance (LBP)</th>
+                <th>Salary Balance (USD)</th>
                 <th>Transport (LBP)</th>
                 <th>Transport (USD)</th>
                 <th>Tax (LBP)</th>
@@ -201,7 +203,7 @@ function renderRows(container) {
 
   if (!rows.length) {
     tbody.innerHTML = `
-      <tr><td colspan="11">
+      <tr><td colspan="13">
         <div class="table-empty">
           <div class="table-empty-icon">📋</div>
           <p>${_filterType !== 'all' ? 'No employees match this filter.' : 'No employees found. Add employees first.'}</p>
@@ -221,6 +223,8 @@ function renderRows(container) {
       <td><input type="number" class="days-input" min="0" max="31" data-emp-id="${esc(r.id)}" value="${r.daysWorked}" style="width:56px;text-align:center;"></td>
       <td class="num-lbp">${fmt(r.baseSalaryLBP)} ل.ل</td>
       <td>${fmtUSD(r.baseSalaryUSD)}</td>
+      <td class="num-lbp">${fmt(r.salaryBalanceLBP)} ل.ل</td>
+      <td>${fmtUSD(r.salaryBalanceUSD)}</td>
       <td class="num-lbp">${fmt(r.transportLBP)} ل.ل</td>
       <td>${fmtUSD(r.transportUSD)}</td>
       <td style="color:var(--color-danger)">- ${fmt(r.taxLBP)} ل.ل</td>
@@ -237,6 +241,8 @@ function renderRows(container) {
       <td colspan="3"><strong>TOTALS (${rows.length})</strong></td>
       <td>${fmt(totals.baseSalaryLBP)} ل.ل</td>
       <td>${fmtUSD(totals.baseSalaryUSD)}</td>
+      <td>${fmt(totals.salaryBalanceLBP)} ل.ل</td>
+      <td>${fmtUSD(totals.salaryBalanceUSD)}</td>
       <td>${fmt(totals.transportLBP)} ل.ل</td>
       <td>${fmtUSD(totals.transportUSD)}</td>
       <td style="color:var(--color-danger)">- ${fmt(totals.taxLBP)} ل.ل</td>
