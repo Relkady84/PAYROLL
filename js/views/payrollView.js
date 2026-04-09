@@ -7,12 +7,14 @@ import { showToast } from './components/toast.js';
 let _filterType  = 'all';
 let _sortKey     = 'firstName';
 let _sortDir     = 'asc';
+let _daysWorked  = {};
 
 export function render(selector) {
   const container = document.querySelector(selector);
   _filterType = 'all';
   _sortKey    = 'firstName';
   _sortDir    = 'asc';
+  _daysWorked = {};
 
   container.innerHTML = `
     <div class="content-header">
@@ -55,6 +57,7 @@ export function render(selector) {
               <tr>
                 <th class="sortable" data-key="firstName">Name <span class="sort-icon">↕</span></th>
                 <th>Type</th>
+                <th>Days Worked</th>
                 <th class="sortable" data-key="baseSalaryLBP">Base Salary (LBP) <span class="sort-icon">↕</span></th>
                 <th>Base Salary (USD)</th>
                 <th>Transport (LBP)</th>
@@ -74,6 +77,16 @@ export function render(selector) {
   `;
 
   renderRows(container);
+
+  document.getElementById('payroll-table').addEventListener('input', e => {
+    const input = e.target.closest('.days-input');
+    if (!input) return;
+    const val = parseInt(input.value, 10);
+    if (!isNaN(val) && val >= 0) {
+      _daysWorked[input.dataset.empId] = val;
+      renderRows(container);
+    }
+  });
 
   // Filter
   document.getElementById('payroll-type-filter').addEventListener('change', e => {
@@ -143,7 +156,7 @@ function getFilteredRows() {
   const settings  = getSettings();
   let employees   = getEmployees();
   if (_filterType !== 'all') employees = employees.filter(e => e.employeeType === _filterType);
-  return calculatePayroll(employees, settings);
+  return calculatePayroll(employees, settings, _daysWorked);
 }
 
 function renderRows(container) {
@@ -154,7 +167,7 @@ function renderRows(container) {
     employees = employees.filter(e => e.employeeType === _filterType);
   }
 
-  let rows = calculatePayroll(employees, settings);
+  let rows = calculatePayroll(employees, settings, _daysWorked);
 
   // Sort
   rows = [...rows].sort((a, b) => {
@@ -188,7 +201,7 @@ function renderRows(container) {
 
   if (!rows.length) {
     tbody.innerHTML = `
-      <tr><td colspan="10">
+      <tr><td colspan="11">
         <div class="table-empty">
           <div class="table-empty-icon">📋</div>
           <p>${_filterType !== 'all' ? 'No employees match this filter.' : 'No employees found. Add employees first.'}</p>
@@ -205,6 +218,7 @@ function renderRows(container) {
     <tr>
       <td><strong>${esc(r.firstName)} ${esc(r.lastName)}</strong></td>
       <td><span class="badge badge-${r.employeeType === 'Teacher' ? 'teacher' : 'admin'}">${r.employeeType === 'Admin' ? 'Admin' : 'Teacher'}</span></td>
+      <td><input type="number" class="days-input" min="0" max="31" data-emp-id="${esc(r.id)}" value="${r.daysWorked}" style="width:56px;text-align:center;"></td>
       <td class="num-lbp">${fmt(r.baseSalaryLBP)} ل.ل</td>
       <td>${fmtUSD(r.baseSalaryUSD)}</td>
       <td class="num-lbp">${fmt(r.transportLBP)} ل.ل</td>
@@ -220,7 +234,7 @@ function renderRows(container) {
   const totals = calculateTotals(rows);
   const totalsRow = `
     <tr class="totals-row">
-      <td colspan="2"><strong>TOTALS (${rows.length})</strong></td>
+      <td colspan="3"><strong>TOTALS (${rows.length})</strong></td>
       <td>${fmt(totals.baseSalaryLBP)} ل.ل</td>
       <td>${fmtUSD(totals.baseSalaryUSD)}</td>
       <td>${fmt(totals.transportLBP)} ل.ل</td>

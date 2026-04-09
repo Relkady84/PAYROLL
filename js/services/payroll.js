@@ -21,11 +21,12 @@ export function getFuelPriceInLBP(settings) {
  *   minimum       = minimumTransportUSD × exchangeRate
  *   result        = max(monthly, minimum)
  */
-export function calculateTransport(employee, settings) {
+export function calculateTransport(employee, settings, daysWorked) {
   const fuelPriceLBP  = getFuelPriceInLBP(settings);
   const litersNeeded  = employee.kmDistance / 7.5;
   const dailyCost     = litersNeeded * fuelPriceLBP;
-  const monthly       = dailyCost * settings.workingDaysPerMonth * 2;
+  const days          = daysWorked ?? settings.workingDaysPerMonth;
+  const monthly       = dailyCost * days * 2;
   const minimumLBP    = settings.minimumTransportUSD * settings.exchangeRate;
   return Math.max(monthly, minimumLBP);
 }
@@ -43,8 +44,8 @@ export function calculateNFS(employee, settings) {
 }
 
 /** Full payroll breakdown for one employee. */
-export function calculateNetSalary(employee, settings) {
-  const transportLBP  = calculateTransport(employee, settings);
+export function calculateNetSalary(employee, settings, daysWorked) {
+  const transportLBP  = calculateTransport(employee, settings, daysWorked);
   const taxLBP        = calculateTax(employee, settings);
   const nfsLBP        = calculateNFS(employee, settings);
   const netLBP        = employee.baseSalaryLBP + transportLBP - taxLBP - nfsLBP;
@@ -64,11 +65,15 @@ export function calculateNetSalary(employee, settings) {
 }
 
 /** Returns the full employee array with calculated fields appended. */
-export function calculatePayroll(employees, settings) {
-  return employees.map(emp => ({
-    ...emp,
-    ...calculateNetSalary(emp, settings)
-  }));
+export function calculatePayroll(employees, settings, daysWorkedMap = {}) {
+  return employees.map(emp => {
+    const days = daysWorkedMap[emp.id] ?? settings.workingDaysPerMonth;
+    return {
+      ...emp,
+      daysWorked: days,
+      ...calculateNetSalary(emp, settings, days)
+    };
+  });
 }
 
 /** Totals row across all calculated employees. */
