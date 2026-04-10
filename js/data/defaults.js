@@ -3,6 +3,7 @@ export const DEFAULT_SETTINGS = {
   fuelPricePerLitre: 0,
   fuelPriceCurrency: 'USD',
   workingDaysPerMonth: 22,
+  kmPerLitre: 7.5,
   taxRates: {
     Teacher: 0,
     Admin: 0
