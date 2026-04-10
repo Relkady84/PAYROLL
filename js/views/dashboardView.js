@@ -68,8 +68,8 @@ export function render(selector) {
           <div class="stat-card-icon cyan">🚌</div>
           <div class="stat-card-body">
             <div class="stat-card-label">Total Transport</div>
-            <div class="stat-card-value">${fmtUSD(totals.transportUSD)}</div>
-            <div class="stat-card-sub">${fmtLBP(totals.transportLBP)}</div>
+            <div class="stat-card-value">${fmtUSD(totals.totalTransportUSD)}</div>
+            <div class="stat-card-sub">${fmtLBP(totals.totalTransportLBP)}</div>
           </div>
         </div>
       </div>
@@ -117,8 +117,8 @@ export function render(selector) {
                       <span class="num-usd">${fmtUSD(r.baseSalaryUSD)}</span>
                     </td>
                     <td>
-                      <span class="num-lbp">${fmtLBP(r.transportLBP)}</span>
-                      <span class="num-usd">${fmtUSD(r.transportUSD)}</span>
+                      <span class="num-lbp">${fmtLBP(r.totalTransportLBP)}</span>
+                      <span class="num-usd">${fmtUSD(r.totalTransportUSD)}</span>
                     </td>
                     <td>
                       <span class="num-lbp" style="color:var(--color-danger)">- ${fmtLBP(r.taxLBP + r.nfsLBP)}</span>
@@ -145,7 +145,7 @@ function buildBreakdownCard(label, cssClass, rows, totals, fmtLBP, fmtUSD) {
     <div class="breakdown-card">
       <div class="breakdown-card-type ${cssClass}">${label}s (${rows.length})</div>
       <div class="breakdown-row"><span>Total Base Salary</span><strong>${fmtUSD(totals.baseSalaryUSD)}</strong></div>
-      <div class="breakdown-row"><span>Transport Allowance</span><strong>${fmtUSD(totals.transportUSD)}</strong></div>
+      <div class="breakdown-row"><span>Transport Allowance</span><strong>${fmtUSD(totals.totalTransportUSD)}</strong></div>
       <div class="breakdown-row"><span>Tax Deductions</span><strong style="color:var(--color-danger)">- ${fmtUSD(totals.taxUSD)}</strong></div>
       <div class="breakdown-row"><span>NFS Deductions</span><strong style="color:var(--color-danger)">- ${fmtUSD(totals.nfsUSD)}</strong></div>
       <div class="breakdown-row"><span>Net Payroll</span><strong style="color:var(--color-success)">${fmtUSD(totals.netSalaryUSD)}</strong></div>

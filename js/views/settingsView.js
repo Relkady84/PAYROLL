@@ -206,11 +206,33 @@ export function render(selector) {
     </div>
   `;
 
-  // Sync fuel currency labels on currency radio change
+  // Convert fuel price value when switching currency (USD ↔ LBP)
   container.querySelectorAll('[name="fuelPriceCurrency"]').forEach(radio => {
     radio.addEventListener('change', () => {
-      document.getElementById('fuel-currency-label').textContent      = radio.value;
-      document.getElementById('fuel-currency-label-tank').textContent = radio.value;
+      const newCurrency = radio.value;
+      const rate        = parseFloat(document.getElementById('exchangeRate').value) || 89600;
+      const mode        = document.querySelector('[name="fuelInputMode"]:checked')?.value || 'litre';
+
+      if (mode === 'litre') {
+        const input = document.getElementById('fuelPricePerLitre');
+        const val   = parseFloat(input.value);
+        if (!isNaN(val)) {
+          input.value = newCurrency === 'LBP'
+            ? (val * rate).toFixed(0)
+            : (val / rate).toFixed(4);
+        }
+      } else {
+        const input = document.getElementById('fuelPricePerTank');
+        const val   = parseFloat(input.value);
+        if (!isNaN(val)) {
+          input.value = newCurrency === 'LBP'
+            ? (val * rate).toFixed(0)
+            : (val / rate).toFixed(2);
+        }
+      }
+
+      document.getElementById('fuel-currency-label').textContent      = newCurrency;
+      document.getElementById('fuel-currency-label-tank').textContent = newCurrency;
       updateTankHint();
     });
   });
