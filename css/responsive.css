@@ -1,3 +1,19 @@
+/* ── Desktop sidebar collapsed ── */
+@media (min-width: 769px) {
+  body.sidebar-collapsed .sidebar {
+    transform: translateX(-240px);
+  }
+
+  body.sidebar-collapsed .main-content {
+    margin-left: 0;
+  }
+
+  /* Show floating ☰ button when sidebar is collapsed on desktop */
+  body.sidebar-collapsed #menu-toggle {
+    display: flex;
+  }
+}
+
 /* ── Tablet (≤ 1024px) ── */
 @media (max-width: 1024px) {
   .stat-cards {
@@ -17,8 +33,8 @@
 
   .sidebar {
     transform: translateX(-240px);
-    transition: transform 0.25s;
     width: 240px;
+    z-index: 200;
   }
 
   .sidebar.open {
@@ -27,19 +43,28 @@
 
   .main-content {
     margin-left: 0;
+    min-width: 0;
+    overflow-x: hidden;
   }
 
   .content-header {
-    padding: 0 16px 0 58px; /* left offset clears the fixed hamburger button */
+    padding: 0 12px 0 56px;
   }
 
   .page-body {
-    padding: 16px;
+    padding: 12px;
+    overflow-x: hidden;
+  }
+
+  /* Horizontal scroll for wide tables */
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .stat-cards {
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    gap: 10px;
   }
 
   .form-grid {
@@ -53,19 +78,26 @@
   .toolbar {
     flex-direction: column;
     align-items: stretch;
+    gap: 8px;
   }
 
   .toolbar-left, .toolbar-right {
     justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
-  /* Mobile hamburger */
+  /* Show floating hamburger on mobile */
   .menu-toggle {
     display: flex;
   }
 
   .breakdown-grid {
     grid-template-columns: 1fr;
+  }
+
+  /* Section card padding tighter on mobile */
+  .section-card-body {
+    padding: 14px;
   }
 }
 
@@ -84,22 +116,27 @@
   }
 }
 
-/* Menu toggle (hidden on desktop) */
+/* Floating ☰ button — hidden on desktop by default, shown on mobile always
+   and on desktop when sidebar is collapsed (see above media query) */
 .menu-toggle {
   display: none;
   position: fixed;
-  top: 14px;
-  left: 14px;
+  top: 12px;
+  left: 12px;
   z-index: 200;
-  padding: 8px 10px;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
   border-radius: var(--radius-md);
   color: #fff;
   cursor: pointer;
   font-size: 18px;
   background: var(--color-sidebar-bg);
-  border: none;
+  border: 1px solid rgba(255,255,255,0.1);
   box-shadow: var(--shadow-md);
   line-height: 1;
+  transition: background 0.15s;
 }
 
 .menu-toggle:hover {

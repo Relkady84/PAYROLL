@@ -18,12 +18,40 @@
   overflow: hidden;
 }
 
+.sidebar {
+  transition: transform 0.25s ease;
+}
+
+.main-content {
+  transition: margin-left 0.25s ease;
+}
+
 .sidebar-logo {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 20px 20px 16px;
+  padding: 16px 16px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Collapse button inside sidebar header */
+.sidebar-collapse-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: var(--color-sidebar-text);
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 17px;
+  line-height: 1;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sidebar-collapse-btn:hover {
+  background: var(--color-sidebar-hover-bg);
+  color: #fff;
 }
 
 .sidebar-logo-icon {

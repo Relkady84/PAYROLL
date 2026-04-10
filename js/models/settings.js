@@ -26,6 +26,11 @@ export function validateSettings(data) {
     errors.push('Minimum transport cannot be negative.');
   }
 
+  const consumption = parseFloat(data.kmPerLitre);
+  if (isNaN(consumption) || consumption <= 0) {
+    errors.push('Car consumption must be greater than 0 km/L.');
+  }
+
   return errors;
 }
 
@@ -44,7 +49,8 @@ export function normalizeSettings(raw) {
       Teacher: parseFloat(raw.nfsRates?.Teacher) / 100,
       Admin:   parseFloat(raw.nfsRates?.Admin)   / 100
     },
-    minimumTransportUSD: parseFloat(raw.minimumTransportUSD)
+    minimumTransportUSD: parseFloat(raw.minimumTransportUSD),
+    kmPerLitre:          parseFloat(raw.kmPerLitre) || 7.5
   };
 }
 

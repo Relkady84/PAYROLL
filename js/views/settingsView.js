@@ -40,6 +40,16 @@ export function render(selector) {
                   <span class="form-hint">Current rate: 1 USD = ${settings.exchangeRate.toLocaleString()} LBP</span>
                 </div>
                 <div class="form-group">
+                  <label class="form-label">Fuel Price Input Mode</label>
+                  <div class="radio-group">
+                    <input type="radio" name="fuelInputMode" id="fuelModeLitre" value="litre" checked>
+                    <label for="fuelModeLitre">Per Litre</label>
+                    <input type="radio" name="fuelInputMode" id="fuelModeTank" value="tank">
+                    <label for="fuelModeTank">Per Tank (20L)</label>
+                  </div>
+                </div>
+                <!-- Per Litre input -->
+                <div class="form-group" id="fuel-litre-group">
                   <label class="form-label" for="fuelPricePerLitre">
                     Fuel Price per Litre <span class="required">*</span>
                   </label>
@@ -51,6 +61,20 @@ export function render(selector) {
                       ${settings.fuelPriceCurrency}
                     </span>
                   </div>
+                </div>
+                <!-- Per Tank input -->
+                <div class="form-group" id="fuel-tank-group" style="display:none;">
+                  <label class="form-label" for="fuelPricePerTank">
+                    Fuel Price per Tank (20L) <span class="required">*</span>
+                  </label>
+                  <div class="input-group">
+                    <input class="form-control" id="fuelPricePerTank" name="fuelPricePerTank"
+                      type="number" min="0" step="0.5" value="">
+                    <span class="input-addon input-addon-right" id="fuel-currency-label-tank">
+                      ${settings.fuelPriceCurrency}
+                    </span>
+                  </div>
+                  <span class="form-hint" id="fuel-per-litre-computed">Enter tank price to see per-litre equivalent</span>
                 </div>
                 <div class="form-group">
                   <label class="form-label">Fuel Price Currency</label>
@@ -80,14 +104,14 @@ export function render(selector) {
               <div class="alert alert-info">
                 <span>ℹ</span>
                 <span>
-                  Formula: <strong>(km ÷ 7.5 L/100km) × fuel price × working days × 2</strong> (round trip).
-                  Car average: 150 km / 20 L = 7.5 km per litre. Minimum applies if calculated is lower.
+                  Formula: <strong>(km ÷ kmPerLitre) × fuel price × 2</strong> (round trip per day).
+                  Employees ≤ 20 km receive the minimum flat rate. Minimum also applies as floor for longer distances.
                 </span>
               </div>
               <div class="form-grid">
                 <div class="form-group">
                   <label class="form-label" for="minimumTransportUSD">
-                    Minimum Transport (USD) <span class="required">*</span>
+                    Minimum Transport/Day (USD) <span class="required">*</span>
                   </label>
                   <div class="input-group">
                     <span class="input-addon input-addon-left">$</span>
@@ -95,7 +119,19 @@ export function render(selector) {
                       type="number" min="0" step="0.5"
                       value="${settings.minimumTransportUSD}">
                   </div>
-                  <span class="form-hint">Employees will receive at least this amount per month</span>
+                  <span class="form-hint">Employees ≤ 20 km always get this flat daily rate</span>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="kmPerLitre">
+                    Car Consumption (km/L) <span class="required">*</span>
+                  </label>
+                  <div class="input-group">
+                    <input class="form-control" id="kmPerLitre" name="kmPerLitre"
+                      type="number" min="0.1" step="0.1"
+                      value="${settings.kmPerLitre ?? 7.5}">
+                    <span class="input-addon input-addon-right">km/L</span>
+                  </div>
+                  <span class="form-hint">Default 7.5 km/L (150 km per 20L tank)</span>
                 </div>
               </div>
             </div>
@@ -170,12 +206,44 @@ export function render(selector) {
     </div>
   `;
 
-  // Sync fuel currency label on radio change
+  // Sync fuel currency labels on currency radio change
   container.querySelectorAll('[name="fuelPriceCurrency"]').forEach(radio => {
     radio.addEventListener('change', () => {
-      document.getElementById('fuel-currency-label').textContent = radio.value;
+      document.getElementById('fuel-currency-label').textContent      = radio.value;
+      document.getElementById('fuel-currency-label-tank').textContent = radio.value;
+      updateTankHint();
     });
   });
+
+  // Fuel input mode toggle (per litre / per tank)
+  const fuelLitreGroup = document.getElementById('fuel-litre-group');
+  const fuelTankGroup  = document.getElementById('fuel-tank-group');
+
+  function updateTankHint() {
+    const tankVal  = parseFloat(document.getElementById('fuelPricePerTank').value);
+    const currency = document.querySelector('[name="fuelPriceCurrency"]:checked')?.value || 'USD';
+    const hint     = document.getElementById('fuel-per-litre-computed');
+    if (!isNaN(tankVal) && tankVal >= 0) {
+      hint.textContent = `= ${(tankVal / 20).toFixed(4)} ${currency} per litre`;
+    } else {
+      hint.textContent = 'Enter tank price to see per-litre equivalent';
+    }
+  }
+
+  container.querySelectorAll('[name="fuelInputMode"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const isTank = radio.value === 'tank';
+      fuelLitreGroup.style.display = isTank ? 'none' : '';
+      fuelTankGroup.style.display  = isTank ? ''     : 'none';
+      if (isTank) {
+        const litre = parseFloat(document.getElementById('fuelPricePerLitre').value) || 0;
+        document.getElementById('fuelPricePerTank').value = (litre * 20).toFixed(2);
+        updateTankHint();
+      }
+    });
+  });
+
+  document.getElementById('fuelPricePerTank').addEventListener('input', updateTankHint);
 
   // Save
   document.getElementById('settings-form').addEventListener('submit', e => {
@@ -205,11 +273,17 @@ export function render(selector) {
 function handleSave(container) {
   const form = document.getElementById('settings-form');
 
+  const fuelMode    = form.querySelector('[name="fuelInputMode"]:checked')?.value || 'litre';
+  const fuelPerLitre = fuelMode === 'tank'
+    ? (parseFloat(form.querySelector('#fuelPricePerTank').value) || 0) / 20
+    : form.querySelector('#fuelPricePerLitre').value;
+
   const rawData = {
     exchangeRate:        form.querySelector('#exchangeRate').value,
-    fuelPricePerLitre:   form.querySelector('#fuelPricePerLitre').value,
+    fuelPricePerLitre:   fuelPerLitre,
     fuelPriceCurrency:   form.querySelector('[name="fuelPriceCurrency"]:checked')?.value || 'USD',
     workingDaysPerMonth: form.querySelector('#workingDaysPerMonth').value,
+    kmPerLitre:          form.querySelector('#kmPerLitre').value,
     taxRates: {
       Teacher: form.querySelector('#taxTeacher').value,
       Admin:   form.querySelector('#taxAdmin').value

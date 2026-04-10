@@ -31,7 +31,7 @@ export function calculateTransport(employee, settings) {
     return minimumLBP;
   }
   const fuelPriceLBP = getFuelPriceInLBP(settings);
-  const litersNeeded = employee.kmDistance / 7.5;
+  const litersNeeded = employee.kmDistance / (settings.kmPerLitre ?? 7.5);
   const dailyCost    = litersNeeded * fuelPriceLBP * 2;
   return Math.max(dailyCost, minimumLBP);
 }

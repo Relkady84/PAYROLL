@@ -19,25 +19,56 @@ register('#employees', () => renderEmployees('#app-content'));
 register('#payroll',   () => renderPayroll('#app-content'));
 register('#settings',  () => renderSettings('#app-content'));
 
-// Mobile sidebar toggle
-function initMobileSidebar() {
-  const toggle  = document.getElementById('menu-toggle');
-  const sidebar = document.querySelector('.sidebar');
-  const overlay = document.getElementById('sidebar-overlay');
-  if (!toggle || !sidebar || !overlay) return;
+// Sidebar toggle — handles both desktop collapse and mobile overlay
+function initSidebarToggle() {
+  const floatBtn    = document.getElementById('menu-toggle');
+  const collapseBtn = document.getElementById('sidebar-collapse-btn');
+  const sidebar     = document.getElementById('sidebar');
+  const overlay     = document.getElementById('sidebar-overlay');
+  if (!floatBtn || !sidebar || !overlay) return;
 
-  toggle.addEventListener('click', () => {
-    sidebar.classList.toggle('open');
-    overlay.classList.toggle('active');
+  // Restore desktop collapsed state
+  if (localStorage.getItem('sidebar-collapsed') === 'true') {
+    document.body.classList.add('sidebar-collapsed');
+  }
+
+  function isMobile() { return window.innerWidth <= 768; }
+
+  // Button INSIDE sidebar: collapses on desktop, closes on mobile
+  collapseBtn?.addEventListener('click', () => {
+    if (isMobile()) {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('active');
+    } else {
+      document.body.classList.add('sidebar-collapsed');
+      localStorage.setItem('sidebar-collapsed', 'true');
+    }
   });
+
+  // Floating button (☰): opens sidebar on both desktop and mobile
+  floatBtn.addEventListener('click', () => {
+    if (isMobile()) {
+      sidebar.classList.toggle('open');
+      overlay.classList.toggle('active');
+    } else {
+      document.body.classList.remove('sidebar-collapsed');
+      localStorage.setItem('sidebar-collapsed', 'false');
+    }
+  });
+
+  // Mobile overlay click closes sidebar
   overlay.addEventListener('click', () => {
     sidebar.classList.remove('open');
     overlay.classList.remove('active');
   });
+
+  // Mobile: close sidebar when navigating
   sidebar.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', () => {
-      sidebar.classList.remove('open');
-      overlay.classList.remove('active');
+      if (isMobile()) {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('active');
+      }
     });
   });
 }
@@ -71,7 +102,7 @@ function hideLoader() {
 
 document.addEventListener('DOMContentLoaded', () => {
   initModal();
-  initMobileSidebar();
+  initSidebarToggle();
 
   // Sign-in buttons
   document.getElementById('google-signin-btn').addEventListener('click', async () => {
