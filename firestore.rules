@@ -29,14 +29,5 @@ service cloud.firestore {
       allow read: if isSuperAdmin();
     }
 
-    // Legacy root collections (old single-tenant structure) —
-    // allow any authenticated user to READ for one-time migration.
-    // You can remove these rules after all accounts have been migrated.
-    match /settings/{document} {
-      allow read: if request.auth != null;
-    }
-    match /employees/{document} {
-      allow read: if request.auth != null;
-    }
   }
 }
