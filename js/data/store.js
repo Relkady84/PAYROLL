@@ -141,6 +141,14 @@ export async function getCompanyMetadata() {
   return snap.exists() ? snap.data() : null;
 }
 
+export async function updateCompanyMetadata(data) {
+  const companyId = _companyId;
+  await Promise.all([
+    setDoc(doc(db, 'companies', companyId), data, { merge: true }),
+    setDoc(companyDoc('metadata', 'info'), data, { merge: true })
+  ]);
+}
+
 // ── Super Admin: list all companies ───────────────────────
 export async function getAllCompanies() {
   const snap = await getDocs(collection(db, 'companies'));

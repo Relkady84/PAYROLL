@@ -1,11 +1,14 @@
-import { getSettings, saveSettings, resetSettings } from '../data/store.js';
+import { getSettings, saveSettings, resetSettings, getCompanyMetadata, updateCompanyMetadata } from '../data/store.js';
 import { validateSettings, normalizeSettings, denormalizeSettings } from '../models/settings.js';
 import { showToast } from './components/toast.js';
 import { openModal, closeModal } from './components/modal.js';
 
-export function render(selector) {
+export async function render(selector) {
   const container = document.querySelector(selector);
   const settings  = denormalizeSettings(getSettings());
+  const meta      = await getCompanyMetadata() || {};
+
+  const logoUrl = meta.logoUrl || '';
 
   container.innerHTML = `
     <div class="content-header">
@@ -15,6 +18,50 @@ export function render(selector) {
       </div>
     </div>
     <div class="page-body">
+
+      <!-- Company Profile -->
+      <div class="section-card" style="margin-bottom:20px;">
+        <div class="section-card-header">
+          <span class="section-card-title">Company Profile</span>
+        </div>
+        <div class="section-card-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="company-name-field">Company Name</label>
+              <input class="form-control" id="company-name-field" type="text"
+                placeholder="e.g. Lycée Montaigne"
+                value="${esc(meta.name || '')}">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="company-logo-url">Logo URL</label>
+              <input class="form-control" id="company-logo-url" type="url"
+                placeholder="https://example.com/logo.png"
+                value="${esc(logoUrl)}">
+              <span class="form-hint">Paste a direct image URL, or upload a file below</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="company-logo-file">Upload Logo (JPG / PNG / SVG)</label>
+              <input class="form-control" id="company-logo-file" type="file"
+                accept="image/jpeg,image/png,image/svg+xml,image/webp">
+              <span class="form-hint">Max recommended size: 200 KB</span>
+            </div>
+            <div class="form-group" style="align-self:center;">
+              <label class="form-label">Preview</label>
+              <div id="logo-preview" style="width:64px;height:64px;border-radius:10px;
+                   border:2px dashed #e2e8f0;display:flex;align-items:center;
+                   justify-content:center;font-size:28px;background:#f8fafc;overflow:hidden;">
+                ${logoUrl
+                  ? `<img src="${esc(logoUrl)}" style="width:100%;height:100%;object-fit:contain;">`
+                  : '💼'}
+              </div>
+            </div>
+          </div>
+          <button type="button" id="save-profile-btn" class="btn btn-primary">
+            💾 Save Company Profile
+          </button>
+        </div>
+      </div>
+
       <div class="section-card">
         <div class="section-card-header">
           <span class="section-card-title">Global Configuration</span>
@@ -206,6 +253,63 @@ export function render(selector) {
     </div>
   `;
 
+  // ── Company Profile logic ────────────────────────────────
+  const logoUrlInput  = document.getElementById('company-logo-url');
+  const logoFileInput = document.getElementById('company-logo-file');
+  const logoPreview   = document.getElementById('logo-preview');
+
+  function setPreview(src) {
+    logoPreview.innerHTML = src
+      ? `<img src="${src}" style="width:100%;height:100%;object-fit:contain;">`
+      : '💼';
+  }
+
+  logoUrlInput.addEventListener('input', () => setPreview(logoUrlInput.value.trim()));
+
+  logoFileInput.addEventListener('change', () => {
+    const file = logoFileInput.files[0];
+    if (!file) return;
+    if (file.size > 300 * 1024) {
+      showToast('Image is too large (max 300 KB). Please resize it first.', 'warning');
+      logoFileInput.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => {
+      logoUrlInput.value = e.target.result;
+      setPreview(e.target.result);
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById('save-profile-btn').addEventListener('click', async () => {
+    const btn      = document.getElementById('save-profile-btn');
+    const name     = document.getElementById('company-name-field').value.trim();
+    const logoUrl  = logoUrlInput.value.trim();
+
+    if (!name) {
+      showToast('Company name cannot be empty.', 'warning');
+      return;
+    }
+
+    btn.disabled    = true;
+    btn.textContent = 'Saving…';
+
+    try {
+      await updateCompanyMetadata({ name, logoUrl });
+      // Update sidebar instantly
+      document.getElementById('sidebar-company-name').textContent = name;
+      _applySidebarLogo(logoUrl);
+      showToast('Company profile saved!', 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to save profile. Try again.', 'error');
+    } finally {
+      btn.disabled    = false;
+      btn.textContent = '💾 Save Company Profile';
+    }
+  });
+
   // Convert fuel price value when switching currency (USD ↔ LBP)
   container.querySelectorAll('[name="fuelPriceCurrency"]').forEach(radio => {
     radio.addEventListener('change', () => {
@@ -290,6 +394,22 @@ export function render(selector) {
       }
     );
   });
+}
+
+export function _applySidebarLogo(logoUrl) {
+  const el = document.getElementById('sidebar-logo-icon');
+  if (!el) return;
+  if (logoUrl) {
+    el.innerHTML = `<img src="${logoUrl}" alt="Logo"
+      style="width:36px;height:36px;object-fit:contain;border-radius:6px;">`;
+  } else {
+    el.textContent = '💼';
+  }
+}
+
+function esc(val) {
+  if (val == null) return '';
+  return String(val).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function handleSave(container) {
