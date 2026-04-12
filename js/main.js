@@ -5,7 +5,7 @@ import { render as renderEmployees }    from './views/employeeListView.js';
 import { render as renderPayroll }      from './views/payrollView.js';
 import { render as renderSettings }     from './views/settingsView.js';
 import { renderOnboarding }             from './views/onboardingView.js';
-import { initStore, setCompanyId, getUserRecord } from './data/store.js';
+import { initStore, setCompanyId, getUserRecord, getCompanyMetadata } from './data/store.js';
 import { onAuthChanged, signInWithGoogle, signInWithMicrosoft, signOutUser } from './auth.js';
 
 // Register all routes
@@ -65,7 +65,7 @@ function initSidebarToggle() {
 }
 
 // ── UI helpers ────────────────────────────────────────────
-function showApp(user) {
+async function showApp(user) {
   document.getElementById('user-name').textContent  = user.displayName || user.email;
   document.getElementById('user-email').textContent = user.email;
   if (user.photoURL) {
@@ -73,9 +73,18 @@ function showApp(user) {
     avatar.src           = user.photoURL;
     avatar.style.display = 'block';
   }
-  document.getElementById('login-screen').style.display    = 'none';
+
+  // Load and display company name in sidebar
+  try {
+    const meta = await getCompanyMetadata();
+    document.getElementById('sidebar-company-name').textContent = meta?.name || '—';
+  } catch {
+    document.getElementById('sidebar-company-name').textContent = '—';
+  }
+
+  document.getElementById('login-screen').style.display      = 'none';
   document.getElementById('onboarding-screen').style.display = 'none';
-  document.getElementById('app-shell').style.display       = 'flex';
+  document.getElementById('app-shell').style.display         = 'flex';
 }
 
 function showLogin() {
@@ -147,7 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
           setCompanyId(companyId);
           await initStore();
           hideLoader();
-          showApp(user);
+          await showApp(user);
           if (!appInitialized) { initRouter(); appInitialized = true; }
         });
         return;
@@ -158,7 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showLoader('Loading payroll data…');
       await initStore();
       hideLoader();
-      showApp(user);
+      await showApp(user);
 
       if (!appInitialized) {
         initRouter();
