@@ -84,7 +84,16 @@ export async function renderOnboarding(user, onComplete) {
     try {
       const companyId = `${user.uid.slice(0, 8)}_${Date.now()}`;
 
-      // Create company metadata
+      // 1. Create user record FIRST — the Firestore rule for company writes
+      //    requires /users/{uid}.companyId to exist before anything else
+      await createUserRecord(user.uid, {
+        companyId,
+        role:  'owner',
+        email: user.email,
+        name:  user.displayName || user.email
+      });
+
+      // 2. Now create company metadata (rule passes because user record exists)
       await createCompany(companyId, {
         name,
         ownerUid:   user.uid,
@@ -92,7 +101,7 @@ export async function renderOnboarding(user, onComplete) {
         createdAt:  serverTimestamp()
       });
 
-      // Migrate legacy data if it exists, otherwise write defaults
+      // 3. Migrate legacy data if it exists, otherwise write defaults
       if (hasLegacyData) {
         await _migrateLegacyData(companyId);
       } else {
@@ -101,14 +110,6 @@ export async function renderOnboarding(user, onComplete) {
           DEFAULT_SETTINGS
         );
       }
-
-      // Link user → company
-      await createUserRecord(user.uid, {
-        companyId,
-        role:  'owner',
-        email: user.email,
-        name:  user.displayName || user.email
-      });
 
       screen.style.display = 'none';
       onComplete(companyId);
