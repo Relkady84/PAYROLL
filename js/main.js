@@ -4,6 +4,7 @@ import { render as renderDashboard }    from './views/dashboardView.js';
 import { render as renderEmployees }    from './views/employeeListView.js';
 import { render as renderPayroll }      from './views/payrollView.js';
 import { render as renderSettings }     from './views/settingsView.js';
+import { render as renderReports }      from './views/reportsView.js';
 import { renderOnboarding }             from './views/onboardingView.js';
 import { renderSuperAdmin }             from './views/superAdminView.js';
 import { _applySidebarLogo, applyDisplayColors } from './views/settingsView.js';
@@ -15,6 +16,7 @@ register('#dashboard', () => renderDashboard('#app-content'));
 register('#employees', () => renderEmployees('#app-content'));
 register('#payroll',   () => renderPayroll('#app-content'));
 register('#settings',  () => renderSettings('#app-content'));
+register('#reports',   () => renderReports('#app-content'));
 
 // ── Sidebar toggle — desktop collapse + mobile overlay ────
 function initSidebarToggle() {
