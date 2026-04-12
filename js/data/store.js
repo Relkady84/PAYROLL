@@ -7,6 +7,9 @@ import {
   writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
+// ── Super Admin ───────────────────────────────────────────
+export const SUPER_ADMIN_EMAIL = 'raedelkady@gmail.com';
+
 // ── In-memory cache ───────────────────────────────────────
 let _employees  = [];
 let _settings   = structuredClone(DEFAULT_SETTINGS);
@@ -126,10 +129,20 @@ export async function createUserRecord(uid, data) {
 
 // ── Company metadata helpers ───────────────────────────────
 export async function createCompany(companyId, metadata) {
-  await setDoc(doc(db, 'companies', companyId, 'metadata', 'info'), metadata);
+  // Write to both the root company document (for super-admin listing) and the metadata subcollection
+  await Promise.all([
+    setDoc(doc(db, 'companies', companyId), metadata),
+    setDoc(doc(db, 'companies', companyId, 'metadata', 'info'), metadata)
+  ]);
 }
 
 export async function getCompanyMetadata() {
   const snap = await getDoc(companyDoc('metadata', 'info'));
   return snap.exists() ? snap.data() : null;
+}
+
+// ── Super Admin: list all companies ───────────────────────
+export async function getAllCompanies() {
+  const snap = await getDocs(collection(db, 'companies'));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }

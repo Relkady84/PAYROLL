@@ -5,7 +5,8 @@ import { render as renderEmployees }    from './views/employeeListView.js';
 import { render as renderPayroll }      from './views/payrollView.js';
 import { render as renderSettings }     from './views/settingsView.js';
 import { renderOnboarding }             from './views/onboardingView.js';
-import { initStore, setCompanyId, getUserRecord, getCompanyMetadata } from './data/store.js';
+import { renderSuperAdmin }             from './views/superAdminView.js';
+import { initStore, setCompanyId, getUserRecord, createUserRecord, getCompanyMetadata, SUPER_ADMIN_EMAIL } from './data/store.js';
 import { onAuthChanged, signInWithGoogle, signInWithMicrosoft, signOutUser } from './auth.js';
 
 // Register all routes
@@ -65,7 +66,7 @@ function initSidebarToggle() {
 }
 
 // ── UI helpers ────────────────────────────────────────────
-async function showApp(user) {
+async function showApp(user, { isSuperAdmin = false, companyName = null } = {}) {
   document.getElementById('user-name').textContent  = user.displayName || user.email;
   document.getElementById('user-email').textContent = user.email;
   if (user.photoURL) {
@@ -75,16 +76,32 @@ async function showApp(user) {
   }
 
   // Load and display company name in sidebar
-  try {
-    const meta = await getCompanyMetadata();
-    document.getElementById('sidebar-company-name').textContent = meta?.name || '—';
-  } catch {
-    document.getElementById('sidebar-company-name').textContent = '—';
+  let name = companyName;
+  if (!name) {
+    try {
+      const meta = await getCompanyMetadata();
+      name = meta?.name || '—';
+    } catch {
+      name = '—';
+    }
+  }
+  document.getElementById('sidebar-company-name').textContent = name;
+
+  // Show super admin controls
+  const saSection = document.getElementById('super-admin-nav-section');
+  const saBtn     = document.getElementById('switch-company-btn');
+  if (isSuperAdmin) {
+    saSection.style.display = '';
+    saBtn.style.display     = '';
+  } else {
+    saSection.style.display = 'none';
+    saBtn.style.display     = 'none';
   }
 
-  document.getElementById('login-screen').style.display      = 'none';
-  document.getElementById('onboarding-screen').style.display = 'none';
-  document.getElementById('app-shell').style.display         = 'flex';
+  document.getElementById('login-screen').style.display        = 'none';
+  document.getElementById('onboarding-screen').style.display   = 'none';
+  document.getElementById('super-admin-screen').style.display  = 'none';
+  document.getElementById('app-shell').style.display           = 'flex';
 }
 
 function showLogin() {
@@ -133,16 +150,64 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let appInitialized = false;
 
+  // ── Switch Company (super admin only) ─────────────────
+  document.getElementById('switch-company-btn').addEventListener('click', e => {
+    e.preventDefault();
+    document.getElementById('app-shell').style.display = 'none';
+    // Re-render the company picker with current user (stored in closure)
+    document.dispatchEvent(new CustomEvent('super-admin-pick'));
+  });
+
+  let _currentUser = null;
+
+  document.addEventListener('super-admin-pick', () => {
+    if (_currentUser) _launchSuperAdminPicker(_currentUser);
+  });
+
+  function _launchSuperAdminPicker(user) {
+    renderSuperAdmin(user, async companyId => {
+      showLoader('Loading company data…');
+      setCompanyId(companyId);
+      await initStore();
+      hideLoader();
+      await showApp(user, { isSuperAdmin: true });
+      if (!appInitialized) { initRouter(); appInitialized = true; }
+      else window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+  }
+
   onAuthChanged(async user => {
     if (!user) {
       showLogin();
       return;
     }
 
+    _currentUser = user;
     showLoader('Checking your account…');
 
     try {
-      // Look up /users/{uid} to get their companyId
+      // ── Super Admin ──────────────────────────────────
+      if (user.email === SUPER_ADMIN_EMAIL) {
+        // Ensure user record exists with superAdmin role
+        let userRecord = await getUserRecord(user.uid);
+        if (!userRecord) {
+          await createUserRecord(user.uid, {
+            role:  'superAdmin',
+            email: user.email,
+            name:  user.displayName || user.email
+          });
+        } else if (userRecord.role !== 'superAdmin') {
+          await createUserRecord(user.uid, { ...userRecord, role: 'superAdmin' });
+        }
+
+        hideLoader();
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('app-shell').style.display    = 'none';
+        _launchSuperAdminPicker(user);
+        return;
+      }
+
+      // ── Regular user ─────────────────────────────────
       const userRecord = await getUserRecord(user.uid);
 
       if (!userRecord?.companyId) {

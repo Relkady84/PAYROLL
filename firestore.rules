@@ -2,17 +2,31 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Super admin check — platform-level role, stored in /users/{uid}.role
+    function isSuperAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superAdmin';
+    }
+
     // Each user can only read/write their own record
     match /users/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
-    // Company data — only users whose /users/{uid}.companyId matches can access
-    // This supports multiple users (owner + team members) per company
+    // Company data — accessible by:
+    //   (a) users whose /users/{uid}.companyId matches, OR
+    //   (b) super admin (platform-wide access)
     match /companies/{companyId}/{document=**} {
-      allow read, write: if request.auth != null
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId == companyId;
+      allow read, write: if isSuperAdmin()
+        || (request.auth != null
+          && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId == companyId);
+    }
+
+    // Super admin can list all company root documents
+    match /companies/{companyId} {
+      allow read: if isSuperAdmin();
     }
 
     // Legacy root collections (old single-tenant structure) —
