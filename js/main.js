@@ -6,7 +6,7 @@ import { render as renderPayroll }      from './views/payrollView.js';
 import { render as renderSettings }     from './views/settingsView.js';
 import { renderOnboarding }             from './views/onboardingView.js';
 import { renderSuperAdmin }             from './views/superAdminView.js';
-import { _applySidebarLogo }            from './views/settingsView.js';
+import { _applySidebarLogo, applyDisplayColors } from './views/settingsView.js';
 import { initStore, setCompanyId, getUserRecord, createUserRecord, getCompanyMetadata, SUPER_ADMIN_EMAIL } from './data/store.js';
 import { onAuthChanged, signInWithGoogle, signInWithMicrosoft, signOutUser } from './auth.js';
 
@@ -76,20 +76,23 @@ async function showApp(user, { isSuperAdmin = false, companyName = null } = {}) 
     avatar.style.display = 'block';
   }
 
-  // Load and display company name + logo in sidebar
+  // Load and display company name + logo + colors in sidebar
   let name = companyName;
   let logoUrl = '';
+  let displayColors = null;
   if (!name) {
     try {
       const meta = await getCompanyMetadata();
-      name    = meta?.name    || '—';
-      logoUrl = meta?.logoUrl || '';
+      name          = meta?.name         || '—';
+      logoUrl       = meta?.logoUrl      || '';
+      displayColors = meta?.displayColors || null;
     } catch {
       name = '—';
     }
   }
   document.getElementById('sidebar-company-name').textContent = name;
   _applySidebarLogo(logoUrl);
+  applyDisplayColors(displayColors);
 
   // Show super admin controls
   const saSection = document.getElementById('super-admin-nav-section');

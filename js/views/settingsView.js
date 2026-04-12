@@ -62,6 +62,66 @@ export async function render(selector) {
         </div>
       </div>
 
+      <!-- Display Settings -->
+      <div class="section-card" style="margin-bottom:20px;">
+        <div class="section-card-header">
+          <span class="section-card-title">Display &amp; Colors</span>
+        </div>
+        <div class="section-card-body">
+
+          <!-- Preset themes -->
+          <div style="margin-bottom:20px;">
+            <div class="form-label" style="margin-bottom:10px;">Quick Themes</div>
+            <div id="theme-presets" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+          </div>
+
+          <!-- Color pickers -->
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="color-sidebar">Sidebar Background</label>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <input type="color" id="color-sidebar" style="width:48px;height:36px;border:none;
+                  border-radius:6px;cursor:pointer;padding:2px;">
+                <span id="color-sidebar-hex" style="font-size:0.8rem;color:#64748b;font-family:monospace;"></span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="color-sidebar-active">Sidebar Active Item</label>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <input type="color" id="color-sidebar-active" style="width:48px;height:36px;border:none;
+                  border-radius:6px;cursor:pointer;padding:2px;">
+                <span id="color-sidebar-active-hex" style="font-size:0.8rem;color:#64748b;font-family:monospace;"></span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="color-header">Header Bar</label>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <input type="color" id="color-header" style="width:48px;height:36px;border:none;
+                  border-radius:6px;cursor:pointer;padding:2px;">
+                <span id="color-header-hex" style="font-size:0.8rem;color:#64748b;font-family:monospace;"></span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="color-page-bg">Page Background</label>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <input type="color" id="color-page-bg" style="width:48px;height:36px;border:none;
+                  border-radius:6px;cursor:pointer;padding:2px;">
+                <span id="color-page-bg-hex" style="font-size:0.8rem;color:#64748b;font-family:monospace;"></span>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:4px;">
+            <button type="button" id="save-display-btn" class="btn btn-primary">
+              💾 Save Colors
+            </button>
+            <button type="button" id="reset-display-btn" class="btn btn-secondary">
+              ↺ Reset to Default
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div class="section-card">
         <div class="section-card-header">
           <span class="section-card-title">Global Configuration</span>
@@ -310,6 +370,110 @@ export async function render(selector) {
     }
   });
 
+  // ── Display / Color settings ─────────────────────────────
+  const THEMES = [
+    { label: 'Default',  sidebarBg: '#0f172a', sidebarActive: '#1e3a8a', headerBg: '#ffffff', pageBg: '#f1f5f9' },
+    { label: 'Slate',    sidebarBg: '#1e293b', sidebarActive: '#334155', headerBg: '#f8fafc', pageBg: '#f1f5f9' },
+    { label: 'Blue',     sidebarBg: '#1e40af', sidebarActive: '#3b82f6', headerBg: '#eff6ff', pageBg: '#e8f0fe' },
+    { label: 'Green',    sidebarBg: '#14532d', sidebarActive: '#16a34a', headerBg: '#f0fdf4', pageBg: '#dcfce7' },
+    { label: 'Purple',   sidebarBg: '#4c1d95', sidebarActive: '#7c3aed', headerBg: '#faf5ff', pageBg: '#f3e8ff' },
+    { label: 'Teal',     sidebarBg: '#134e4a', sidebarActive: '#0d9488', headerBg: '#f0fdfa', pageBg: '#ccfbf1' },
+    { label: 'Rose',     sidebarBg: '#881337', sidebarActive: '#e11d48', headerBg: '#fff1f2', pageBg: '#ffe4e6' },
+    { label: 'Midnight', sidebarBg: '#020617', sidebarActive: '#0f172a', headerBg: '#0f172a', pageBg: '#1e293b' },
+  ];
+
+  const displayColors = meta.displayColors || {};
+  const currentColors = {
+    sidebarBg:     displayColors.sidebarBg     || '#0f172a',
+    sidebarActive: displayColors.sidebarActive || '#1e3a8a',
+    headerBg:      displayColors.headerBg      || '#ffffff',
+    pageBg:        displayColors.pageBg        || '#f1f5f9',
+  };
+
+  // Render theme preset buttons
+  const presetsEl = document.getElementById('theme-presets');
+  THEMES.forEach(t => {
+    const btn = document.createElement('button');
+    btn.type      = 'button';
+    btn.title     = t.label;
+    btn.innerHTML = `
+      <div style="display:flex;gap:3px;margin-bottom:4px;">
+        <div style="width:16px;height:28px;border-radius:3px 0 0 3px;background:${t.sidebarBg};"></div>
+        <div style="width:28px;height:28px;background:${t.headerBg};border:1px solid #e2e8f0;"></div>
+        <div style="width:20px;height:28px;border-radius:0 3px 3px 0;background:${t.pageBg};border:1px solid #e2e8f0;"></div>
+      </div>
+      <div style="font-size:0.7rem;color:#64748b;text-align:center;">${t.label}</div>
+    `;
+    btn.style.cssText = 'background:none;border:2px solid #e2e8f0;border-radius:8px;padding:6px 8px;cursor:pointer;transition:border-color 0.15s;';
+    btn.addEventListener('mouseenter', () => btn.style.borderColor = '#2563eb');
+    btn.addEventListener('mouseleave', () => btn.style.borderColor = '#e2e8f0');
+    btn.addEventListener('click', () => {
+      setPickerValues({ sidebarBg: t.sidebarBg, sidebarActive: t.sidebarActive, headerBg: t.headerBg, pageBg: t.pageBg });
+      applyDisplayColors({ sidebarBg: t.sidebarBg, sidebarActive: t.sidebarActive, headerBg: t.headerBg, pageBg: t.pageBg });
+    });
+    presetsEl.appendChild(btn);
+  });
+
+  function setPickerValues(c) {
+    document.getElementById('color-sidebar').value        = c.sidebarBg;
+    document.getElementById('color-sidebar-active').value = c.sidebarActive;
+    document.getElementById('color-header').value         = c.headerBg;
+    document.getElementById('color-page-bg').value        = c.pageBg;
+    document.getElementById('color-sidebar-hex').textContent        = c.sidebarBg;
+    document.getElementById('color-sidebar-active-hex').textContent = c.sidebarActive;
+    document.getElementById('color-header-hex').textContent         = c.headerBg;
+    document.getElementById('color-page-bg-hex').textContent        = c.pageBg;
+  }
+
+  // Init pickers with current colors
+  setPickerValues(currentColors);
+
+  // Live preview on change
+  ['color-sidebar', 'color-sidebar-active', 'color-header', 'color-page-bg'].forEach(id => {
+    document.getElementById(id).addEventListener('input', e => {
+      document.getElementById(id + '-hex').textContent = e.target.value;
+      applyDisplayColors(getPickerValues());
+    });
+  });
+
+  function getPickerValues() {
+    return {
+      sidebarBg:     document.getElementById('color-sidebar').value,
+      sidebarActive: document.getElementById('color-sidebar-active').value,
+      headerBg:      document.getElementById('color-header').value,
+      pageBg:        document.getElementById('color-page-bg').value,
+    };
+  }
+
+  document.getElementById('save-display-btn').addEventListener('click', async () => {
+    const btn    = document.getElementById('save-display-btn');
+    const colors = getPickerValues();
+    btn.disabled    = true;
+    btn.textContent = 'Saving…';
+    try {
+      await updateCompanyMetadata({ displayColors: colors });
+      showToast('Colors saved!', 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to save colors.', 'error');
+    } finally {
+      btn.disabled    = false;
+      btn.textContent = '💾 Save Colors';
+    }
+  });
+
+  document.getElementById('reset-display-btn').addEventListener('click', async () => {
+    const defaults = { sidebarBg: '#0f172a', sidebarActive: '#1e3a8a', headerBg: '#ffffff', pageBg: '#f1f5f9' };
+    setPickerValues(defaults);
+    applyDisplayColors(defaults);
+    try {
+      await updateCompanyMetadata({ displayColors: defaults });
+      showToast('Colors reset to default.', 'info');
+    } catch (e) {
+      console.error(e);
+    }
+  });
+
   // Convert fuel price value when switching currency (USD ↔ LBP)
   container.querySelectorAll('[name="fuelPriceCurrency"]').forEach(radio => {
     radio.addEventListener('change', () => {
@@ -394,6 +558,15 @@ export async function render(selector) {
       }
     );
   });
+}
+
+export function applyDisplayColors(colors) {
+  if (!colors) return;
+  const r = document.documentElement.style;
+  if (colors.sidebarBg)     r.setProperty('--color-sidebar-bg',        colors.sidebarBg);
+  if (colors.sidebarActive) r.setProperty('--color-sidebar-active-bg', colors.sidebarActive);
+  if (colors.headerBg)      r.setProperty('--color-header-bg',         colors.headerBg);
+  if (colors.pageBg)        r.setProperty('--color-bg',                colors.pageBg);
 }
 
 export function _applySidebarLogo(logoUrl) {
