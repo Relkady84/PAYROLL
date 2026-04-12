@@ -142,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('app-shell').style.display    = 'none';
 
-        renderOnboarding(user, async companyId => {
+        await renderOnboarding(user, async companyId => {
           showLoader('Setting up your workspace…');
           setCompanyId(companyId);
           await initStore();

@@ -1,16 +1,22 @@
 import { db } from '../firebase.js';
-import { doc, setDoc, serverTimestamp }
-  from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
-import { createCompany, createUserRecord, setCompanyId } from '../data/store.js';
+import {
+  doc, setDoc, getDoc, getDocs,
+  collection, serverTimestamp, writeBatch
+} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+import { createCompany, createUserRecord } from '../data/store.js';
 import { DEFAULT_SETTINGS } from '../data/defaults.js';
 
 /**
  * Renders the "Create your company" onboarding screen.
- * Calls onComplete(companyId) when the company is created successfully.
+ * Detects legacy root-level data and migrates it to the new company path.
+ * Calls onComplete(companyId) when done.
  */
-export function renderOnboarding(user, onComplete) {
+export async function renderOnboarding(user, onComplete) {
   const screen = document.getElementById('onboarding-screen');
   screen.style.display = 'flex';
+
+  // Check for legacy data at root level (old single-tenant structure)
+  const hasLegacyData = await _checkLegacyData();
 
   screen.innerHTML = `
     <div class="login-card" style="max-width:420px;">
@@ -18,12 +24,19 @@ export function renderOnboarding(user, onComplete) {
       <div class="login-title">Set Up Your Company</div>
       <div class="login-sub">Signed in as <strong>${esc(user.email)}</strong></div>
 
-      <form id="onboarding-form" style="margin-top:24px;text-align:left;">
+      ${hasLegacyData ? `
+        <div style="margin-top:16px;padding:12px 14px;background:#eff6ff;border:1px solid #bfdbfe;
+                    border-radius:8px;font-size:0.82rem;color:#1e40af;text-align:left;">
+          ✅ We found your existing employees and settings — they will be migrated automatically.
+        </div>
+      ` : ''}
+
+      <form id="onboarding-form" style="margin-top:20px;text-align:left;">
         <div style="margin-bottom:16px;">
           <label style="display:block;font-size:0.85rem;font-weight:600;color:#1e293b;margin-bottom:6px;">
             Company Name <span style="color:#dc2626;">*</span>
           </label>
-          <input id="company-name-input" type="text" placeholder="e.g. Montaigne School"
+          <input id="company-name-input" type="text" placeholder="e.g. Lycée Montaigne"
             style="width:100%;padding:10px 14px;border:2px solid #e2e8f0;border-radius:8px;
                    font-size:0.9rem;font-family:inherit;box-sizing:border-box;outline:none;
                    transition:border-color 0.15s;"
@@ -35,7 +48,7 @@ export function renderOnboarding(user, onComplete) {
           style="width:100%;padding:12px;background:#2563eb;color:#fff;border:none;
                  border-radius:8px;font-size:0.9rem;font-weight:600;cursor:pointer;
                  font-family:inherit;transition:background 0.15s;">
-          Create Company &amp; Continue →
+          ${hasLegacyData ? 'Migrate &amp; Continue →' : 'Create Company &amp; Continue →'}
         </button>
 
         <div id="onboarding-error"
@@ -64,16 +77,14 @@ export function renderOnboarding(user, onComplete) {
       return;
     }
 
-    btn.textContent = 'Creating…';
+    btn.textContent = hasLegacyData ? 'Migrating…' : 'Creating…';
     btn.disabled    = true;
     errEl.textContent = '';
 
     try {
-      // Generate a unique company ID independent of the user's UID
-      // (allows multiple users/team members to be added later)
       const companyId = `${user.uid.slice(0, 8)}_${Date.now()}`;
 
-      // Create company metadata + default settings
+      // Create company metadata
       await createCompany(companyId, {
         name,
         ownerUid:   user.uid,
@@ -81,11 +92,15 @@ export function renderOnboarding(user, onComplete) {
         createdAt:  serverTimestamp()
       });
 
-      // Write default settings so the company is ready to use immediately
-      await setDoc(
-        doc(db, 'companies', companyId, 'settings', 'config'),
-        DEFAULT_SETTINGS
-      );
+      // Migrate legacy data if it exists, otherwise write defaults
+      if (hasLegacyData) {
+        await _migrateLegacyData(companyId);
+      } else {
+        await setDoc(
+          doc(db, 'companies', companyId, 'settings', 'config'),
+          DEFAULT_SETTINGS
+        );
+      }
 
       // Link user → company
       await createUserRecord(user.uid, {
@@ -100,7 +115,7 @@ export function renderOnboarding(user, onComplete) {
     } catch (err) {
       console.error('Onboarding failed:', err);
       errEl.textContent = 'Something went wrong. Please try again.';
-      btn.textContent   = 'Create Company & Continue →';
+      btn.textContent   = hasLegacyData ? 'Migrate & Continue →' : 'Create Company & Continue →';
       btn.disabled      = false;
     }
   });
@@ -109,6 +124,43 @@ export function renderOnboarding(user, onComplete) {
     screen.style.display = 'none';
     import('../auth.js').then(({ signOutUser }) => signOutUser());
   });
+}
+
+// ── Legacy data helpers ───────────────────────────────────
+
+async function _checkLegacyData() {
+  try {
+    const [settingsSnap, employeesSnap] = await Promise.all([
+      getDoc(doc(db, 'settings', 'config')),
+      getDocs(collection(db, 'employees'))
+    ]);
+    return settingsSnap.exists() || !employeesSnap.empty;
+  } catch {
+    return false;
+  }
+}
+
+async function _migrateLegacyData(companyId) {
+  const batch = writeBatch(db);
+
+  // Migrate settings
+  const settingsSnap = await getDoc(doc(db, 'settings', 'config'));
+  const settingsData = settingsSnap.exists() ? settingsSnap.data() : DEFAULT_SETTINGS;
+  batch.set(doc(db, 'companies', companyId, 'settings', 'config'), {
+    ...DEFAULT_SETTINGS,
+    ...settingsData
+  });
+
+  // Migrate employees
+  const employeesSnap = await getDocs(collection(db, 'employees'));
+  for (const empDoc of employeesSnap.docs) {
+    batch.set(
+      doc(db, 'companies', companyId, 'employees', empDoc.id),
+      empDoc.data()
+    );
+  }
+
+  await batch.commit();
 }
 
 function esc(val) {
