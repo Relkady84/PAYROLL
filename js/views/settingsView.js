@@ -319,9 +319,15 @@ export async function render(selector) {
   const logoPreview   = document.getElementById('logo-preview');
 
   function setPreview(src) {
-    logoPreview.innerHTML = src
-      ? `<img src="${src}" style="width:100%;height:100%;object-fit:contain;">`
-      : '💼';
+    logoPreview.textContent = '';
+    if (src) {
+      const img = document.createElement('img');
+      img.src = src;
+      img.style.cssText = 'width:100%;height:100%;object-fit:contain;';
+      logoPreview.appendChild(img);
+    } else {
+      logoPreview.textContent = '💼';
+    }
   }
 
   logoUrlInput.addEventListener('input', () => setPreview(logoUrlInput.value.trim()));
@@ -573,8 +579,12 @@ export function _applySidebarLogo(logoUrl) {
   const el = document.getElementById('sidebar-logo-icon');
   if (!el) return;
   if (logoUrl) {
-    el.innerHTML = `<img src="${logoUrl}" alt="Logo"
-      style="width:36px;height:36px;object-fit:contain;border-radius:6px;">`;
+    const img = document.createElement('img');
+    img.src = logoUrl;
+    img.alt = 'Logo';
+    img.style.cssText = 'width:36px;height:36px;object-fit:contain;border-radius:6px;';
+    el.textContent = '';
+    el.appendChild(img);
   } else {
     el.textContent = '💼';
   }
