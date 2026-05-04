@@ -3,7 +3,7 @@ import { getSettings } from '../data/store.js';
 import { openAddModal, openEditModal } from './employeeFormView.js';
 import { openModal, closeModal } from './components/modal.js';
 import { showToast } from './components/toast.js';
-import { importCSV } from '../services/importService.js';
+import { importCSV, importExcel } from '../services/importService.js';
 
 let _filterType   = 'all';
 let _searchQuery  = '';
@@ -42,12 +42,16 @@ export function render(selector) {
             </select>
           </div>
           <div class="toolbar-right">
-            <span style="font-size:var(--font-size-xs);color:var(--color-text-muted);font-weight:500;">IMPORT CSV:</span>
-            <label class="btn btn-secondary btn-sm badge-teacher" style="cursor:pointer;" title="Import Teachers from CSV">
+            <label class="btn btn-primary btn-sm" style="cursor:pointer;" title="Import any spreadsheet (CSV, Excel) — file must include a Type column with values 'Teacher' or 'Admin'">
+              📥 Import Spreadsheet
+              <input type="file" class="file-input-hidden" id="import-spreadsheet" accept=".csv,.xlsx,.xls">
+            </label>
+            <span style="font-size:var(--font-size-xs);color:var(--color-text-muted);font-weight:500;margin-left:8px;">QUICK CSV:</span>
+            <label class="btn btn-secondary btn-sm badge-teacher" style="cursor:pointer;" title="Import Teachers from CSV (auto-sets type to Teacher)">
               📂 Teachers
               <input type="file" class="file-input-hidden" id="import-teacher-csv" accept=".csv">
             </label>
-            <label class="btn btn-secondary btn-sm badge-admin" style="cursor:pointer;" title="Import Administrators from CSV">
+            <label class="btn btn-secondary btn-sm badge-admin" style="cursor:pointer;" title="Import Administrators from CSV (auto-sets type to Admin)">
               📂 Administrators
               <input type="file" class="file-input-hidden" id="import-admin-csv" accept=".csv">
             </label>
@@ -78,6 +82,20 @@ export function render(selector) {
   // Add employee
   document.getElementById('add-employee-btn').addEventListener('click', () => {
     openAddModal(() => renderRows(container));
+  });
+
+  // Import Spreadsheet (CSV or Excel) — type is read from the file's "Type" column
+  document.getElementById('import-spreadsheet').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    const importer = (ext === 'xlsx' || ext === 'xls') ? importExcel : importCSV;
+    importer(file,
+      count => { showToast(`${count} employee(s) imported.`, 'success'); renderRows(container); },
+      err   => showToast(err, 'error')
+      // No forceType — file must contain a Type column ('Teacher' or 'Admin')
+    );
+    e.target.value = '';
   });
 
   // Import Teachers CSV
