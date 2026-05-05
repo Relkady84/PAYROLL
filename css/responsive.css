@@ -64,6 +64,11 @@
   body.sidebar-collapsed .menu-toggle {
     display: flex;
   }
+
+  /* Push the page header to the right so the floating ☰ doesn't overlap the title */
+  body.sidebar-collapsed .content-header {
+    padding-left: 60px;
+  }
 }
 
 /* ── Tablet (≤ 1024px) ── */
