@@ -4,6 +4,111 @@
  * Fuel price stored in settings is USD; converted to LBP internally.
  */
 
+import { computeWorkingDaysInMonth, countHolidaysInMonth } from '../models/calendar.js';
+import { countApprovedAbsencesInMonth } from '../models/absenceRequest.js';
+import { resolveEmployeeRole } from '../models/role.js';
+
+/**
+ * Compute the effective paid working days for an employee in a given month.
+ *
+ * Hierarchy (highest priority first):
+ *   1. Manual override (if provided)        — admin-typed value in payroll table
+ *   2. Active periods of the role × calendar − absences  (when academic year is set)
+ *   3. Plain calendar (legacy fallback) − absences       (when no academic year)
+ *
+ * Also returns a breakdown for display.
+ *
+ * @returns {{
+ *   days: number,
+ *   calendarDays: number,
+ *   holidays: number,
+ *   absences: number,
+ *   isManualOverride: boolean,
+ *   isOutsideActivePeriod: boolean
+ * }}
+ */
+export function computeEffectiveDays({
+  employee,
+  calendar,
+  absenceRequests,
+  year,
+  month,
+  manualOverride = undefined,
+  academicYear   = null,           // optional: if provided, role-based periods are used
+  roleRegistry   = null,           // optional: needed when academicYear is provided
+  forceOffPeriod = false           // optional: when academic years exist but none covers this month
+}) {
+  // Short-circuit: month is outside ALL defined academic years → 0 days for everyone
+  if (forceOffPeriod) {
+    const absences = countApprovedAbsencesInMonth(absenceRequests, employee.id, year, month);
+    if (manualOverride !== undefined && manualOverride !== null && manualOverride !== '' && !isNaN(manualOverride)) {
+      return {
+        days: Math.max(0, parseInt(manualOverride, 10) || 0),
+        calendarDays:        0,
+        holidays:             0,
+        absences,
+        isManualOverride:     true,
+        isOutsideActivePeriod: true
+      };
+    }
+    return {
+      days: 0,
+      calendarDays:           0,
+      holidays:                0,
+      absences,
+      isManualOverride:        false,
+      isOutsideActivePeriod:   true
+    };
+  }
+  // Resolve the role + the active periods that apply (if academic-year mode).
+  // Periods with empty from/to are treated as "not set" — we fall back to the
+  // legacy calc (employee.workSchedule + full month) rather than showing "off-period"
+  // for an unconfigured year.
+  let activePeriods = null;
+  let roleId        = null;
+  if (academicYear && academicYear.rolePeriods) {
+    const role = resolveEmployeeRole(employee, roleRegistry);
+    roleId = role?.id;
+    const raw = academicYear.rolePeriods[roleId]
+             || academicYear.rolePeriods[role?.name]
+             || null;
+    if (Array.isArray(raw)) {
+      const valid = raw.filter(p => p && p.from && p.to);
+      activePeriods = valid.length ? valid : null;
+    }
+  }
+
+  const calendarDays = computeWorkingDaysInMonth(year, month, calendar, employee, {
+    activePeriods: activePeriods || undefined
+  });
+  const holidays     = countHolidaysInMonth(year, month, calendar);
+  const absences     = countApprovedAbsencesInMonth(absenceRequests, employee.id, year, month);
+
+  // Outside active period? = no calendar days at all because none matched
+  const isOutsideActivePeriod = !!activePeriods && calendarDays === 0;
+
+  if (manualOverride !== undefined && manualOverride !== null && manualOverride !== '' && !isNaN(manualOverride)) {
+    return {
+      days: Math.max(0, parseInt(manualOverride, 10) || 0),
+      calendarDays,
+      holidays,
+      absences,
+      isManualOverride: true,
+      isOutsideActivePeriod
+    };
+  }
+
+  return {
+    days: Math.max(0, calendarDays - absences),
+    calendarDays,
+    holidays,
+    absences,
+    isManualOverride: false,
+    isOutsideActivePeriod
+  };
+}
+
+
 export function getFuelPriceInLBP(settings) {
   if (settings.fuelPriceCurrency === 'LBP') {
     return settings.fuelPricePerLitre;

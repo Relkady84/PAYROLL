@@ -16,7 +16,10 @@ import {
   getAbsenceRequests,
   getEmployeeRecord,
   getCompanyMetadataFor,
-  getSettingsFor
+  getSettingsFor,
+  getCalendarFor,
+  getAcademicYearFor,
+  getRoleRegistryFor
 } from '../data/store.js';
 import {
   ABSENCE_CATEGORIES,
@@ -26,10 +29,9 @@ import {
   validateAbsenceRequest,
   createAbsenceRequest,
   todayISO,
-  dateNDaysAgo,
-  countApprovedAbsencesInMonth
+  dateNDaysAgo
 } from '../models/absenceRequest.js';
-import { calculateNetSalary } from '../services/payroll.js';
+import { calculateNetSalary, computeEffectiveDays } from '../services/payroll.js';
 import { signOutUser } from '../auth.js';
 
 // ── State ─────────────────────────────────────────────
@@ -39,6 +41,9 @@ let _companyId   = null;
 let _companyName = '';
 let _companyLogo = '';
 let _settings    = null;
+let _calendar    = null;
+let _roleRegistry = null;
+let _academicYearsCache = {};   // yearId -> year doc, lazy-loaded
 
 let _section     = 'home';            // 'home' | 'payslip' | 'history'
 let _drawerOpen  = false;
@@ -63,11 +68,13 @@ export async function renderEmployeePortal({ user, companyId, employeeId }) {
   const screen = document.getElementById('employee-portal-screen');
   screen.style.display = 'flex';
 
-  // Load employee + metadata + settings + own requests in parallel
-  const [emp, meta, settings] = await Promise.all([
+  // Load employee + metadata + settings + calendar + role registry + own requests in parallel
+  const [emp, meta, settings, calendar, roleRegistry] = await Promise.all([
     getEmployeeRecord(companyId, employeeId),
     getCompanyMetadataFor(companyId),
-    getSettingsFor(companyId)
+    getSettingsFor(companyId),
+    getCalendarFor(companyId),
+    getRoleRegistryFor(companyId)
   ]);
 
   if (!emp) {
@@ -80,9 +87,13 @@ export async function renderEmployeePortal({ user, companyId, employeeId }) {
   _companyName  = meta?.name    || '—';
   _companyLogo  = meta?.logoUrl || '';
   _settings     = settings;
+  _calendar     = calendar;
+  _roleRegistry = roleRegistry;
   _paySlipMonth = _paySlipMonth || defaultMonth();
 
   await loadOwnAbsenceRequests(companyId, employeeId);
+  // Pre-fetch the academic year covering the current pay-slip month so the breakdown is correct on first render
+  await findAcademicYearForMonth();
   draw();
 }
 
@@ -278,11 +289,43 @@ function requestItemHTML(r) {
   `;
 }
 
+/** Find the academic year (cached) that contains the given mid-month probe ISO date. */
+async function findAcademicYearForMonth(yearId) {
+  // We don't know the yearIds — fetch via getAcademicYearFor for likely candidates.
+  // Heuristic: try yearId derived from the month's year, e.g. "2026-2027" if month is in 2026 (>=Aug) or 2027 (<=Jul).
+  const probe = `${_paySlipMonth}-15`;
+  const [y, m] = _paySlipMonth.split('-').map(Number);
+  const candidates = m >= 8 ? [`${y}-${y + 1}`] : [`${y - 1}-${y}`];
+  for (const id of candidates) {
+    if (!_academicYearsCache[id]) {
+      _academicYearsCache[id] = await getAcademicYearFor(_companyId, id);
+    }
+    const yr = _academicYearsCache[id];
+    if (yr && yr.startDate && yr.endDate && probe >= yr.startDate && probe <= yr.endDate) {
+      return yr;
+    }
+  }
+  return null;
+}
+
 // ── Section: PAY SLIP ────────────────────────────────────
 function paySlipSectionHTML() {
   const [y, m] = _paySlipMonth.split('-').map(Number);
-  const absences = countApprovedAbsencesInMonth(getAbsenceRequests(), _employee.id, y, m);
-  const days = Math.max(0, _settings.workingDaysPerMonth - absences);
+  // Use synchronously-loaded year if cached; otherwise compute without active periods.
+  const probe = `${_paySlipMonth}-15`;
+  const candidateId = m >= 8 ? `${y}-${y + 1}` : `${y - 1}-${y}`;
+  const academicYear = _academicYearsCache[candidateId] || null;
+
+  const bd = computeEffectiveDays({
+    employee:        _employee,
+    calendar:        _calendar,
+    absenceRequests: getAbsenceRequests(),
+    year:            y,
+    month:           m,
+    academicYear,
+    roleRegistry:    _roleRegistry
+  });
+  const days = bd.days;
   const calc = calculateNetSalary(_employee, _settings, days);
 
   const monthLabel = new Date(`${_paySlipMonth}-01T00:00:00`).toLocaleDateString(undefined, {
@@ -318,13 +361,9 @@ function paySlipSectionHTML() {
           <span>Working days this month</span>
           <strong>${days}</strong>
         </div>
-        ${absences > 0 ? `
-          <div class="ep-payslip-sub">
-            ${_settings.workingDaysPerMonth} − ${absences} approved absence${absences !== 1 ? 's' : ''}
-          </div>
-        ` : `
-          <div class="ep-payslip-sub">No absences this month.</div>
-        `}
+        <div class="ep-payslip-sub">
+          ${bd.calendarDays} from calendar${bd.holidays > 0 ? ` (after ${bd.holidays} holiday${bd.holidays !== 1 ? 's' : ''})` : ''}${bd.absences > 0 ? ` − ${bd.absences} absence${bd.absences !== 1 ? 's' : ''}` : ''}${bd.absences === 0 && bd.holidays === 0 ? ' · No holidays or absences this month.' : ''}
+        </div>
       </div>
 
       <div class="ep-payslip-section">
@@ -536,8 +575,10 @@ function bindListEvents() {
 }
 
 function bindPaySlipEvents() {
-  document.getElementById('ep-payslip-month').addEventListener('change', e => {
+  document.getElementById('ep-payslip-month').addEventListener('change', async e => {
     _paySlipMonth = e.target.value || defaultMonth();
+    // Pre-fetch the academic year for this month, then redraw
+    await findAcademicYearForMonth();
     draw();
   });
 
@@ -581,8 +622,18 @@ function generatePaySlipPDF() {
   const doc = new jsPDF();
 
   const [y, m] = _paySlipMonth.split('-').map(Number);
-  const absences = countApprovedAbsencesInMonth(getAbsenceRequests(), _employee.id, y, m);
-  const days = Math.max(0, _settings.workingDaysPerMonth - absences);
+  const candidateId = m >= 8 ? `${y}-${y + 1}` : `${y - 1}-${y}`;
+  const academicYear = _academicYearsCache[candidateId] || null;
+  const bd = computeEffectiveDays({
+    employee:        _employee,
+    calendar:        _calendar,
+    absenceRequests: getAbsenceRequests(),
+    year:            y,
+    month:           m,
+    academicYear,
+    roleRegistry:    _roleRegistry
+  });
+  const days = bd.days;
   const calc = calculateNetSalary(_employee, _settings, days);
 
   const monthLabel = new Date(`${_paySlipMonth}-01T00:00:00`).toLocaleDateString(undefined, {
@@ -642,8 +693,12 @@ function generatePaySlipPDF() {
   drawRow(fmtUSD(calc.baseSalaryUSD), '', { indent: 4, size: 8 });
   yPos += 2;
   drawRow('Working days this month', String(days));
-  if (absences > 0) {
-    drawRow(`(${_settings.workingDaysPerMonth} - ${absences} approved absence${absences !== 1 ? 's' : ''})`, '', { indent: 4, size: 8 });
+  {
+    const parts = [];
+    parts.push(`${bd.calendarDays} from calendar`);
+    if (bd.holidays > 0)  parts.push(`-${bd.holidays} holiday${bd.holidays !== 1 ? 's' : ''}`);
+    if (bd.absences > 0)  parts.push(`-${bd.absences} absence${bd.absences !== 1 ? 's' : ''}`);
+    drawRow(`(${parts.join(' ')})`, '', { indent: 4, size: 8 });
   }
   yPos += 2;
   drawRow('Transport / day', fmtLBP(calc.transportPerDayLBP));

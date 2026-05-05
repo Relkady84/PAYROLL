@@ -1,5 +1,23 @@
-import { getSettings, saveSettings, resetSettings, getCompanyMetadata, updateCompanyMetadata } from '../data/store.js';
+import {
+  getSettings, saveSettings, resetSettings,
+  getCompanyMetadata, updateCompanyMetadata,
+  getCalendar, saveCalendar,
+  getAcademicYears, getCurrentAcademicYear, getCurrentAcademicYearId,
+  saveAcademicYear, setCurrentAcademicYear, deleteAcademicYear,
+  getRoleRegistry, saveRoleRegistry
+} from '../data/store.js';
 import { validateSettings, normalizeSettings, denormalizeSettings } from '../models/settings.js';
+import {
+  DOW_LABELS, DOW_LABELS_FULL,
+  seedLebaneseHolidays, validateHoliday
+} from '../models/calendar.js';
+import {
+  TAX_CATEGORIES, validateRole
+} from '../models/role.js';
+import {
+  makeAcademicYear, generateYearId, suggestCurrentAcademicYear,
+  validatePeriod
+} from '../models/academicYear.js';
 import { showToast } from './components/toast.js';
 import { openModal, closeModal } from './components/modal.js';
 
@@ -119,6 +137,183 @@ export async function render(selector) {
               ↺ Reset to Default
             </button>
           </div>
+        </div>
+      </div>
+
+      <!-- School Calendar -->
+      <div class="section-card" id="calendar-card" style="margin-bottom:20px;">
+        <div class="section-card-header">
+          <span class="section-card-title">School Calendar</span>
+        </div>
+        <div class="section-card-body">
+          <div class="alert alert-info" style="margin-bottom:14px;">
+            <span>ℹ</span>
+            <span>The calendar auto-computes monthly working days. Define weekends and holidays once
+              per year and the Payroll page applies them automatically (alongside approved absences).</span>
+          </div>
+
+          <!-- Weekends -->
+          <div class="settings-section">
+            <div class="settings-section-title">Weekend Days</div>
+            <div id="cal-weekend-checks" style="display:flex;flex-wrap:wrap;gap:10px;"></div>
+            <span class="form-hint">Lebanon default: Saturday + Sunday. Some schools follow Friday + Saturday or Sunday only.</span>
+          </div>
+
+          <!-- Holidays list -->
+          <div class="settings-section">
+            <div class="settings-section-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <span>Holidays</span>
+
+              <!-- Year filter dropdown (multi-select) -->
+              <div id="cal-year-filter-wrap" style="position:relative;display:inline-block;font-weight:400;font-size:0.8rem;">
+                <button type="button" id="cal-year-filter-btn"
+                  style="padding:5px 10px;border:1.5px solid var(--color-border);border-radius:6px;
+                         background:#fff;cursor:pointer;font-family:inherit;font-size:0.78rem;
+                         color:var(--color-text-secondary);display:inline-flex;align-items:center;gap:6px;">
+                  <span id="cal-year-filter-label">All years</span>
+                  <span style="font-size:0.7rem;">▼</span>
+                </button>
+                <div id="cal-year-filter-menu"
+                  style="display:none;position:absolute;top:100%;left:0;margin-top:4px;
+                         background:#fff;border:1.5px solid var(--color-border);border-radius:8px;
+                         box-shadow:0 4px 12px rgba(0,0,0,0.08);min-width:180px;z-index:1000;
+                         padding:6px;max-height:280px;overflow-y:auto;">
+                  <!-- Filled by JS -->
+                </div>
+              </div>
+
+              <span id="cal-holiday-count" style="font-size:0.75rem;color:var(--color-text-muted);font-weight:400;margin-left:auto;"></span>
+            </div>
+
+            <div class="table-wrapper" style="margin-bottom:10px;">
+              <table class="data-table" id="cal-holidays-table">
+                <thead>
+                  <tr>
+                    <th style="width:140px;">Date</th>
+                    <th>Name</th>
+                    <th style="width:120px;">Type</th>
+                    <th style="width:80px;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="cal-holidays-tbody"></tbody>
+              </table>
+            </div>
+
+            <!-- Add holiday / vacation period inline form -->
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;">
+              <div style="flex:0 0 150px;">
+                <label class="form-label">From date</label>
+                <input type="date" class="form-control" id="cal-add-date">
+              </div>
+              <div style="flex:0 0 150px;">
+                <label class="form-label">To date <span class="form-hint" style="margin:0;font-weight:400;">(optional)</span></label>
+                <input type="date" class="form-control" id="cal-add-end-date">
+              </div>
+              <div style="flex:1 1 200px;">
+                <label class="form-label">Name</label>
+                <input type="text" class="form-control" id="cal-add-name" maxlength="80" placeholder="e.g., Christmas Break, All Saints Week">
+              </div>
+              <div style="flex:0 0 130px;">
+                <label class="form-label">Type</label>
+                <select class="form-control" id="cal-add-type">
+                  <option value="school">School</option>
+                  <option value="official">Official</option>
+                </select>
+              </div>
+              <div>
+                <button type="button" class="btn btn-secondary" id="cal-add-btn">+ Add</button>
+              </div>
+            </div>
+            <div id="cal-add-error" style="font-size:0.78rem;color:var(--color-danger);margin-top:6px;min-height:18px;"></div>
+            <span class="form-hint" style="margin-top:6px;">
+              For multi-day vacations, fill both <strong>From</strong> and <strong>To</strong>.
+              The system creates one entry per day automatically. Days that fall on weekends are still included
+              (so the calendar stays accurate if you ever change which days are weekends).
+            </span>
+
+            <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+              <button type="button" class="btn btn-secondary btn-sm" id="cal-prefill-btn">
+                🇱🇧 Pre-fill Lebanese holidays
+              </button>
+              <span class="form-hint" style="margin:0;">
+                Adds 10 fixed-date Lebanese holidays for both the current year and the next year (so school
+                breaks crossing Jan 1 get the right labels). Movable holidays (Easter, Eid, Ashura) and
+                school breaks (Christmas, All Saints, Snow week) must be added manually.
+              </span>
+            </div>
+          </div>
+
+          <!-- Save -->
+          <div style="display:flex;gap:10px;padding-top:8px;">
+            <button type="button" class="btn btn-primary" id="cal-save-btn">💾 Save Calendar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Academic Year + Roles -->
+      <div class="section-card" id="academic-year-card" style="margin-bottom:20px;">
+        <div class="section-card-header">
+          <span class="section-card-title">Academic Year & Roles</span>
+        </div>
+        <div class="section-card-body">
+
+          <div class="alert alert-info" style="margin-bottom:14px;">
+            <span>ℹ</span>
+            <span>Define each role's active period within the academic year. For example: Teachers
+              start Sep 7, Administrators start Sep 1, Service Financier starts Aug 21 with a permanence
+              period at end of July (1 day/week).</span>
+          </div>
+
+          <!-- Year selector + actions -->
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:18px;">
+            <div style="flex:1 1 220px;">
+              <label class="form-label">Academic year</label>
+              <select class="form-control" id="ay-year-select"></select>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" id="ay-new-btn">+ New year</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="ay-set-current-btn">★ Set as current</button>
+            <button type="button" class="btn btn-danger btn-sm" id="ay-delete-btn">🗑 Delete</button>
+          </div>
+
+          <!-- Year details -->
+          <div id="ay-details">
+            <!-- Filled by JS -->
+          </div>
+
+          <!-- Roles management -->
+          <div class="settings-section" style="margin-top:24px;">
+            <div class="settings-section-title">Roles</div>
+            <div class="table-wrapper" style="margin-bottom:10px;">
+              <table class="data-table" id="role-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th style="width:140px;">Tax category</th>
+                    <th style="width:100px;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="role-tbody"></tbody>
+              </table>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;">
+              <div style="flex:1 1 200px;">
+                <label class="form-label">Add role — name</label>
+                <input type="text" class="form-control" id="role-add-name" maxlength="50"
+                  placeholder="e.g., Service Financier">
+              </div>
+              <div style="flex:0 0 160px;">
+                <label class="form-label">Tax category</label>
+                <select class="form-control" id="role-add-tax">
+                  ${TAX_CATEGORIES.map(t => `<option value="${t}">${t}</option>`).join('')}
+                </select>
+              </div>
+              <button type="button" class="btn btn-secondary" id="role-add-btn">+ Add role</button>
+            </div>
+            <div id="role-add-error" style="font-size:0.78rem;color:var(--color-danger);margin-top:6px;min-height:18px;"></div>
+            <span class="form-hint">Built-in roles (Teacher, Administrator) cannot be deleted. Custom roles
+              like "Service Financier" inherit their tax/NFS rates from the chosen tax category.</span>
+          </div>
+
         </div>
       </div>
 
@@ -480,6 +675,13 @@ export async function render(selector) {
     }
   });
 
+  // ── School Calendar ─────────────────────────────────────
+  initCalendarSection();
+
+  // ── Academic Year & Roles ──────────────────────────────
+  initAcademicYearSection();
+  initRolesSection();
+
   // Convert fuel price value when switching currency (USD ↔ LBP)
   container.querySelectorAll('[name="fuelPriceCurrency"]').forEach(radio => {
     radio.addEventListener('change', () => {
@@ -641,4 +843,779 @@ function handleSave(container) {
   const settings = denormalizeSettings(getSettings());
   const hint = form.querySelector('#exchangeRate').closest('.form-group').querySelector('.form-hint');
   if (hint) hint.textContent = `Current rate: 1 USD = ${settings.exchangeRate.toLocaleString()} LBP`;
+}
+
+// ── Academic Year section logic ────────────────────────────
+function initAcademicYearSection() {
+  let years      = getAcademicYears();
+  let currentId  = getCurrentAcademicYearId();
+  let editingId  = currentId || years[0]?.yearId || null;
+  // Working copy of the year being edited (separate from the in-memory cache)
+  let edited     = editingId ? structuredClone(years.find(y => y.yearId === editingId)) : null;
+
+  function refreshYearList() {
+    years     = getAcademicYears();
+    currentId = getCurrentAcademicYearId();
+    if (!editingId || !years.some(y => y.yearId === editingId)) {
+      editingId = currentId || years[0]?.yearId || null;
+      edited    = editingId ? structuredClone(years.find(y => y.yearId === editingId)) : null;
+    }
+    renderYearSelect();
+    renderYearDetails();
+  }
+
+  function renderYearSelect() {
+    const sel = document.getElementById('ay-year-select');
+    if (!years.length) {
+      sel.innerHTML = `<option value="">— No academic year defined yet —</option>`;
+      sel.value = '';
+      return;
+    }
+    sel.innerHTML = years.map(y =>
+      `<option value="${esc(y.yearId)}" ${y.yearId === editingId ? 'selected' : ''}>${esc(y.label || y.yearId)}${y.isCurrent ? ' ★ current' : ''}</option>`
+    ).join('');
+  }
+
+  function renderYearDetails() {
+    const wrap = document.getElementById('ay-details');
+    if (!edited) {
+      wrap.innerHTML = `
+        <div class="alert alert-info">
+          <span>ℹ</span>
+          <span>No academic year yet. Click <strong>+ New year</strong> to create one (default: Sep 1 → Jun 30).</span>
+        </div>
+      `;
+      return;
+    }
+
+    const roleRegistry = getRoleRegistry();
+
+    wrap.innerHTML = `
+      <div class="form-grid" style="margin-bottom:12px;">
+        <div class="form-group">
+          <label class="form-label">Year start</label>
+          <input type="date" class="form-control" id="ay-start-date" value="${esc(edited.startDate || '')}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Year end</label>
+          <input type="date" class="form-control" id="ay-end-date" value="${esc(edited.endDate || '')}">
+        </div>
+      </div>
+
+      <div style="font-weight:600;margin:12px 0 8px;">Active periods per role</div>
+      <div id="ay-role-periods"></div>
+    `;
+
+    document.getElementById('ay-start-date').addEventListener('change', e => {
+      edited.startDate = e.target.value;
+    });
+    document.getElementById('ay-end-date').addEventListener('change', e => {
+      edited.endDate = e.target.value;
+    });
+
+    renderRolePeriods(roleRegistry);
+  }
+
+  function renderRolePeriods(roleRegistry) {
+    const wrap = document.getElementById('ay-role-periods');
+    edited.rolePeriods = edited.rolePeriods || {};
+
+    wrap.innerHTML = roleRegistry.roles.map(role => {
+      const periods = edited.rolePeriods[role.id] || [];
+      const periodsHtml = periods.length
+        ? periods.map((p, idx) => periodRowHTML(role.id, idx, p)).join('')
+        : `<div style="padding:10px;color:var(--color-text-muted);font-size:0.85rem;">No active period — this role gets 0 working days. Click "+ Add period" to set one.</div>`;
+      return `
+        <div class="section-card" style="margin-bottom:10px;background:#f8fafc;">
+          <div style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--color-border);">
+            <strong>${esc(role.name)}</strong>
+            <button type="button" class="btn btn-secondary btn-sm" data-add-period="${esc(role.id)}">+ Add period</button>
+          </div>
+          <div style="padding:10px 14px;">
+            ${periodsHtml}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // "Add period" buttons
+    wrap.querySelectorAll('[data-add-period]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const roleId = btn.dataset.addPeriod;
+        edited.rolePeriods[roleId] = edited.rolePeriods[roleId] || [];
+        edited.rolePeriods[roleId].push({
+          from:     edited.startDate || '',
+          to:       edited.endDate   || '',
+          schedule: [1, 2, 3, 4, 5]
+        });
+        renderRolePeriods(roleRegistry);
+      });
+    });
+
+    // Delete period buttons
+    wrap.querySelectorAll('[data-del-period]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const [roleId, idxStr] = btn.dataset.delPeriod.split('::');
+        const idx = parseInt(idxStr, 10);
+        if (edited.rolePeriods[roleId]) {
+          edited.rolePeriods[roleId].splice(idx, 1);
+          renderRolePeriods(roleRegistry);
+        }
+      });
+    });
+
+    // From/To/Schedule inputs
+    wrap.querySelectorAll('[data-period-input]').forEach(input => {
+      input.addEventListener('change', () => {
+        const [roleId, idxStr, field] = input.dataset.periodInput.split('::');
+        const idx = parseInt(idxStr, 10);
+        const p = edited.rolePeriods[roleId]?.[idx];
+        if (!p) return;
+        if (field === 'from')  p.from = input.value;
+        if (field === 'to')    p.to   = input.value;
+      });
+    });
+
+    // Schedule day toggles
+    wrap.querySelectorAll('[data-period-day]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const [roleId, idxStr, dowStr] = cb.dataset.periodDay.split('::');
+        const idx = parseInt(idxStr, 10);
+        const dow = parseInt(dowStr, 10);
+        const p = edited.rolePeriods[roleId]?.[idx];
+        if (!p) return;
+        p.schedule = Array.isArray(p.schedule) ? p.schedule : [];
+        if (cb.checked) {
+          if (!p.schedule.includes(dow)) p.schedule = [...p.schedule, dow].sort((a, b) => a - b);
+        } else {
+          p.schedule = p.schedule.filter(d => d !== dow);
+        }
+        renderRolePeriods(roleRegistry);
+      });
+    });
+  }
+
+  function periodRowHTML(roleId, idx, p) {
+    const orderedDows = [1, 2, 3, 4, 5, 6, 0];
+    const dayChips = orderedDows.map(dow => `
+      <label style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;
+                    border:1.5px solid var(--color-border);border-radius:6px;font-size:0.75rem;
+                    cursor:pointer;background:${(p.schedule || []).includes(dow) ? '#dbeafe' : '#fff'};
+                    color:${(p.schedule || []).includes(dow) ? '#1e40af' : '#1e293b'};">
+        <input type="checkbox" data-period-day="${esc(roleId)}::${idx}::${dow}"
+          ${(p.schedule || []).includes(dow) ? 'checked' : ''}>
+        ${DOW_LABELS[dow]}
+      </label>
+    `).join('');
+
+    return `
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;padding:8px 0;border-bottom:1px solid var(--color-border);">
+        <div style="flex:0 0 145px;">
+          <label class="form-label" style="font-size:0.75rem;">From</label>
+          <input type="date" class="form-control" data-period-input="${esc(roleId)}::${idx}::from" value="${esc(p.from || '')}">
+        </div>
+        <div style="flex:0 0 145px;">
+          <label class="form-label" style="font-size:0.75rem;">To</label>
+          <input type="date" class="form-control" data-period-input="${esc(roleId)}::${idx}::to" value="${esc(p.to || '')}">
+        </div>
+        <div style="flex:1 1 240px;">
+          <label class="form-label" style="font-size:0.75rem;">Schedule</label>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;">${dayChips}</div>
+        </div>
+        <button type="button" class="btn btn-danger btn-sm" data-del-period="${esc(roleId)}::${idx}" title="Remove this period">🗑</button>
+      </div>
+    `;
+  }
+
+  // Year selector change
+  document.getElementById('ay-year-select').addEventListener('change', async e => {
+    const yearId = e.target.value;
+    if (!yearId) return;
+    // Save current edits before switching
+    if (edited && editingId) {
+      try { await saveAcademicYear(edited); } catch (err) { console.error(err); }
+    }
+    editingId = yearId;
+    edited    = structuredClone(getAcademicYears().find(y => y.yearId === yearId));
+    renderYearDetails();
+  });
+
+  // New year button
+  document.getElementById('ay-new-btn').addEventListener('click', () => {
+    openYearCreatorModal(async (newYear) => {
+      try {
+        await saveAcademicYear(newYear);
+        showToast(`Academic year ${newYear.yearId} created.`, 'success');
+        editingId = newYear.yearId;
+        edited    = structuredClone(newYear);
+        refreshYearList();
+      } catch (e) {
+        console.error(e);
+        showToast('Failed to create academic year.', 'error');
+      }
+    });
+  });
+
+  // Set as current
+  document.getElementById('ay-set-current-btn').addEventListener('click', async () => {
+    if (!editingId) return;
+    try {
+      await setCurrentAcademicYear(editingId);
+      showToast('Set as current academic year.', 'success');
+      refreshYearList();
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to set current year.', 'error');
+    }
+  });
+
+  // Delete year
+  document.getElementById('ay-delete-btn').addEventListener('click', () => {
+    if (!editingId) return;
+    openModal(
+      'Delete Academic Year',
+      `<p style="color:var(--color-text-secondary)">Delete academic year <strong>${esc(editingId)}</strong>? This cannot be undone.</p>`,
+      {
+        confirmLabel: 'Delete',
+        danger: true,
+        onConfirm: async () => {
+          try {
+            await deleteAcademicYear(editingId);
+            closeModal();
+            showToast('Academic year deleted.', 'info');
+            editingId = null;
+            edited    = null;
+            refreshYearList();
+          } catch (e) {
+            console.error(e);
+            showToast('Failed to delete.', 'error');
+          }
+        }
+      }
+    );
+  });
+
+  // Auto-save edits when user clicks save calendar (existing button)
+  // Add a "Save Year" button next to year details — simpler: save on each change
+  // Actually let's add a save button at the bottom of the year details block
+  document.addEventListener('click', async e => {
+    if (e.target.id !== 'ay-save-btn') return;
+    if (!edited || !editingId) return;
+    const btn = e.target;
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    try {
+      // Validate periods
+      const errors = [];
+      for (const [roleId, periods] of Object.entries(edited.rolePeriods || {})) {
+        for (const p of periods) {
+          const errs = validatePeriod(p);
+          if (errs.length) errors.push(`${roleId}: ${errs.join(' ')}`);
+        }
+      }
+      if (errors.length) {
+        showToast(errors[0], 'warning');
+        btn.disabled = false;
+        btn.textContent = '💾 Save Year';
+        return;
+      }
+      await saveAcademicYear(edited);
+      showToast('Academic year saved.', 'success');
+      refreshYearList();
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to save.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '💾 Save Year';
+    }
+  });
+
+  // Inject a save button below the year details
+  const observer = new MutationObserver(() => {
+    const wrap = document.getElementById('ay-details');
+    if (wrap && !wrap.querySelector('#ay-save-btn')) {
+      const btnDiv = document.createElement('div');
+      btnDiv.style.cssText = 'margin-top:12px;display:flex;gap:10px;';
+      btnDiv.innerHTML = `<button type="button" class="btn btn-primary" id="ay-save-btn">💾 Save Year</button>`;
+      wrap.appendChild(btnDiv);
+    }
+  });
+  observer.observe(document.getElementById('ay-details'), { childList: true, subtree: true });
+
+  refreshYearList();
+}
+
+function openYearCreatorModal(onCreate) {
+  const suggestion = suggestCurrentAcademicYear();
+  openModal(
+    'Create Academic Year',
+    `
+      <div class="form-group">
+        <label class="form-label">Start date</label>
+        <input type="date" class="form-control" id="ay-new-start" value="${suggestion.startDate}">
+        <span class="form-hint">Default: September 1 of the school year</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">End date</label>
+        <input type="date" class="form-control" id="ay-new-end" value="${suggestion.endDate}">
+        <span class="form-hint">Default: June 30 of the next year</span>
+      </div>
+      <div class="alert alert-info">
+        <span>ℹ</span>
+        <span>The year will be named automatically (e.g., <strong>${suggestion.yearId}</strong>) and start with default Mon–Fri active periods for built-in roles.</span>
+      </div>
+    `,
+    {
+      confirmLabel: 'Create',
+      onConfirm: () => {
+        const startDate = document.getElementById('ay-new-start').value;
+        const endDate   = document.getElementById('ay-new-end').value;
+        if (!startDate || !endDate || endDate < startDate) {
+          showToast('Please choose valid start and end dates (end ≥ start).', 'warning');
+          return;
+        }
+        const yearId = generateYearId(startDate);
+        const year = makeAcademicYear({ yearId, startDate, endDate, isCurrent: false });
+        // Initialize role periods using the start/end as the default active range
+        for (const roleId of Object.keys(year.rolePeriods)) {
+          year.rolePeriods[roleId] = [{ from: startDate, to: endDate, schedule: [1,2,3,4,5] }];
+        }
+        closeModal();
+        onCreate(year);
+      }
+    }
+  );
+}
+
+// ── Roles section logic ────────────────────────────────────
+function initRolesSection() {
+  function renderRoleTable() {
+    const registry = getRoleRegistry();
+    const tbody = document.getElementById('role-tbody');
+    if (!registry.roles.length) {
+      tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--color-text-muted);">No roles defined.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = registry.roles.map(r => `
+      <tr>
+        <td><strong>${esc(r.name)}</strong>${r.builtin ? ' <span class="badge" style="background:#f1f5f9;color:#64748b;font-size:0.65rem;">built-in</span>' : ''}</td>
+        <td><span class="badge badge-${r.taxCategory === 'Teacher' ? 'teacher' : 'admin'}">${esc(r.taxCategory)}</span></td>
+        <td>
+          ${r.builtin ? '<span style="font-size:0.75rem;color:var(--color-text-muted);">—</span>'
+                     : `<button class="btn btn-danger btn-sm" data-del-role="${esc(r.id)}">🗑</button>`}
+        </td>
+      </tr>
+    `).join('');
+
+    tbody.querySelectorAll('[data-del-role]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.delRole;
+        if (!confirm(`Delete role "${id}"? Employees with this role will fall back to their tax category.`)) return;
+        const reg = getRoleRegistry();
+        reg.roles = reg.roles.filter(r => r.id !== id);
+        try {
+          await saveRoleRegistry(reg);
+          showToast('Role deleted.', 'info');
+          renderRoleTable();
+        } catch (e) {
+          console.error(e);
+          showToast('Failed to delete role.', 'error');
+        }
+      });
+    });
+  }
+
+  document.getElementById('role-add-btn').addEventListener('click', async () => {
+    const name = document.getElementById('role-add-name').value.trim();
+    const tax  = document.getElementById('role-add-tax').value;
+    const errEl = document.getElementById('role-add-error');
+
+    const reg = getRoleRegistry();
+    const errors = validateRole({ name, taxCategory: tax }, reg.roles);
+    if (errors.length) {
+      errEl.textContent = errors.join(' ');
+      return;
+    }
+    errEl.textContent = '';
+
+    reg.roles.push({ id: name, name, taxCategory: tax, builtin: false });
+    try {
+      await saveRoleRegistry(reg);
+      document.getElementById('role-add-name').value = '';
+      showToast(`Role "${name}" added.`, 'success');
+      renderRoleTable();
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to add role.', 'error');
+    }
+  });
+
+  renderRoleTable();
+}
+
+/**
+ * Expand "2025-12-23" to "2026-01-07" → array of every YYYY-MM-DD in between (inclusive).
+ * Includes weekend dates — that's fine because the calendar separately filters weekends
+ * during the working-day calculation. Holidays exist as data even when they fall on weekends
+ * so the breakdown stays correct if the school later changes which days are weekends.
+ */
+function expandDateRange(fromIso, toIso) {
+  const out = [];
+  const [fy, fm, fd] = fromIso.split('-').map(Number);
+  const [ty, tm, td] = toIso.split('-').map(Number);
+  let cursor = new Date(fy, fm - 1, fd);
+  const end  = new Date(ty, tm - 1, td);
+  while (cursor <= end) {
+    const y  = cursor.getFullYear();
+    const m  = String(cursor.getMonth() + 1).padStart(2, '0');
+    const d  = String(cursor.getDate()).padStart(2, '0');
+    out.push(`${y}-${m}-${d}`);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return out;
+}
+
+// ── School Calendar section logic ──────────────────────────
+function initCalendarSection() {
+  // Working copy — only flushed to Firestore on Save
+  let cal = getCalendar();
+
+  // Year filter state — null means "all years"; array of year strings (e.g. ["2026","2027"]) means filtered.
+  let yearFilter = null;
+
+  function renderWeekendChecks() {
+    const wrap = document.getElementById('cal-weekend-checks');
+    wrap.innerHTML = DOW_LABELS_FULL.map((label, i) => `
+      <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;cursor:pointer;
+                    padding:6px 12px;border:1.5px solid var(--color-border);border-radius:7px;
+                    background:${cal.weekendDays.includes(i) ? '#dbeafe' : '#fff'};
+                    color:${cal.weekendDays.includes(i) ? '#1e40af' : '#1e293b'};
+                    font-weight:${cal.weekendDays.includes(i) ? '600' : '500'};">
+        <input type="checkbox" data-dow="${i}" ${cal.weekendDays.includes(i) ? 'checked' : ''}>
+        ${label}
+      </label>
+    `).join('');
+
+    wrap.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const dow = parseInt(cb.dataset.dow, 10);
+        if (cb.checked) {
+          if (!cal.weekendDays.includes(dow)) cal.weekendDays = [...cal.weekendDays, dow].sort((a,b) => a - b);
+        } else {
+          cal.weekendDays = cal.weekendDays.filter(d => d !== dow);
+        }
+        renderWeekendChecks();
+      });
+    });
+  }
+
+  function yearOf(iso) {
+    return typeof iso === 'string' && iso.length >= 4 ? iso.slice(0, 4) : '';
+  }
+
+  // Distinct years present in the data — recomputed when needed.
+  function getAvailableYears() {
+    return [...new Set(cal.holidays.map(h => yearOf(h.date)).filter(Boolean))].sort();
+  }
+
+  function updateYearFilterLabel() {
+    const labelEl = document.getElementById('cal-year-filter-label');
+    if (!labelEl) return;
+    const years = getAvailableYears();
+    if (!yearFilter || !yearFilter.length) {
+      labelEl.textContent = years.length ? `All years (${years.length})` : 'No years yet';
+    } else if (yearFilter.length === 1) {
+      labelEl.textContent = `Year ${yearFilter[0]}`;
+    } else {
+      labelEl.textContent = `${yearFilter.length} years`;
+    }
+  }
+
+  // Build the dropdown menu HTML. ONLY called when the years list changes
+  // (add/remove holiday) — never on filter toggles. This way clicks on
+  // checkboxes don't get nuked by a rebuild during their own change handler.
+  function renderYearFilterMenu() {
+    const menu = document.getElementById('cal-year-filter-menu');
+    if (!menu) return;
+    const years = getAvailableYears();
+
+    if (!years.length) {
+      menu.innerHTML = `<div style="padding:8px;color:var(--color-text-muted);font-size:0.8rem;">No years yet — add a holiday first.</div>`;
+      updateYearFilterLabel();
+      return;
+    }
+
+    const allChecked = !yearFilter || !yearFilter.length;
+    menu.innerHTML = `
+      <label style="display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:pointer;
+                    border-bottom:1px solid var(--color-border);font-weight:600;">
+        <input type="checkbox" id="cal-year-filter-all" ${allChecked ? 'checked' : ''}>
+        <span>All years</span>
+      </label>
+      ${years.map(y => `
+        <label style="display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">
+          <input type="checkbox" data-year="${y}"
+            ${(!yearFilter || yearFilter.length === 0 || yearFilter.includes(y)) ? 'checked' : ''}>
+          <span>${y}</span>
+        </label>
+      `).join('')}
+    `;
+
+    // "All years" toggle
+    menu.querySelector('#cal-year-filter-all').addEventListener('change', e => {
+      yearFilter = e.target.checked ? null : [];
+      updateYearFilterLabel();
+      // Update sibling checkboxes in place (no menu rebuild)
+      menu.querySelectorAll('[data-year]').forEach(cb => { cb.checked = e.target.checked; });
+      renderHolidaysTableOnly();
+    });
+
+    // Per-year toggles
+    menu.querySelectorAll('[data-year]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        if (!yearFilter) yearFilter = [...years];
+        const y = cb.dataset.year;
+        if (cb.checked && !yearFilter.includes(y)) yearFilter.push(y);
+        else if (!cb.checked) yearFilter = yearFilter.filter(v => v !== y);
+        if (yearFilter.length === years.length) yearFilter = null;
+        // Update the "All years" checkbox in place
+        const allCb = menu.querySelector('#cal-year-filter-all');
+        if (allCb) allCb.checked = !yearFilter || !yearFilter.length;
+        updateYearFilterLabel();
+        renderHolidaysTableOnly();
+      });
+    });
+
+    updateYearFilterLabel();
+  }
+
+  // Render JUST the table (no menu rebuild). Used by filter toggles.
+  function renderHolidaysTableOnly() {
+    const tbody = document.getElementById('cal-holidays-tbody');
+    const allSorted = [...cal.holidays].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const sorted = (yearFilter && yearFilter.length)
+      ? allSorted.filter(h => yearFilter.includes(yearOf(h.date)))
+      : allSorted;
+
+    document.getElementById('cal-holiday-count').textContent =
+      `${sorted.length} day${sorted.length !== 1 ? 's' : ''}${yearFilter && yearFilter.length ? ` (filtered)` : ''}`;
+
+    if (!sorted.length) {
+      tbody.innerHTML = `
+        <tr><td colspan="4">
+          <div class="table-empty">
+            <div class="table-empty-icon">📅</div>
+            <p>${cal.holidays.length === 0
+                ? 'No holidays added yet. Use "Pre-fill Lebanese holidays" or add them manually.'
+                : 'No holidays match the selected year(s). Adjust the filter to see more.'}</p>
+          </div>
+        </td></tr>
+      `;
+      return;
+    }
+
+    const groups = groupConsecutiveByName(sorted);
+    tbody.innerHTML = groups.map(g => {
+      const isRange = g.dates.length > 1;
+      const dateLabel = isRange
+        ? `${g.dates[0]} <small style="color:var(--color-text-muted);">→</small> ${g.dates[g.dates.length - 1]}`
+        : `<strong>${g.dates[0]}</strong>`;
+      const dayBadge = isRange
+        ? `<span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;background:#f1f5f9;color:#475569;font-size:0.7rem;font-weight:600;">${g.dates.length} days</span>`
+        : '';
+      const groupKey = `${g.dates[0]}::${g.dates[g.dates.length - 1]}::${g.name}`;
+      return `
+        <tr>
+          <td>${dateLabel}${dayBadge}</td>
+          <td>${esc(g.name)}</td>
+          <td><span class="badge ${g.type === 'official' ? 'badge-teacher' : 'badge-admin'}">${esc(g.type || 'official')}</span></td>
+          <td>
+            <button class="btn btn-danger btn-sm" data-del-group="${esc(groupKey)}" title="${isRange ? `Delete all ${g.dates.length} days` : 'Delete'}">🗑</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    tbody.querySelectorAll('[data-del-group]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const [from, to, name] = btn.dataset.delGroup.split('::');
+        cal.holidays = cal.holidays.filter(h =>
+          !(h.name === name && h.date >= from && h.date <= to)
+        );
+        renderHolidaysTable(); // full re-render — years list may have changed
+      });
+    });
+  }
+
+  // Full re-render — used when the holidays list itself has changed
+  // (add holiday, remove holiday, pre-fill). Rebuilds menu AND table.
+  function renderHolidaysTable() {
+    renderYearFilterMenu();
+    renderHolidaysTableOnly();
+  }
+
+  function groupConsecutiveByName(sortedHolidays) {
+    const groups = [];
+    for (const h of sortedHolidays) {
+      const last = groups[groups.length - 1];
+      if (last
+          && last.name === h.name
+          && last.type === (h.type || 'official')
+          && isNextDay(last.dates[last.dates.length - 1], h.date)) {
+        last.dates.push(h.date);
+      } else {
+        groups.push({ name: h.name, type: h.type || 'official', dates: [h.date] });
+      }
+    }
+    return groups;
+  }
+
+  function isNextDay(prevIso, nextIso) {
+    const [py, pm, pd] = prevIso.split('-').map(Number);
+    const prev = new Date(py, pm - 1, pd);
+    prev.setDate(prev.getDate() + 1);
+    const expected = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}-${String(prev.getDate()).padStart(2, '0')}`;
+    return expected === nextIso;
+  }
+
+  // Add holiday / vacation period inline form
+  document.getElementById('cal-add-btn').addEventListener('click', () => {
+    const date    = document.getElementById('cal-add-date').value;
+    const endDate = document.getElementById('cal-add-end-date').value;
+    const name    = document.getElementById('cal-add-name').value.trim();
+    const type    = document.getElementById('cal-add-type').value;
+    const errEl   = document.getElementById('cal-add-error');
+
+    // Validate "from" date and name (always required)
+    const errors = validateHoliday({ date, name });
+    if (errors.length) {
+      errEl.textContent = errors.join(' ');
+      return;
+    }
+
+    // If "To" date provided, validate it and expand into a range
+    let datesToAdd = [date];
+    if (endDate) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+        errEl.textContent = 'End date must be in YYYY-MM-DD format.';
+        return;
+      }
+      if (endDate < date) {
+        errEl.textContent = 'End date must be on or after the start date.';
+        return;
+      }
+      datesToAdd = expandDateRange(date, endDate);
+      // Cap at 60 days to prevent runaway adds
+      if (datesToAdd.length > 60) {
+        errEl.textContent = `Range too long (${datesToAdd.length} days). Please add in chunks of 60 days or less.`;
+        return;
+      }
+    }
+
+    // Filter out duplicates (same date already in calendar)
+    const existingDates = new Set(cal.holidays.map(h => h.date));
+    const newDates = datesToAdd.filter(d => !existingDates.has(d));
+    const skipped  = datesToAdd.length - newDates.length;
+
+    if (!newDates.length) {
+      errEl.textContent = 'All days in this range are already in the calendar.';
+      return;
+    }
+
+    errEl.textContent = '';
+    for (const d of newDates) {
+      cal.holidays.push({ date: d, name, type });
+    }
+
+    document.getElementById('cal-add-name').value = '';
+    document.getElementById('cal-add-date').value = '';
+    document.getElementById('cal-add-end-date').value = '';
+    renderHolidaysTable();
+
+    if (newDates.length > 1 || skipped > 0) {
+      const parts = [`Added ${newDates.length} day${newDates.length !== 1 ? 's' : ''} for "${name}"`];
+      if (skipped > 0) parts.push(`(${skipped} already existed)`);
+      showToast(parts.join(' '), 'success');
+    }
+  });
+
+  // Pre-fill Lebanese holidays — seeds CURRENT and NEXT year so school breaks
+  // crossing into January (Christmas, New Year, Armenian Christmas) get the
+  // right official labels even when the academic year spans two calendar years.
+  document.getElementById('cal-prefill-btn').addEventListener('click', () => {
+    const year     = new Date().getFullYear();
+    const seeded   = [...seedLebaneseHolidays(year), ...seedLebaneseHolidays(year + 1)];
+
+    const conflicts = seeded.filter(s => cal.holidays.some(h => h.date === s.date));
+    const proceed = () => {
+      const existingDates = new Set(cal.holidays.map(h => h.date));
+      let added = 0;
+      for (const h of seeded) {
+        if (!existingDates.has(h.date)) {
+          cal.holidays.push(h);
+          added++;
+        }
+      }
+      renderHolidaysTable();
+      showToast(`Pre-filled ${added} Lebanese holiday${added !== 1 ? 's' : ''} for ${year} and ${year + 1}.`, 'success');
+    };
+
+    if (conflicts.length) {
+      openModal(
+        'Pre-fill Lebanese Holidays',
+        `<p style="color:var(--color-text-secondary)">
+          ${conflicts.length} of these dates already have holidays in your calendar.
+          Existing entries will be kept; only missing ones will be added.
+          Continue?
+        </p>`,
+        { confirmLabel: 'Add Missing', onConfirm: () => { closeModal(); proceed(); } }
+      );
+    } else {
+      proceed();
+    }
+  });
+
+  // Save calendar
+  document.getElementById('cal-save-btn').addEventListener('click', async () => {
+    if (!cal.weekendDays.length) {
+      showToast('Select at least one weekend day, or none if your school works 7 days a week.', 'warning');
+    }
+    const btn = document.getElementById('cal-save-btn');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    try {
+      await saveCalendar(cal);
+      showToast('Calendar saved!', 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to save calendar.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '💾 Save Calendar';
+    }
+  });
+
+  // Year-filter dropdown open/close
+  const yearBtn  = document.getElementById('cal-year-filter-btn');
+  const yearMenu = document.getElementById('cal-year-filter-menu');
+  if (yearBtn && yearMenu) {
+    yearBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      yearMenu.style.display = yearMenu.style.display === 'block' ? 'none' : 'block';
+    });
+    // Stop ALL clicks inside the menu from bubbling — otherwise the document
+    // "click outside" listener fires after the menu re-renders and sees a detached
+    // node (the checkbox you just clicked), thinks you clicked outside, and closes.
+    yearMenu.addEventListener('click', e => e.stopPropagation());
+    // Close on outside click
+    document.addEventListener('click', e => {
+      if (!yearBtn.contains(e.target) && !yearMenu.contains(e.target)) {
+        yearMenu.style.display = 'none';
+      }
+    });
+  }
+
+  renderWeekendChecks();
+  renderHolidaysTable();
 }

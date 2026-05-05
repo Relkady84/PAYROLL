@@ -111,6 +111,24 @@ service cloud.firestore {
       allow read: if isEmployeeOf(companyId);
     }
 
+    // Employees can read the calendar (needed to compute working days for
+    // their pay slip — applies weekends + holidays).
+    match /companies/{companyId}/calendar/config {
+      allow read: if isEmployeeOf(companyId);
+    }
+
+    // Employees can read academic years (for pay-slip working-day calculation
+    // when the company uses role-based active periods).
+    match /companies/{companyId}/academicYears/{yearId} {
+      allow read: if isEmployeeOf(companyId);
+    }
+
+    // Employees can read the roles registry (so the portal knows which role
+    // they belong to and applies the right active periods).
+    match /companies/{companyId}/roles/{docId} {
+      allow read: if isEmployeeOf(companyId);
+    }
+
     // ── /companies/{companyId}/absenceRequests/{requestId} ───
     // Owners (covered by parent rule above) have full access.
     // Employees can: read their own, create new pending requests, delete own pending.

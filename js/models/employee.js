@@ -1,16 +1,32 @@
 export const EMPLOYEE_TYPES = ['Teacher', 'Admin'];
 
+// Default work schedule: Monday–Friday (1–5). 0=Sun, 6=Sat.
+export const DEFAULT_EMPLOYEE_SCHEDULE = [1, 2, 3, 4, 5];
+
+function normalizeSchedule(input) {
+  if (!Array.isArray(input)) return [...DEFAULT_EMPLOYEE_SCHEDULE];
+  const cleaned = input
+    .map(n => parseInt(n, 10))
+    .filter(n => Number.isInteger(n) && n >= 0 && n <= 6);
+  // Dedupe + sort for consistency
+  return [...new Set(cleaned)].sort((a, b) => a - b);
+}
+
 export function createEmployee(data) {
+  const schedule = normalizeSchedule(data.workSchedule);
+  const employeeType = EMPLOYEE_TYPES.includes(data.employeeType) ? data.employeeType : 'Teacher';
   return {
     id: crypto.randomUUID(),
     firstName:     String(data.firstName    || '').trim(),
     lastName:      String(data.lastName     || '').trim(),
     age:           parseInt(data.age)       || 0,
     homeLocation:  String(data.homeLocation || '').trim(),
-    employeeType:  EMPLOYEE_TYPES.includes(data.employeeType) ? data.employeeType : 'Teacher',
+    role:          String(data.role || '').trim() || (employeeType === 'Admin' ? 'Administrator' : 'Teacher'),
+    employeeType,                        // tax category — derived from role
     baseSalaryLBP: parseFloat(data.baseSalaryLBP) || 0,
     kmDistance:    parseFloat(data.kmDistance)    || 0,
-    email:         String(data.email        || '').trim().toLowerCase()
+    email:         String(data.email        || '').trim().toLowerCase(),
+    workSchedule:  schedule.length ? schedule : [...DEFAULT_EMPLOYEE_SCHEDULE]
   };
 }
 
@@ -37,6 +53,14 @@ export function validateEmployee(data) {
   const email = String(data.email || '').trim();
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     errors.push('Email address is not valid.');
+  }
+
+  // Work schedule must have at least one day if provided
+  if (data.workSchedule !== undefined) {
+    const schedule = normalizeSchedule(data.workSchedule);
+    if (schedule.length === 0) {
+      errors.push('Work schedule must include at least one day.');
+    }
   }
 
   return errors;

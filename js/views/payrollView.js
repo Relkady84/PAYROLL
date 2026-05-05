@@ -1,9 +1,12 @@
-import { getEmployees, getSettings, getAbsenceRequests } from '../data/store.js';
-import { calculatePayroll, calculateTotals } from '../services/payroll.js';
+import {
+  getEmployees, getSettings, getAbsenceRequests,
+  getCalendar, getCurrentAcademicYear, findAcademicYearForMonth, getRoleRegistry,
+  getAcademicYears
+} from '../data/store.js';
+import { calculatePayroll, calculateTotals, computeEffectiveDays } from '../services/payroll.js';
 import { exportCSV, exportExcel, exportPDF } from '../services/exportService.js';
 import { importCSV, importExcel } from '../services/importService.js';
 import { showToast } from './components/toast.js';
-import { countApprovedAbsencesInMonth } from '../models/absenceRequest.js';
 
 let _filterType  = 'all';
 let _sortKey     = 'firstName';
@@ -16,20 +19,20 @@ function defaultMonth() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-/**
- * Compute days worked for an employee = workingDays - approved absences in selected month.
- * Manual override (in _daysWorked) wins if present.
- */
-function daysWorkedFor(empId, settings) {
-  if (_daysWorked[empId] !== undefined) return _daysWorked[empId];
+/** Compute effective day breakdown for an employee in the selected month. */
+function dayBreakdownFor(employee) {
   const [y, m] = _selectedMonth.split('-').map(Number);
-  const absences = countApprovedAbsencesInMonth(getAbsenceRequests(), empId, y, m);
-  return Math.max(0, settings.workingDaysPerMonth - absences);
-}
-
-function absenceCountFor(empId) {
-  const [y, m] = _selectedMonth.split('-').map(Number);
-  return countApprovedAbsencesInMonth(getAbsenceRequests(), empId, y, m);
+  const academicYear = findAcademicYearForMonth(y, m);
+  return computeEffectiveDays({
+    employee,
+    calendar:        getCalendar(),
+    absenceRequests: getAbsenceRequests(),
+    year:            y,
+    month:           m,
+    manualOverride:  _daysWorked[employee.id],
+    academicYear,
+    roleRegistry:    getRoleRegistry()
+  });
 }
 
 export function render(selector) {
@@ -200,9 +203,8 @@ function getFilteredRows() {
   const settings  = getSettings();
   let employees   = getEmployees();
   if (_filterType !== 'all') employees = employees.filter(e => e.employeeType === _filterType);
-  // Build the days map: manual overrides win, otherwise auto-compute from absences
   const daysMap = {};
-  for (const e of employees) daysMap[e.id] = daysWorkedFor(e.id, settings);
+  for (const e of employees) daysMap[e.id] = dayBreakdownFor(e).days;
   return calculatePayroll(employees, settings, daysMap);
 }
 
@@ -214,9 +216,13 @@ function renderRows(container) {
     employees = employees.filter(e => e.employeeType === _filterType);
   }
 
-  // Build the days map: manual overrides win, else auto-compute from absences
+  // Compute breakdown per employee (used for cell hints) and the days map
+  const breakdowns = {};
   const daysMap = {};
-  for (const e of employees) daysMap[e.id] = daysWorkedFor(e.id, settings);
+  for (const e of employees) {
+    breakdowns[e.id] = dayBreakdownFor(e);
+    daysMap[e.id]    = breakdowns[e.id].days;
+  }
   let rows = calculatePayroll(employees, settings, daysMap);
 
   // Sort
@@ -265,21 +271,22 @@ function renderRows(container) {
   const fmtUSD = n => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const dataRows = rows.map(r => {
-    const absences = absenceCountFor(r.id);
-    const isManualOverride = _daysWorked[r.id] !== undefined;
-    const breakdownHint = absences > 0
-      ? `<div style="font-size:0.65rem;color:var(--color-text-muted);margin-top:2px;" title="${settings.workingDaysPerMonth} - ${absences} approved absence${absences !== 1 ? 's' : ''}">−${absences} abs</div>`
-      : '';
-    const overrideHint = isManualOverride
-      ? `<div style="font-size:0.6rem;color:#ea580c;margin-top:2px;">manual</div>`
-      : '';
+    const bd = breakdowns[r.id];
+    let breakdownHint;
+    if (bd.isManualOverride) {
+      breakdownHint = `<div style="font-size:0.6rem;color:#ea580c;margin-top:2px;" title="Manual override — type a different number to change, or click Reset Days">manual</div>`;
+    } else if (bd.isOutsideActivePeriod) {
+      breakdownHint = `<div style="font-size:0.6rem;color:#94a3b8;margin-top:2px;" title="This month is outside the role's active period(s) for the academic year">off-period</div>`;
+    } else {
+      breakdownHint = `<div style="font-size:0.62rem;color:var(--color-text-muted);margin-top:2px;line-height:1.2;" title="${bd.calendarDays} working days from calendar/active period (after weekends + ${bd.holidays} holiday${bd.holidays !== 1 ? 's' : ''}) − ${bd.absences} approved absence${bd.absences !== 1 ? 's' : ''}">${bd.calendarDays} cal${bd.holidays > 0 ? ` − ${bd.holidays} hol` : ''}${bd.absences > 0 ? ` − ${bd.absences} abs` : ''}</div>`;
+    }
     return `
     <tr>
       <td><strong>${esc(r.firstName)} ${esc(r.lastName)}</strong></td>
       <td><span class="badge badge-${r.employeeType === 'Teacher' ? 'teacher' : 'admin'}">${r.employeeType === 'Admin' ? 'Admin' : 'Teacher'}</span></td>
       <td>
         <input type="number" class="days-input" min="0" max="31" data-emp-id="${esc(r.id)}" value="${r.daysWorked}" style="width:52px;text-align:center;" oninput="if(this.value.length>2)this.value=this.value.slice(0,2)">
-        ${breakdownHint}${overrideHint}
+        ${breakdownHint}
       </td>
       <td class="num-lbp">${fmt(r.baseSalaryLBP)} ل.ل</td>
       <td>${fmtUSD(r.baseSalaryUSD)}</td>

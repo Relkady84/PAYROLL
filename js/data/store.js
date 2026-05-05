@@ -1,4 +1,6 @@
 import { DEFAULT_SETTINGS } from './defaults.js';
+import { DEFAULT_CALENDAR } from '../models/calendar.js';
+import { DEFAULT_ROLE_REGISTRY } from '../models/role.js';
 import { db } from '../firebase.js';
 import {
   collection, doc,
@@ -16,6 +18,10 @@ let _employees  = [];
 let _settings   = structuredClone(DEFAULT_SETTINGS);
 let _companyId  = null;
 let _absenceRequests = [];
+let _calendar   = structuredClone(DEFAULT_CALENDAR);
+let _academicYears = [];                                  // array of full year docs
+let _currentYearId = null;                                // id of the currently active year
+let _roleRegistry  = structuredClone(DEFAULT_ROLE_REGISTRY);
 
 // ── Helpers ───────────────────────────────────────────────
 function emailKey(email) {
@@ -41,12 +47,73 @@ function companyDoc(...segments) {
 
 // ── Startup: load everything from Firestore ───────────────
 export async function initStore() {
-  await Promise.all([_loadSettings(), _loadEmployees(), _loadAbsenceRequests()]);
+  await Promise.all([
+    _loadSettings(),
+    _loadEmployees(),
+    _loadAbsenceRequests(),
+    _loadCalendar(),
+    _loadAcademicYears(),
+    _loadRoleRegistry()
+  ]);
   // One-time backfill: ensure /employeeLookup entries exist for all current
   // employees (so they can sign in via the employee portal).
   // Cheap because setDoc with same data is a no-op on the wire after first sync.
   for (const emp of _employees) {
     if (emp.email) _syncEmployeeLookup(emp);
+  }
+}
+
+async function _loadCalendar() {
+  try {
+    const snap = await getDoc(companyDoc('calendar', 'config'));
+    if (snap.exists()) {
+      const stored = snap.data();
+      _calendar = {
+        ...DEFAULT_CALENDAR,
+        ...stored,
+        weekendDays: Array.isArray(stored.weekendDays) ? stored.weekendDays : DEFAULT_CALENDAR.weekendDays,
+        holidays:    Array.isArray(stored.holidays)    ? stored.holidays    : []
+      };
+    } else {
+      _calendar = structuredClone(DEFAULT_CALENDAR);
+    }
+  } catch (e) {
+    console.warn('Could not load calendar:', e);
+    _calendar = structuredClone(DEFAULT_CALENDAR);
+  }
+}
+
+async function _loadAcademicYears() {
+  try {
+    const snap = await getDocs(companyCol('academicYears'));
+    _academicYears = snap.docs.map(d => ({ ...d.data(), yearId: d.id }));
+    const current = _academicYears.find(y => y.isCurrent);
+    _currentYearId = current ? current.yearId : (_academicYears[0]?.yearId ?? null);
+  } catch (e) {
+    console.warn('Could not load academic years:', e);
+    _academicYears = [];
+    _currentYearId = null;
+  }
+}
+
+async function _loadRoleRegistry() {
+  try {
+    const snap = await getDoc(companyDoc('roles', 'registry'));
+    if (snap.exists()) {
+      const stored = snap.data();
+      _roleRegistry = {
+        ...DEFAULT_ROLE_REGISTRY,
+        ...stored,
+        roles: Array.isArray(stored.roles) && stored.roles.length
+          ? stored.roles
+          : DEFAULT_ROLE_REGISTRY.roles
+      };
+    } else {
+      _roleRegistry = structuredClone(DEFAULT_ROLE_REGISTRY);
+    }
+  } catch (e) {
+    console.warn('Could not load role registry:', e);
+    _roleRegistry = structuredClone(DEFAULT_ROLE_REGISTRY);
   }
 }
 
@@ -100,6 +167,171 @@ export function saveSettings(settings) {
 export function resetSettings() {
   _settings = structuredClone(DEFAULT_SETTINGS);
   setDoc(companyDoc('settings', 'config'), DEFAULT_SETTINGS).catch(console.error);
+}
+
+// ── Calendar ──────────────────────────────────────────────
+export function getCalendar() {
+  return structuredClone(_calendar);
+}
+
+export async function saveCalendar(calendar) {
+  _calendar = structuredClone(calendar);
+  await setDoc(companyDoc('calendar', 'config'), _calendar);
+}
+
+// ── Academic Years ────────────────────────────────────────
+export function getAcademicYears() {
+  return [..._academicYears].sort((a, b) => (b.yearId || '').localeCompare(a.yearId || ''));
+}
+
+export function getAcademicYearById(yearId) {
+  return _academicYears.find(y => y.yearId === yearId) || null;
+}
+
+export function getCurrentAcademicYear() {
+  if (!_currentYearId) return null;
+  return _academicYears.find(y => y.yearId === _currentYearId) || null;
+}
+
+export function getCurrentAcademicYearId() {
+  return _currentYearId;
+}
+
+export async function saveAcademicYear(year) {
+  if (!year.yearId) throw new Error('saveAcademicYear: yearId is required');
+  const idx = _academicYears.findIndex(y => y.yearId === year.yearId);
+  if (idx === -1) _academicYears.push({ ...year });
+  else            _academicYears[idx] = { ...year };
+  await setDoc(companyDoc('academicYears', year.yearId), year);
+}
+
+export async function setCurrentAcademicYear(yearId) {
+  // Flip flags: only the chosen one is current
+  const batch = writeBatch(db);
+  for (const y of _academicYears) {
+    const updated = { ...y, isCurrent: y.yearId === yearId };
+    batch.set(companyDoc('academicYears', y.yearId), updated);
+  }
+  await batch.commit();
+  // Update memory
+  _academicYears = _academicYears.map(y => ({ ...y, isCurrent: y.yearId === yearId }));
+  _currentYearId = yearId;
+}
+
+export async function deleteAcademicYear(yearId) {
+  _academicYears = _academicYears.filter(y => y.yearId !== yearId);
+  if (_currentYearId === yearId) {
+    _currentYearId = _academicYears[0]?.yearId || null;
+  }
+  await deleteDoc(companyDoc('academicYears', yearId));
+}
+
+// Used by employee portal — fetches a single year doc directly.
+export async function getAcademicYearFor(companyId, yearId) {
+  if (!yearId) return null;
+  try {
+    const snap = await getDoc(doc(db, 'companies', companyId, 'academicYears', yearId));
+    return snap.exists() ? { ...snap.data(), yearId: snap.id } : null;
+  } catch (e) {
+    console.warn('Could not load academic year:', e);
+    return null;
+  }
+}
+
+/** Find the academic year that a given ISO date falls within.
+ *  Used for single-day lookups (e.g., employee portal pay slip).
+ */
+export function findAcademicYearForDate(iso) {
+  if (!iso) return null;
+  return _academicYears.find(y => {
+    if (typeof y.startDate === 'string' && typeof y.endDate === 'string'
+        && iso >= y.startDate && iso <= y.endDate) return true;
+    if (y.rolePeriods) {
+      for (const periods of Object.values(y.rolePeriods)) {
+        if (Array.isArray(periods)) {
+          for (const p of periods) {
+            if (p && p.from && p.to && iso >= p.from && iso <= p.to) return true;
+          }
+        }
+      }
+    }
+    return false;
+  }) || null;
+}
+
+/** Find the academic year that overlaps a given calendar month.
+ *  A year matches if its date range OR any role period inside it intersects
+ *  ANY day of the month (not just the middle). This is what payroll uses.
+ */
+export function findAcademicYearForMonth(year, month) {
+  const lastDay = new Date(year, month, 0).getDate();
+  const mm        = String(month).padStart(2, '0');
+  const monthStart = `${year}-${mm}-01`;
+  const monthEnd   = `${year}-${mm}-${String(lastDay).padStart(2, '0')}`;
+
+  return _academicYears.find(y => {
+    if (typeof y.startDate === 'string' && typeof y.endDate === 'string'
+        && y.startDate <= monthEnd && y.endDate >= monthStart) return true;
+    if (y.rolePeriods) {
+      for (const periods of Object.values(y.rolePeriods)) {
+        if (Array.isArray(periods)) {
+          for (const p of periods) {
+            if (p && p.from && p.to && p.from <= monthEnd && p.to >= monthStart) return true;
+          }
+        }
+      }
+    }
+    return false;
+  }) || null;
+}
+
+// ── Role registry ─────────────────────────────────────────
+export function getRoleRegistry() {
+  return structuredClone(_roleRegistry);
+}
+
+export async function saveRoleRegistry(registry) {
+  _roleRegistry = structuredClone(registry);
+  await setDoc(companyDoc('roles', 'registry'), _roleRegistry);
+}
+
+// Employee portal can read this for pay slip computation
+export async function getRoleRegistryFor(companyId) {
+  try {
+    const snap = await getDoc(doc(db, 'companies', companyId, 'roles', 'registry'));
+    if (snap.exists()) {
+      const stored = snap.data();
+      return {
+        ...DEFAULT_ROLE_REGISTRY,
+        ...stored,
+        roles: Array.isArray(stored.roles) && stored.roles.length
+          ? stored.roles
+          : DEFAULT_ROLE_REGISTRY.roles
+      };
+    }
+  } catch (e) {
+    console.warn('Could not load role registry:', e);
+  }
+  return structuredClone(DEFAULT_ROLE_REGISTRY);
+}
+
+// Used by the employee portal pay-slip view (no _companyId state required).
+export async function getCalendarFor(companyId) {
+  try {
+    const snap = await getDoc(doc(db, 'companies', companyId, 'calendar', 'config'));
+    if (snap.exists()) {
+      const stored = snap.data();
+      return {
+        ...DEFAULT_CALENDAR,
+        ...stored,
+        weekendDays: Array.isArray(stored.weekendDays) ? stored.weekendDays : DEFAULT_CALENDAR.weekendDays,
+        holidays:    Array.isArray(stored.holidays)    ? stored.holidays    : []
+      };
+    }
+  } catch (e) {
+    console.warn('Could not load calendar:', e);
+  }
+  return structuredClone(DEFAULT_CALENDAR);
 }
 
 // ── Employees ─────────────────────────────────────────────

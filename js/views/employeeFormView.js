@@ -1,5 +1,7 @@
-import { getEmployees, addEmployee, updateEmployee } from '../data/store.js';
-import { createEmployee, validateEmployee, EMPLOYEE_TYPES } from '../models/employee.js';
+import { getEmployees, addEmployee, updateEmployee, getRoleRegistry } from '../data/store.js';
+import { createEmployee, validateEmployee, EMPLOYEE_TYPES, DEFAULT_EMPLOYEE_SCHEDULE } from '../models/employee.js';
+import { DOW_LABELS } from '../models/calendar.js';
+import { findRole } from '../models/role.js';
 import { openModal, closeModal } from './components/modal.js';
 import { showToast } from './components/toast.js';
 
@@ -24,12 +26,15 @@ function buildFormHTML(employee = null) {
             type="number" min="18" max="100" placeholder="30" value="${e.age || ''}">
         </div>
         <div class="form-group">
-          <label class="form-label" for="ef-employeeType">Employee Type <span class="required">*</span></label>
-          <select class="form-control" id="ef-employeeType" name="employeeType">
-            ${EMPLOYEE_TYPES.map(t => `
-              <option value="${t}" ${e.employeeType === t ? 'selected' : ''}>${t === 'Admin' ? 'Personal Administrator' : t}</option>
-            `).join('')}
+          <label class="form-label" for="ef-role">Role <span class="required">*</span></label>
+          <select class="form-control" id="ef-role" name="role">
+            ${getRoleRegistry().roles.map(r => {
+              const selected = (e.role && e.role === r.id)
+                            || (!e.role && e.employeeType === r.taxCategory && r.builtin);
+              return `<option value="${r.id}" data-tax="${r.taxCategory}" ${selected ? 'selected' : ''}>${r.name}${r.taxCategory !== r.id ? ` (${r.taxCategory} tax)` : ''}</option>`;
+            }).join('')}
           </select>
+          <span class="form-hint">Add custom roles in Settings → School Calendar → Roles.</span>
         </div>
         <div class="form-group form-full">
           <label class="form-label" for="ef-homeLocation">Home Location <span class="required">*</span></label>
@@ -58,10 +63,69 @@ function buildFormHTML(employee = null) {
           </div>
           <span class="form-hint">One-way distance from home to workplace</span>
         </div>
+
+        <div class="form-group form-full">
+          <label class="form-label">Work Schedule <span class="required">*</span></label>
+          <div id="ef-schedule-checks" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;"></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-secondary btn-sm" data-preset="full">Full-time (Mon–Fri)</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-preset="mwf">Mon / Wed / Fri</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-preset="ttf">Tue / Thu</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-preset="six">6-day (Mon–Sat)</button>
+          </div>
+          <span class="form-hint">Days this employee normally works. Used to compute monthly working days for payroll.</span>
+        </div>
       </div>
       <div id="form-errors" style="margin-top:12px;"></div>
     </form>
   `;
+}
+
+const SCHEDULE_PRESETS = {
+  full: [1, 2, 3, 4, 5],
+  mwf:  [1, 3, 5],
+  ttf:  [2, 4],
+  six:  [1, 2, 3, 4, 5, 6]
+};
+
+function renderScheduleChecks(selected) {
+  const wrap = document.getElementById('ef-schedule-checks');
+  if (!wrap) return;
+  // Order: Mon, Tue, Wed, Thu, Fri, Sat, Sun (the way schools think)
+  const orderedDows = [1, 2, 3, 4, 5, 6, 0];
+  wrap.innerHTML = orderedDows.map(dow => `
+    <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.82rem;cursor:pointer;
+                  padding:5px 10px;border:1.5px solid var(--color-border);border-radius:7px;
+                  background:${selected.includes(dow) ? '#dbeafe' : '#fff'};
+                  color:${selected.includes(dow) ? '#1e40af' : '#1e293b'};
+                  font-weight:${selected.includes(dow) ? '600' : '500'};">
+      <input type="checkbox" data-dow="${dow}" ${selected.includes(dow) ? 'checked' : ''}>
+      ${DOW_LABELS[dow]}
+    </label>
+  `).join('');
+}
+
+function getSelectedSchedule() {
+  const wrap = document.getElementById('ef-schedule-checks');
+  if (!wrap) return [...DEFAULT_EMPLOYEE_SCHEDULE];
+  return Array.from(wrap.querySelectorAll('input[type="checkbox"]'))
+    .filter(cb => cb.checked)
+    .map(cb => parseInt(cb.dataset.dow, 10))
+    .sort((a, b) => a - b);
+}
+
+function bindScheduleControls() {
+  // Each checkbox change → re-render to update the visual state
+  const wrap = document.getElementById('ef-schedule-checks');
+  wrap.addEventListener('change', () => renderScheduleChecks(getSelectedSchedule()));
+
+  // Preset buttons
+  document.querySelectorAll('[data-preset]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const preset = SCHEDULE_PRESETS[btn.dataset.preset];
+      if (preset) renderScheduleChecks(preset);
+    });
+  });
 }
 
 function esc(val) {
@@ -74,6 +138,9 @@ export function openAddModal(onSaved) {
     confirmLabel: 'Add Employee',
     onConfirm: () => handleSubmit(null, onSaved)
   });
+  // Modal renders synchronously, so the form DOM is now in place
+  renderScheduleChecks([...DEFAULT_EMPLOYEE_SCHEDULE]);
+  bindScheduleControls();
 }
 
 export function openEditModal(id, onSaved) {
@@ -84,21 +151,34 @@ export function openEditModal(id, onSaved) {
     confirmLabel: 'Save Changes',
     onConfirm: () => handleSubmit(id, onSaved)
   });
+  const initialSchedule = Array.isArray(employee.workSchedule) && employee.workSchedule.length
+    ? employee.workSchedule
+    : [...DEFAULT_EMPLOYEE_SCHEDULE];
+  renderScheduleChecks(initialSchedule);
+  bindScheduleControls();
 }
 
 function handleSubmit(existingId, onSaved) {
   const form = document.getElementById('employee-form');
   if (!form) return;
 
+  const roleSelect = form.querySelector('#ef-role');
+  const roleId     = roleSelect.value;
+  const role       = findRole(getRoleRegistry(), roleId);
+  // Tax category is inherited from the role (Teacher or Admin)
+  const taxCategory = role?.taxCategory || 'Teacher';
+
   const data = {
     firstName:     form.querySelector('#ef-firstName').value,
     lastName:      form.querySelector('#ef-lastName').value,
     age:           form.querySelector('#ef-age').value,
     homeLocation:  form.querySelector('#ef-homeLocation').value,
-    employeeType:  form.querySelector('#ef-employeeType').value,
+    role:          roleId,
+    employeeType:  taxCategory,                     // drives tax/NFS rates
     baseSalaryLBP: form.querySelector('#ef-baseSalaryLBP').value,
     kmDistance:    form.querySelector('#ef-kmDistance').value,
-    email:         form.querySelector('#ef-email').value
+    email:         form.querySelector('#ef-email').value,
+    workSchedule:  getSelectedSchedule()
   };
 
   const errors = validateEmployee(data);
