@@ -25,6 +25,7 @@ import {
   ABSENCE_CATEGORIES,
   CATEGORY_LABELS,
   STATUS_LABELS,
+  TYPE_LABELS,
   MAX_BACKDATE_DAYS,
   validateAbsenceRequest,
   createAbsenceRequest,
@@ -115,8 +116,9 @@ function draw() {
 }
 
 function renderSection() {
-  if (_section === 'payslip') return paySlipSectionHTML();
-  if (_section === 'history') return historySectionHTML();
+  if (_section === 'payslip')    return paySlipSectionHTML();
+  if (_section === 'history')    return historySectionHTML();
+  if (_section === 'permanence') return permanenceSectionHTML();
   return homeSectionHTML();
 }
 
@@ -141,8 +143,9 @@ function headerHTML() {
 }
 
 function sectionTitle(section) {
-  if (section === 'payslip') return 'My Pay Slip';
-  if (section === 'history') return 'Absence History';
+  if (section === 'payslip')    return 'My Pay Slip';
+  if (section === 'history')    return 'Absence History';
+  if (section === 'permanence') return 'Permanence Day';
   return 'Employee Portal';
 }
 
@@ -170,9 +173,10 @@ function drawerHTML() {
       </div>
 
       <nav class="ep-drawer-nav">
-        ${item('home',    '🏠', 'Home')}
-        ${item('payslip', '💰', 'My Pay Slip')}
-        ${item('history', '📋', 'Absence History')}
+        ${item('home',       '🏠', 'Home')}
+        ${item('permanence', '🎯', 'Permanence Day')}
+        ${item('payslip',    '💰', 'My Pay Slip')}
+        ${item('history',    '📋', 'Absence History')}
       </nav>
 
       <div class="ep-drawer-footer">
@@ -271,10 +275,11 @@ function recentRequestsHTML(requests) {
 
 function requestItemHTML(r) {
   const dateStr = formatHumanDate(r.date);
-  const cat     = CATEGORY_LABELS[r.category] || r.category;
+  const type    = r.type || 'absence';
+  const cat     = type === 'permanence' ? '🎯 Permanence (+1 day)' : (CATEGORY_LABELS[r.category] || r.category);
   const status  = r.status || 'pending';
   return `
-    <div class="ep-request" data-id="${esc(r.id)}">
+    <div class="ep-request" data-id="${esc(r.id)}" data-type="${esc(type)}">
       <div class="ep-request-row">
         <div class="ep-request-date">${esc(dateStr)}</div>
         <span class="ep-status ep-status-${esc(status)}">${esc(STATUS_LABELS[status] || status)}</span>
@@ -362,7 +367,13 @@ function paySlipSectionHTML() {
           <strong>${days}</strong>
         </div>
         <div class="ep-payslip-sub">
-          ${bd.calendarDays} from calendar${bd.holidays > 0 ? ` (after ${bd.holidays} holiday${bd.holidays !== 1 ? 's' : ''})` : ''}${bd.absences > 0 ? ` − ${bd.absences} absence${bd.absences !== 1 ? 's' : ''}` : ''}${bd.absences === 0 && bd.holidays === 0 ? ' · No holidays or absences this month.' : ''}
+          ${(() => {
+            const parts = [`${bd.calendarDays} from calendar${bd.holidays > 0 ? ` (after ${bd.holidays} holiday${bd.holidays !== 1 ? 's' : ''})` : ''}`];
+            if (bd.absences   > 0) parts.push(`− ${bd.absences} absence${bd.absences !== 1 ? 's' : ''}`);
+            if (bd.permanence > 0) parts.push(`+ ${bd.permanence} permanence day${bd.permanence !== 1 ? 's' : ''}`);
+            if (bd.absences === 0 && bd.holidays === 0 && bd.permanence === 0) parts.push('No holidays, absences, or permanence days this month.');
+            return parts.join(bd.absences || bd.permanence ? ' ' : ' · ');
+          })()}
         </div>
       </div>
 
@@ -401,6 +412,63 @@ function paySlipSectionHTML() {
         Calculated from current settings. For official records, contact your administrator.
       </div>
     </section>
+  `;
+}
+
+// ── Section: PERMANENCE DAY ──────────────────────────────
+function permanenceSectionHTML() {
+  const today    = todayISO();
+  const earliest = dateNDaysAgo(MAX_BACKDATE_DAYS);
+
+  // Show only PERMANENCE requests in the recent list (not absences)
+  const myPerm = getAbsenceRequests()
+    .filter(r => (r.type || 'absence') === 'permanence')
+    .sort((a, b) => (b.requestedAt || 0) - (a.requestedAt || 0))
+    .slice(0, 5);
+
+  return `
+    <section class="ep-card">
+      <div class="ep-card-title">🎯 Request a Permanence Day</div>
+      <p style="font-size:0.82rem;color:var(--color-text-muted);margin-bottom:14px;">
+        Use this when you came in on a day that was supposed to be off
+        (holiday, vacation, weekend). Once approved, the day adds <strong>+1</strong>
+        to your transport days for that month.
+      </p>
+
+      <form id="ep-perm-form" novalidate>
+        <label class="ep-label" for="ep-perm-date">Date you worked</label>
+        <input class="ep-input" type="date" id="ep-perm-date"
+          min="${earliest}" value="${today}" required>
+        <div class="ep-hint">From ${earliest} to any future date.</div>
+
+        <label class="ep-label" for="ep-perm-reason">
+          Reason for working <span class="ep-muted">(required)</span>
+        </label>
+        <textarea class="ep-input" id="ep-perm-reason" rows="3"
+          maxlength="500"
+          placeholder="e.g., Year-end closing, exam supervision, urgent task…"></textarea>
+
+        <div id="ep-perm-form-errors" class="ep-errors"></div>
+
+        <button type="submit" class="ep-btn ep-btn-primary">
+          ✓ Submit Request
+        </button>
+      </form>
+    </section>
+
+    ${myPerm.length ? `
+      <section class="ep-card">
+        <div class="ep-card-title">📋 Recent Permanence Requests</div>
+        <div class="ep-list">
+          ${myPerm.map(r => requestItemHTML(r)).join('')}
+        </div>
+      </section>
+    ` : `
+      <section class="ep-card ep-empty">
+        <div class="ep-empty-icon">📭</div>
+        <div class="ep-empty-text">No permanence requests yet.</div>
+      </section>
+    `}
   `;
 }
 
@@ -506,6 +574,9 @@ function bindSectionEvents() {
   } else if (_section === 'history') {
     bindHistoryEvents();
     bindListEvents();
+  } else if (_section === 'permanence') {
+    bindPermanenceEvents();
+    bindListEvents();
   }
 }
 
@@ -584,6 +655,43 @@ function bindPaySlipEvents() {
 
   document.getElementById('ep-payslip-pdf').addEventListener('click', () => {
     generatePaySlipPDF();
+  });
+}
+
+function bindPermanenceEvents() {
+  const form = document.getElementById('ep-perm-form');
+  if (!form) return;
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const data = {
+      type:   'permanence',
+      date:   document.getElementById('ep-perm-date').value,
+      reason: document.getElementById('ep-perm-reason').value
+    };
+
+    const errors = validateAbsenceRequest(data);
+    const errEl  = document.getElementById('ep-perm-form-errors');
+    if (errors.length) {
+      errEl.innerHTML = errors.map(e => `<div>⚠ ${esc(e)}</div>`).join('');
+      return;
+    }
+    errEl.innerHTML = '';
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting…';
+
+    try {
+      const req = createAbsenceRequest(data, _employee);
+      await addOwnAbsenceRequest(_companyId, req);
+      draw();
+    } catch (err) {
+      console.error(err);
+      errEl.innerHTML = `<div>⚠ Failed to submit. Try again.</div>`;
+      submitBtn.disabled = false;
+      submitBtn.textContent = '✓ Submit Request';
+    }
   });
 }
 
@@ -696,8 +804,9 @@ function generatePaySlipPDF() {
   {
     const parts = [];
     parts.push(`${bd.calendarDays} from calendar`);
-    if (bd.holidays > 0)  parts.push(`-${bd.holidays} holiday${bd.holidays !== 1 ? 's' : ''}`);
-    if (bd.absences > 0)  parts.push(`-${bd.absences} absence${bd.absences !== 1 ? 's' : ''}`);
+    if (bd.holidays   > 0) parts.push(`-${bd.holidays} holiday${bd.holidays !== 1 ? 's' : ''}`);
+    if (bd.absences   > 0) parts.push(`-${bd.absences} absence${bd.absences !== 1 ? 's' : ''}`);
+    if (bd.permanence > 0) parts.push(`+${bd.permanence} permanence day${bd.permanence !== 1 ? 's' : ''}`);
     drawRow(`(${parts.join(' ')})`, '', { indent: 4, size: 8 });
   }
   yPos += 2;

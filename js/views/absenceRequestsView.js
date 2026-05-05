@@ -8,7 +8,7 @@ import {
   getAbsenceRequests,
   updateAbsenceRequest
 } from '../data/store.js';
-import { CATEGORY_LABELS, STATUS_LABELS } from '../models/absenceRequest.js';
+import { CATEGORY_LABELS, STATUS_LABELS, TYPE_LABELS } from '../models/absenceRequest.js';
 import { showToast } from './components/toast.js';
 import { openModal, closeModal } from './components/modal.js';
 import { getCurrentUser } from '../auth.js';
@@ -43,7 +43,7 @@ export function render(selector) {
               <tr>
                 <th>Employee</th>
                 <th>Date</th>
-                <th>Category</th>
+                <th>Type / Category</th>
                 <th>Reason</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -128,14 +128,22 @@ function drawList() {
     return;
   }
 
-  tbody.innerHTML = rows.map(r => `
+  tbody.innerHTML = rows.map(r => {
+    const type = r.type || 'absence';
+    const typeBadge = type === 'permanence'
+      ? `<span class="badge" style="background:#dcfce7;color:#166534;">🎯 Permanence (+1)</span>`
+      : `<span class="badge" style="background:#fee2e2;color:#991b1b;">🚫 Absence (−1)</span>`;
+    const categoryDisplay = type === 'permanence'
+      ? '—'
+      : (CATEGORY_LABELS[r.category] || r.category || '—');
+    return `
     <tr>
       <td>
         <strong>${esc(r.employeeName)}</strong>
         ${r.employeeEmail ? `<br><span style="font-size:var(--font-size-xs);color:var(--color-text-muted);">${esc(r.employeeEmail)}</span>` : ''}
       </td>
       <td>${esc(formatHumanDate(r.date))}</td>
-      <td><span class="badge">${esc(CATEGORY_LABELS[r.category] || r.category)}</span></td>
+      <td>${typeBadge}<br><span style="font-size:var(--font-size-xs);color:var(--color-text-muted);">${esc(categoryDisplay)}</span></td>
       <td style="max-width:240px;">${r.reason ? `<em>${esc(r.reason)}</em>` : '<span style="color:var(--color-text-muted);">—</span>'}</td>
       <td><span class="badge badge-${esc(r.status)}">${esc(STATUS_LABELS[r.status])}</span></td>
       <td>
@@ -153,7 +161,8 @@ function drawList() {
         `}
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 
   tbody.querySelectorAll('[data-action]').forEach(btn => {
     btn.addEventListener('click', () => handleReview(btn.dataset.action, btn.dataset.id));
@@ -167,11 +176,15 @@ function handleReview(action, id) {
   const req = requests.find(r => r.id === id);
   if (!req) return;
 
+  const reqType = req.type || 'absence';
+  const reqTypeLabel = reqType === 'permanence' ? 'Permanence (+1 day)' : 'Absence (−1 day)';
+
   openModal(
-    `${titleVerb} Absence Request`,
+    `${titleVerb} ${reqTypeLabel}`,
     `
       <p style="color:var(--color-text-secondary);margin-bottom:12px;">
-        ${titleVerb} <strong>${esc(req.employeeName)}</strong>'s request for
+        ${titleVerb} <strong>${esc(req.employeeName)}</strong>'s
+        <strong>${esc(reqTypeLabel.toLowerCase())}</strong> for
         <strong>${esc(formatHumanDate(req.date))}</strong>?
       </p>
       <label class="form-label">Optional note (visible to employee)</label>

@@ -5,7 +5,7 @@
  */
 
 import { computeWorkingDaysInMonth, countHolidaysInMonth } from '../models/calendar.js';
-import { countApprovedAbsencesInMonth } from '../models/absenceRequest.js';
+import { countApprovedAbsencesInMonth, countApprovedPermanenceInMonth } from '../models/absenceRequest.js';
 import { resolveEmployeeRole } from '../models/role.js';
 
 /**
@@ -40,22 +40,25 @@ export function computeEffectiveDays({
 }) {
   // Short-circuit: month is outside ALL defined academic years → 0 days for everyone
   if (forceOffPeriod) {
-    const absences = countApprovedAbsencesInMonth(absenceRequests, employee.id, year, month);
+    const absences   = countApprovedAbsencesInMonth(absenceRequests, employee.id, year, month);
+    const permanence = countApprovedPermanenceInMonth(absenceRequests, employee.id, year, month);
     if (manualOverride !== undefined && manualOverride !== null && manualOverride !== '' && !isNaN(manualOverride)) {
       return {
         days: Math.max(0, parseInt(manualOverride, 10) || 0),
         calendarDays:        0,
         holidays:             0,
         absences,
+        permanence,
         isManualOverride:     true,
         isOutsideActivePeriod: true
       };
     }
     return {
-      days: 0,
+      days: Math.max(0, permanence),                  // permanence days still pay even when "off-period"
       calendarDays:           0,
       holidays:                0,
       absences,
+      permanence,
       isManualOverride:        false,
       isOutsideActivePeriod:   true
     };
@@ -83,6 +86,7 @@ export function computeEffectiveDays({
   });
   const holidays     = countHolidaysInMonth(year, month, calendar);
   const absences     = countApprovedAbsencesInMonth(absenceRequests, employee.id, year, month);
+  const permanence   = countApprovedPermanenceInMonth(absenceRequests, employee.id, year, month);
 
   // Outside active period? = no calendar days at all because none matched
   const isOutsideActivePeriod = !!activePeriods && calendarDays === 0;
@@ -93,16 +97,18 @@ export function computeEffectiveDays({
       calendarDays,
       holidays,
       absences,
+      permanence,
       isManualOverride: true,
       isOutsideActivePeriod
     };
   }
 
   return {
-    days: Math.max(0, calendarDays - absences),
+    days: Math.max(0, calendarDays - absences + permanence),
     calendarDays,
     holidays,
     absences,
+    permanence,
     isManualOverride: false,
     isOutsideActivePeriod
   };

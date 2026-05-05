@@ -13,6 +13,16 @@ export const STATUS_LABELS = {
   rejected: 'Rejected'
 };
 
+// Request types — 'absence' subtracts a day; 'permanence' adds a day.
+// Permanence: an employee worked on a day that's normally non-working
+// (holiday, weekend, vacation period). Counts as +1 in the pay slip.
+export const REQUEST_TYPES = ['absence', 'permanence'];
+
+export const TYPE_LABELS = {
+  absence:    'Absence',
+  permanence: 'Permanence'
+};
+
 // How many days back can an employee retroactively request an absence?
 export const MAX_BACKDATE_DAYS = 7;
 
@@ -41,11 +51,16 @@ export function dateNDaysAgo(n) {
 }
 
 /**
- * Validate an absence request's input.
+ * Validate a request's input.
  * Returns array of error strings (empty if valid).
  */
 export function validateAbsenceRequest(data) {
   const errors = [];
+  const type = data.type || 'absence';
+
+  if (!REQUEST_TYPES.includes(type)) {
+    errors.push('Invalid request type.');
+  }
 
   if (!data.date || !/^\d{4}-\d{2}-\d{2}$/.test(data.date)) {
     errors.push('A valid date is required.');
@@ -56,12 +71,19 @@ export function validateAbsenceRequest(data) {
     }
   }
 
-  if (!ABSENCE_CATEGORIES.includes(data.category)) {
-    errors.push('Please select a valid category.');
-  }
-
-  if (data.category === 'other' && !String(data.reason || '').trim()) {
-    errors.push('Reason is required for "Other" category.');
+  if (type === 'absence') {
+    // Absence: category required + reason required for "other"
+    if (!ABSENCE_CATEGORIES.includes(data.category)) {
+      errors.push('Please select a valid category.');
+    }
+    if (data.category === 'other' && !String(data.reason || '').trim()) {
+      errors.push('Reason is required for "Other" category.');
+    }
+  } else if (type === 'permanence') {
+    // Permanence: reason is always required (need to explain why work was done)
+    if (!String(data.reason || '').trim()) {
+      errors.push('Please describe why you came in (reason is required).');
+    }
   }
 
   if (data.reason && String(data.reason).length > 500) {
@@ -72,15 +94,18 @@ export function validateAbsenceRequest(data) {
 }
 
 /**
- * Build a clean absence request object for storage.
+ * Build a clean request object for storage.
+ * Supports both absence and permanence types.
  */
 export function createAbsenceRequest(data, employee) {
+  const type = REQUEST_TYPES.includes(data.type) ? data.type : 'absence';
   return {
     employeeId:    employee.id,
     employeeEmail: String(employee.email || '').trim().toLowerCase(),
     employeeName:  `${employee.firstName} ${employee.lastName}`.trim(),
     date:          data.date,
-    category:      data.category,
+    type,                                                   // 'absence' or 'permanence'
+    category:      type === 'absence' ? data.category : null,
     reason:        String(data.reason || '').trim(),
     status:        'pending',
     requestedAt:   Date.now(),
@@ -91,19 +116,31 @@ export function createAbsenceRequest(data, employee) {
 }
 
 /**
- * Count approved absences for an employee in a given month.
- * @param {Array} requests  - all absence requests
+ * Count approved requests of a given type for an employee in a given month.
+ * @param {Array} requests
  * @param {string} employeeId
- * @param {number} year     - e.g., 2026
- * @param {number} month    - 1-based (1 = January)
+ * @param {number} year
+ * @param {number} month     - 1-based
+ * @param {string} type      - 'absence' or 'permanence'
  * @returns {number}
  */
-export function countApprovedAbsencesInMonth(requests, employeeId, year, month) {
+function countApprovedByType(requests, employeeId, year, month, type) {
   const prefix = `${year}-${String(month).padStart(2, '0')}-`;
   return requests.filter(r =>
     r.status === 'approved'
     && r.employeeId === employeeId
+    && (r.type || 'absence') === type        // legacy entries default to 'absence'
     && typeof r.date === 'string'
     && r.date.startsWith(prefix)
   ).length;
+}
+
+/** Count approved absences in a month (legacy entries without `type` count here). */
+export function countApprovedAbsencesInMonth(requests, employeeId, year, month) {
+  return countApprovedByType(requests, employeeId, year, month, 'absence');
+}
+
+/** Count approved permanence days in a month. */
+export function countApprovedPermanenceInMonth(requests, employeeId, year, month) {
+  return countApprovedByType(requests, employeeId, year, month, 'permanence');
 }

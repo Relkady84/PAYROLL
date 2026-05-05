@@ -275,10 +275,14 @@ function renderRows(container) {
     let breakdownHint;
     if (bd.isManualOverride) {
       breakdownHint = `<div style="font-size:0.6rem;color:#ea580c;margin-top:2px;" title="Manual override — type a different number to change, or click Reset Days">manual</div>`;
-    } else if (bd.isOutsideActivePeriod) {
+    } else if (bd.isOutsideActivePeriod && !bd.permanence) {
       breakdownHint = `<div style="font-size:0.6rem;color:#94a3b8;margin-top:2px;" title="This month is outside the role's active period(s) for the academic year">off-period</div>`;
     } else {
-      breakdownHint = `<div style="font-size:0.62rem;color:var(--color-text-muted);margin-top:2px;line-height:1.2;" title="${bd.calendarDays} working days from calendar/active period (after weekends + ${bd.holidays} holiday${bd.holidays !== 1 ? 's' : ''}) − ${bd.absences} approved absence${bd.absences !== 1 ? 's' : ''}">${bd.calendarDays} cal${bd.holidays > 0 ? ` − ${bd.holidays} hol` : ''}${bd.absences > 0 ? ` − ${bd.absences} abs` : ''}</div>`;
+      const parts = [`${bd.calendarDays} cal`];
+      if (bd.holidays   > 0) parts.push(`− ${bd.holidays} hol`);
+      if (bd.absences   > 0) parts.push(`− ${bd.absences} abs`);
+      if (bd.permanence > 0) parts.push(`+ ${bd.permanence} perm`);
+      breakdownHint = `<div style="font-size:0.62rem;color:var(--color-text-muted);margin-top:2px;line-height:1.2;" title="Calendar working days, minus absences, plus permanence days approved by admin">${parts.join(' ')}</div>`;
     }
     return `
     <tr>
