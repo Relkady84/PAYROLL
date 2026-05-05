@@ -29,10 +29,11 @@ import {
 } from '../models/absenceRequest.js';
 import { signOutUser } from '../auth.js';
 
-let _user      = null;
-let _employee  = null;
-let _companyId = null;
+let _user        = null;
+let _employee    = null;
+let _companyId   = null;
 let _companyName = '';
+let _companyLogo = '';
 
 export async function renderEmployeePortal({ user, companyId, employeeId }) {
   _user      = user;
@@ -54,7 +55,8 @@ export async function renderEmployeePortal({ user, companyId, employeeId }) {
   }
 
   _employee    = emp;
-  _companyName = meta?.name || '—';
+  _companyName = meta?.name    || '—';
+  _companyLogo = meta?.logoUrl || '';
 
   await loadOwnAbsenceRequests(companyId, employeeId);
   draw();
@@ -87,10 +89,16 @@ function draw() {
 }
 
 function headerHTML() {
+  // Use the company's uploaded logo if available, otherwise a generic icon
+  // (avoiding 📅 because the emoji glyph has "JUL 17" baked into its design).
+  const logoMarkup = _companyLogo
+    ? `<img src="${esc(_companyLogo)}" alt="" class="ep-logo-img">`
+    : `<span class="ep-logo">🏫</span>`;
+
   return `
     <header class="ep-header">
       <div class="ep-header-title">
-        <span class="ep-logo">📅</span>
+        ${logoMarkup}
         <div>
           <div class="ep-header-name">${esc(_companyName)}</div>
           <div class="ep-header-sub">Employee Portal</div>

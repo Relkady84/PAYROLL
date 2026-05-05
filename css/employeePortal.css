@@ -38,6 +38,16 @@
   flex-shrink: 0;
 }
 
+.ep-logo-img {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: contain;
+  background: #fff;
+  padding: 3px;
+  flex-shrink: 0;
+}
+
 .ep-header-name {
   font-size: 1rem;
   font-weight: 700;
