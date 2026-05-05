@@ -5,18 +5,26 @@ import { render as renderEmployees }    from './views/employeeListView.js';
 import { render as renderPayroll }      from './views/payrollView.js';
 import { render as renderSettings }     from './views/settingsView.js';
 import { render as renderReports }      from './views/reportsView.js';
+import { render as renderAbsenceRequests } from './views/absenceRequestsView.js';
 import { renderOnboarding }             from './views/onboardingView.js';
 import { renderSuperAdmin }             from './views/superAdminView.js';
+import { renderEmployeePortal }         from './views/employeePortalView.js';
 import { _applySidebarLogo, applyDisplayColors } from './views/settingsView.js';
-import { initStore, setCompanyId, getUserRecord, createUserRecord, getCompanyMetadata, SUPER_ADMIN_EMAIL } from './data/store.js';
+import {
+  initStore, setCompanyId,
+  getUserRecord, createUserRecord,
+  getCompanyMetadata, lookupEmployeeByEmail,
+  SUPER_ADMIN_EMAIL
+} from './data/store.js';
 import { onAuthChanged, signInWithGoogle, signInWithMicrosoft, signOutUser } from './auth.js';
 
 // Register all routes
-register('#dashboard', () => renderDashboard('#app-content'));
-register('#employees', () => renderEmployees('#app-content'));
-register('#payroll',   () => renderPayroll('#app-content'));
-register('#settings',  () => renderSettings('#app-content'));
-register('#reports',   () => renderReports('#app-content'));
+register('#dashboard',         () => renderDashboard('#app-content'));
+register('#employees',         () => renderEmployees('#app-content'));
+register('#payroll',           () => renderPayroll('#app-content'));
+register('#settings',          () => renderSettings('#app-content'));
+register('#reports',           () => renderReports('#app-content'));
+register('#absence-requests',  () => renderAbsenceRequests('#app-content'));
 
 // ── Sidebar toggle — desktop collapse + mobile overlay ────
 function initSidebarToggle() {
@@ -110,12 +118,16 @@ async function showApp(user, { isSuperAdmin = false, companyName = null } = {}) 
   document.getElementById('login-screen').style.display        = 'none';
   document.getElementById('onboarding-screen').style.display   = 'none';
   document.getElementById('super-admin-screen').style.display  = 'none';
+  const ep = document.getElementById('employee-portal-screen');
+  if (ep) ep.style.display = 'none';
   document.getElementById('app-shell').style.display           = 'flex';
 }
 
 function showLogin() {
   document.getElementById('login-screen').style.display      = 'flex';
   document.getElementById('onboarding-screen').style.display = 'none';
+  const ep = document.getElementById('employee-portal-screen');
+  if (ep) ep.style.display = 'none';
   document.getElementById('app-shell').style.display         = 'none';
 }
 
@@ -196,17 +208,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       // ── Super Admin ──────────────────────────────────
+      // Identified by email in firestore.rules — no need to write role here.
+      // Just ensure a basic user record exists for app metadata.
       if (user.email === SUPER_ADMIN_EMAIL) {
-        // Ensure user record exists with superAdmin role
-        let userRecord = await getUserRecord(user.uid);
+        const userRecord = await getUserRecord(user.uid);
         if (!userRecord) {
           await createUserRecord(user.uid, {
-            role:  'superAdmin',
             email: user.email,
             name:  user.displayName || user.email
           });
-        } else if (userRecord.role !== 'superAdmin') {
-          await createUserRecord(user.uid, { ...userRecord, role: 'superAdmin' });
         }
 
         hideLoader();
@@ -219,36 +229,72 @@ document.addEventListener('DOMContentLoaded', () => {
       // ── Regular user ─────────────────────────────────
       const userRecord = await getUserRecord(user.uid);
 
-      if (!userRecord?.companyId) {
-        // First-time user — show onboarding to create their company
+      // Returning EMPLOYEE — show employee portal
+      if (userRecord?.role === 'employee' && userRecord.employeeOf) {
         hideLoader();
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('app-shell').style.display    = 'none';
-
-        await renderOnboarding(user, async companyId => {
-          showLoader('Setting up your workspace…');
-          setCompanyId(companyId);
-          await initStore();
-          hideLoader();
-          await showApp(user);
-          if (!appInitialized) { initRouter(); appInitialized = true; }
+        await renderEmployeePortal({
+          user,
+          companyId:  userRecord.employeeOf,
+          employeeId: userRecord.employeeId
         });
         return;
       }
 
-      // Existing user — load their company
-      setCompanyId(userRecord.companyId);
-      showLoader('Loading payroll data…');
-      await initStore();
-      hideLoader();
-      await showApp(user);
+      // Returning OWNER — load their company
+      // (treat any existing record with companyId as owner for backward compat)
+      if (userRecord?.companyId && userRecord.role !== 'employee') {
+        setCompanyId(userRecord.companyId);
+        showLoader('Loading payroll data…');
+        await initStore();
+        hideLoader();
+        await showApp(user);
 
-      if (!appInitialized) {
-        initRouter();
-        appInitialized = true;
-      } else {
-        window.dispatchEvent(new HashChangeEvent('hashchange'));
+        if (!appInitialized) {
+          initRouter();
+          appInitialized = true;
+        } else {
+          window.dispatchEvent(new HashChangeEvent('hashchange'));
+        }
+        return;
       }
+
+      // No record yet — first-time login. Check if email matches an employee.
+      const lookup = await lookupEmployeeByEmail(user.email);
+      if (lookup?.companyId && lookup?.employeeId) {
+        // Create employee user record so subsequent logins recognize them
+        await createUserRecord(user.uid, {
+          role:       'employee',
+          employeeOf: lookup.companyId,
+          employeeId: lookup.employeeId,
+          email:      user.email,
+          name:       user.displayName || user.email
+        });
+        hideLoader();
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('app-shell').style.display    = 'none';
+        await renderEmployeePortal({
+          user,
+          companyId:  lookup.companyId,
+          employeeId: lookup.employeeId
+        });
+        return;
+      }
+
+      // Otherwise — first-time owner: show onboarding to create their company
+      hideLoader();
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app-shell').style.display    = 'none';
+
+      await renderOnboarding(user, async companyId => {
+        showLoader('Setting up your workspace…');
+        setCompanyId(companyId);
+        await initStore();
+        hideLoader();
+        await showApp(user);
+        if (!appInitialized) { initRouter(); appInitialized = true; }
+      });
 
     } catch (e) {
       console.error('Failed to load data', e);

@@ -1,4 +1,4 @@
-import { getEmployees, getSettings } from '../data/store.js';
+import { getEmployees, getSettings, getAbsenceRequests } from '../data/store.js';
 import { calculatePayroll, calculateTotals } from '../services/payroll.js';
 import { navigate } from '../router.js';
 
@@ -38,6 +38,18 @@ export function render(selector) {
           <span>Settings have not been configured yet. <a href="#settings" style="color:inherit;font-weight:600;text-decoration:underline;">Go to Settings</a> to set tax rates, NFS rates, and fuel price.</span>
         </div>
       ` : ''}
+
+      ${(() => {
+        const pending = getAbsenceRequests().filter(r => r.status === 'pending').length;
+        return pending > 0 ? `
+          <div class="alert alert-info" style="margin-bottom:20px;">
+            <span>📅</span>
+            <span><strong>${pending} absence request${pending !== 1 ? 's' : ''}</strong> waiting for review.
+              <a href="#absence-requests" style="color:inherit;font-weight:600;text-decoration:underline;">Review now →</a>
+            </span>
+          </div>
+        ` : '';
+      })()}
 
       <div class="stat-cards">
         <div class="stat-card">

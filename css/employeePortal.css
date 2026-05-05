@@ -1,0 +1,310 @@
+/* ─────────────────────────────────────────────────────────
+   Employee Portal — mobile-first absence request UI
+   Uses ep- prefix to avoid conflicts with the main app.
+   ───────────────────────────────────────────────────────── */
+
+#employee-portal-screen {
+  font-family: inherit;
+  color: #1e293b;
+}
+
+.ep-shell {
+  max-width: 540px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ── */
+.ep-header {
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+  color: #fff;
+  padding: 20px 18px;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+.ep-header-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ep-logo {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.ep-header-name {
+  font-size: 1rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ep-header-sub {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.7);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+/* ── Main ── */
+.ep-main {
+  flex: 1;
+  padding: 16px 14px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Card ── */
+.ep-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  border: 1px solid #e2e8f0;
+}
+
+.ep-card-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 14px;
+  color: #1e293b;
+}
+
+/* ── Greeting ── */
+.ep-greeting {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 1px solid #bfdbfe;
+}
+
+.ep-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.ep-greeting-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: #1e293b;
+}
+
+.ep-greeting-meta {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+/* ── Form ── */
+.ep-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 12px 0 6px;
+}
+
+.ep-input {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 9px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+  background: #fff;
+  color: #1e293b;
+}
+
+.ep-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+textarea.ep-input {
+  resize: vertical;
+  min-height: 64px;
+  font-family: inherit;
+}
+
+.ep-hint {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin: 5px 0 0;
+}
+
+.ep-muted {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.ep-errors {
+  margin: 10px 0 0;
+  color: #dc2626;
+  font-size: 0.82rem;
+}
+
+.ep-errors div {
+  padding: 4px 0;
+}
+
+/* ── Buttons ── */
+.ep-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 18px;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, transform 0.05s;
+}
+
+.ep-btn:active { transform: scale(0.98); }
+.ep-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.ep-btn-primary {
+  background: #2563eb;
+  color: #fff;
+  width: 100%;
+  margin-top: 14px;
+}
+
+.ep-btn-primary:hover:not(:disabled) { background: #1d4ed8; }
+
+.ep-btn-ghost {
+  background: transparent;
+  color: #dc2626;
+  border: 1.5px solid #fecaca;
+}
+
+.ep-btn-ghost:hover { background: #fef2f2; }
+
+.ep-btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+
+.ep-link-btn {
+  background: none;
+  border: none;
+  color: #64748b;
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-decoration: underline;
+  font-family: inherit;
+  padding: 8px 12px;
+}
+
+/* ── Footer ── */
+.ep-footer {
+  text-align: center;
+  padding: 16px 0 24px;
+}
+
+/* ── Request list items ── */
+.ep-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ep-request {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.ep-request-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ep-request-date {
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 0.9rem;
+}
+
+.ep-request-cat {
+  font-size: 0.78rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.ep-request-reason {
+  font-size: 0.82rem;
+  color: #475569;
+  font-style: italic;
+  margin-top: 6px;
+}
+
+.ep-request-review {
+  font-size: 0.78rem;
+  color: #1e40af;
+  background: #eff6ff;
+  padding: 6px 8px;
+  border-radius: 6px;
+  margin-top: 8px;
+}
+
+/* ── Status badges ── */
+.ep-status {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ep-status-pending  { background: #fef3c7; color: #92400e; }
+.ep-status-approved { background: #dcfce7; color: #166534; }
+.ep-status-rejected { background: #fee2e2; color: #991b1b; }
+
+/* ── Empty state ── */
+.ep-empty {
+  text-align: center;
+  padding: 28px 18px;
+}
+.ep-empty-icon { font-size: 2.4rem; margin-bottom: 10px; }
+.ep-empty-text { font-weight: 600; color: #1e293b; }
+.ep-empty-sub { font-size: 0.82rem; color: #94a3b8; margin-top: 4px; }
+
+/* ── Status badges in admin table (matches ep- styles) ── */
+.badge-pending  { background: #fef3c7; color: #92400e; }
+.badge-approved { background: #dcfce7; color: #166534; }
+.badge-rejected { background: #fee2e2; color: #991b1b; }
+
+/* btn-success for the approve button */
+.btn.btn-success {
+  background: #16a34a;
+  color: #fff;
+  border: none;
+}
+.btn.btn-success:hover { background: #15803d; }

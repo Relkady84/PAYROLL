@@ -2,35 +2,125 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Super admin check — platform-level role, stored in /users/{uid}.role
+    // ── Helper functions ──────────────────────────────────────
+
+    function userExists() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function userData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Super admin is identified by email (hardcoded — single platform admin).
+    // This avoids the bootstrapping problem of needing to write role='superAdmin'
+    // to a user record that the new self-write rules don't permit.
     function isSuperAdmin() {
       return request.auth != null
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superAdmin';
+        && request.auth.token.email == 'raedelkady@gmail.com';
     }
 
-    // Each user can read their own record.
-    // Users can create/update their own record but cannot set or change the 'role' field.
-    // Only the admin SDK / Cloud Functions should assign roles.
+    function isOwnerOf(companyId) {
+      return userExists()
+        && userData().role == 'owner'
+        && userData().companyId == companyId;
+    }
+
+    function isEmployeeOf(companyId) {
+      return userExists()
+        && userData().role == 'employee'
+        && userData().employeeOf == companyId;
+    }
+
+    function myEmployeeId() {
+      return userData().employeeId;
+    }
+
+    // ── /users/{uid} — self-managed records ──────────────────
+    // Users can create/update their own record. The 'role' field is
+    // restricted to 'owner' or 'employee' (self-service signup).
+    // 'superAdmin' role can NEVER be set by self-write — only the admin SDK.
+    // Once 'role' is set, it cannot be changed (except to the same value).
     match /users/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
+
       allow create: if request.auth != null
         && request.auth.uid == uid
-        && !('role' in request.resource.data);
+        && (!('role' in request.resource.data)
+            || request.resource.data.role in ['owner', 'employee']);
+
+      // Update rules:
+      //  - If a 'role' already exists on the record, it must NOT change.
+      //  - If no 'role' exists yet, you may set it to 'owner' or 'employee'.
+      //  - 'superAdmin' role can never be SET via self-write (use Firebase Admin SDK).
       allow update: if request.auth != null
         && request.auth.uid == uid
-        && !('role' in request.resource.data)
-        && !('role' in resource.data);
+        && (
+          // Case A: role unchanged (including legacy 'superAdmin' records)
+          (!('role' in resource.data) && !('role' in request.resource.data))
+          || (('role' in resource.data) && ('role' in request.resource.data)
+              && resource.data.role == request.resource.data.role)
+          // Case B: setting role for the first time on a record that had none
+          || (!('role' in resource.data)
+              && ('role' in request.resource.data)
+              && request.resource.data.role in ['owner', 'employee'])
+        );
     }
 
-    // Company data — accessible by:
-    //   (a) users whose /users/{uid}.companyId matches, OR
-    //   (b) super admin (platform-wide access)
+    // ── /employeeLookup/{email} — email → company/employee mapping ──
+    // Used to find which company an employee belongs to on first login.
+    // Document ID is the lowercased email. Data: { companyId, employeeId, name }
+    match /employeeLookup/{email} {
+      // Anyone authenticated can read (needed for first-login lookup).
+      // Privacy note: discloses which company an email is linked to.
+      allow read: if request.auth != null;
+
+      // Only company owners (writing for their own company) and super admin can write.
+      allow write: if isSuperAdmin()
+        || (userExists()
+            && userData().role == 'owner'
+            && userData().companyId == request.resource.data.companyId);
+
+      allow delete: if isSuperAdmin()
+        || (userExists()
+            && userData().role == 'owner'
+            && userData().companyId == resource.data.companyId);
+    }
+
+    // ── /companies/{companyId}/** — full company data ────────
+    // Default: super admin and company owner have full read/write.
     match /companies/{companyId}/{document=**} {
-      allow read, write: if isSuperAdmin()
-        || (request.auth != null
-          && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId == companyId);
+      allow read, write: if isSuperAdmin() || isOwnerOf(companyId);
+    }
+
+    // ── Employee read access overrides ───────────────────────
+    // Employees can read their own employee record (to know their own info).
+    match /companies/{companyId}/employees/{employeeId} {
+      allow read: if isEmployeeOf(companyId) && myEmployeeId() == employeeId;
+    }
+
+    // Employees can read company metadata (for company name / logo display).
+    match /companies/{companyId}/metadata/info {
+      allow read: if isEmployeeOf(companyId);
+    }
+
+    // ── /companies/{companyId}/absenceRequests/{requestId} ───
+    // Owners (covered by parent rule above) have full access.
+    // Employees can: read their own, create new pending requests, delete own pending.
+    match /companies/{companyId}/absenceRequests/{requestId} {
+      allow read: if isEmployeeOf(companyId)
+        && resource.data.employeeId == myEmployeeId();
+
+      allow create: if isEmployeeOf(companyId)
+        && request.resource.data.employeeId == myEmployeeId()
+        && request.resource.data.status == 'pending';
+
+      allow delete: if isEmployeeOf(companyId)
+        && resource.data.employeeId == myEmployeeId()
+        && resource.data.status == 'pending';
+
+      // Employees cannot update (only delete pending or admin can update).
     }
 
     // Super admin can list all company root documents
