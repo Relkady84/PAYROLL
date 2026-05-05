@@ -294,6 +294,24 @@ export async function getCompanyMetadataFor(companyId) {
   return snap.exists() ? snap.data() : null;
 }
 
+export async function getSettingsFor(companyId) {
+  try {
+    const snap = await getDoc(doc(db, 'companies', companyId, 'settings', 'config'));
+    if (snap.exists()) {
+      const stored = snap.data();
+      return {
+        ...DEFAULT_SETTINGS,
+        ...stored,
+        taxRates: { ...DEFAULT_SETTINGS.taxRates, ...stored.taxRates },
+        nfsRates: { ...DEFAULT_SETTINGS.nfsRates, ...stored.nfsRates }
+      };
+    }
+  } catch (e) {
+    console.warn('Could not load settings:', e);
+  }
+  return structuredClone(DEFAULT_SETTINGS);
+}
+
 // ── Super Admin: list all companies ───────────────────────
 export async function getAllCompanies() {
   const snap = await getDocs(collection(db, 'companies'));

@@ -105,6 +105,12 @@ service cloud.firestore {
       allow read: if isEmployeeOf(companyId);
     }
 
+    // Employees can read settings (needed for pay slip calculation: tax rates,
+    // fuel price, exchange rate, etc.). Read-only — they cannot modify.
+    match /companies/{companyId}/settings/config {
+      allow read: if isEmployeeOf(companyId);
+    }
+
     // ── /companies/{companyId}/absenceRequests/{requestId} ───
     // Owners (covered by parent rule above) have full access.
     // Employees can: read their own, create new pending requests, delete own pending.
