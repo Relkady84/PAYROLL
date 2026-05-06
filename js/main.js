@@ -87,32 +87,30 @@ async function showApp(user, { isSuperAdmin = false, companyName = null } = {}) 
   document.getElementById('user-name').textContent  = user.displayName || user.email;
   document.getElementById('user-email').textContent = user.email;
 
-  // Avatar: show photo if available, fall back to emoji placeholder.
+  // Avatar: placeholder is default; swap to photo only when it actually loads.
   // referrerpolicy="no-referrer" is set on the img tag so Google's CDN
   // accepts the request (mobile browsers often strip referer otherwise).
   const avatar      = document.getElementById('user-avatar');
   const placeholder = document.getElementById('user-avatar-placeholder');
+
+  // Reset to placeholder state every time
+  if (avatar)      { avatar.style.display      = 'none'; avatar.src = ''; }
+  if (placeholder) { placeholder.style.display = 'flex'; placeholder.textContent = initialsFor(user); }
+
   if (user.photoURL && avatar && placeholder) {
-    avatar.onload = () => {
+    // Use a temporary Image to test-load the URL before showing the visible img.
+    // If it fails (CDN error, network, CSP, etc.), we keep the placeholder.
+    const probe = new Image();
+    probe.referrerPolicy = 'no-referrer';
+    probe.onload = () => {
+      avatar.src                = user.photoURL;
       avatar.style.display      = 'block';
       placeholder.style.display = 'none';
     };
-    avatar.onerror = () => {
-      avatar.style.display      = 'none';
-      placeholder.style.display = 'flex';
+    probe.onerror = () => {
+      // Fallback already in place — do nothing
     };
-    avatar.src = user.photoURL;
-    // If the image is already cached and loaded synchronously, the events
-    // above might miss. Force a check on next tick.
-    setTimeout(() => {
-      if (avatar.complete && avatar.naturalWidth > 0) {
-        avatar.style.display      = 'block';
-        placeholder.style.display = 'none';
-      }
-    }, 0);
-  } else if (placeholder) {
-    placeholder.style.display = 'flex';
-    if (avatar) avatar.style.display = 'none';
+    probe.src = user.photoURL;
   }
 
   // Load and display company name + logo + colors in sidebar
@@ -167,6 +165,16 @@ function showLoader(msg = 'Loading payroll data…') {
 
 function hideLoader() {
   document.getElementById('app-loader').style.display = 'none';
+}
+
+// Derive 1-2 letter initials from the user (used as the avatar fallback).
+function initialsFor(user) {
+  const source = user?.displayName || user?.email || '';
+  if (!source) return '👤';
+  const parts = source.split(/[\s@.+_-]/).filter(Boolean);
+  const a = (parts[0]?.[0] || '').toUpperCase();
+  const b = (parts[1]?.[0] || '').toUpperCase();
+  return (a + b) || '👤';
 }
 
 // ── Login screen language picker ──────────────────────────
