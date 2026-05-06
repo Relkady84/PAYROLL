@@ -87,44 +87,35 @@ async function showApp(user, { isSuperAdmin = false, companyName = null } = {}) 
   document.getElementById('user-name').textContent  = user.displayName || user.email;
   document.getElementById('user-email').textContent = user.email;
 
-  // Avatar: bulletproof approach.
-  // The slot starts with the placeholder (initials) only — NO <img> element exists.
-  // We test-load the photo URL via a hidden Image probe. Only if it succeeds do we
-  // dynamically inject an <img>. This means there's no possibility of a broken-image
-  // icon ever showing on screen.
-  const slot        = document.getElementById('user-avatar-slot');
-  const placeholder = document.getElementById('user-avatar-placeholder');
+  // Avatar: dead-simple approach.
+  // The placeholder is ALWAYS visible. If the user has a photoURL and it
+  // actually loads via a probe, we paint it as a CSS background-image on the
+  // placeholder. If it fails, the initials show. No <img> element involved at
+  // all → no broken-image icon possible on any platform.
+  try {
+    const placeholder = document.getElementById('user-avatar-placeholder');
+    if (placeholder) {
+      // Default: show initials
+      placeholder.textContent       = initialsFor(user);
+      placeholder.style.backgroundImage = '';
+      placeholder.style.color           = '';
 
-  // Remove any previously-injected <img> (in case showApp is called again)
-  const previousImg = slot?.querySelector('img.sidebar-user-avatar');
-  if (previousImg) previousImg.remove();
-
-  // Update placeholder text with initials
-  if (placeholder) {
-    placeholder.textContent  = initialsFor(user);
-    placeholder.style.display = 'flex';
-  }
-
-  if (user.photoURL && slot && placeholder) {
-    const probe = new Image();
-    probe.referrerPolicy = 'no-referrer';
-    probe.onload = () => {
-      // Probe succeeded — image is definitely loadable.
-      // Build the <img> dynamically and inject it.
-      const img = document.createElement('img');
-      img.className       = 'sidebar-user-avatar';
-      img.alt             = '';
-      img.referrerPolicy  = 'no-referrer';
-      img.src             = user.photoURL;
-      // Show it, hide the placeholder
-      img.style.display       = 'block';
-      placeholder.style.display = 'none';
-      slot.insertBefore(img, placeholder);
-    };
-    probe.onerror = () => {
-      // Probe failed — keep the initials placeholder. Nothing visible breaks.
-    };
-    probe.src = user.photoURL;
+      if (user.photoURL) {
+        const probe = new Image();
+        probe.referrerPolicy = 'no-referrer';
+        probe.onload = () => {
+          // Image loaded successfully — paint it as background, hide initials text
+          placeholder.style.backgroundImage = `url("${user.photoURL.replace(/"/g, '%22')}")`;
+          placeholder.style.backgroundSize  = 'cover';
+          placeholder.style.backgroundPosition = 'center';
+          placeholder.style.color = 'transparent'; // hide the initials underneath
+        };
+        // probe.onerror — keep initials visible (nothing to do)
+        probe.src = user.photoURL;
+      }
+    }
+  } catch (e) {
+    console.warn('Avatar setup failed (non-fatal):', e);
   }
 
   // Load and display company name + logo + colors in sidebar
