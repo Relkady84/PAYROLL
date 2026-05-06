@@ -9,7 +9,7 @@
  * Version bump = bump CACHE_VERSION below.
  */
 
-const CACHE_VERSION = 'v2-2026-05-06-avatar-fix';
+const CACHE_VERSION = 'v3-2026-05-06-avatar-fix2';
 const CACHE_SHELL   = `payroll-shell-${CACHE_VERSION}`;
 const CACHE_RUNTIME = `payroll-runtime-${CACHE_VERSION}`;
 

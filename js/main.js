@@ -93,22 +93,27 @@ async function showApp(user, { isSuperAdmin = false, companyName = null } = {}) 
   const avatar      = document.getElementById('user-avatar');
   const placeholder = document.getElementById('user-avatar-placeholder');
 
-  // Reset to placeholder state every time
-  if (avatar)      { avatar.style.display      = 'none'; avatar.src = ''; }
+  // Reset to placeholder state every time. Use 1x1 transparent gif as a
+  // safe "empty" src (some mobile browsers render a broken-image icon when
+  // src is "" or removed).
+  const TRANSPARENT_GIF = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+  if (avatar)      { avatar.style.display      = 'none'; avatar.src = TRANSPARENT_GIF; }
   if (placeholder) { placeholder.style.display = 'flex'; placeholder.textContent = initialsFor(user); }
 
   if (user.photoURL && avatar && placeholder) {
-    // Use a temporary Image to test-load the URL before showing the visible img.
-    // If it fails (CDN error, network, CSP, etc.), we keep the placeholder.
+    // Test-load via a hidden Image first. Only swap the visible avatar
+    // once the probe succeeds — so the user never sees a broken-image icon.
     const probe = new Image();
     probe.referrerPolicy = 'no-referrer';
     probe.onload = () => {
+      // Probe succeeded → show the actual photo
       avatar.src                = user.photoURL;
       avatar.style.display      = 'block';
       placeholder.style.display = 'none';
     };
     probe.onerror = () => {
-      // Fallback already in place — do nothing
+      // Probe failed → keep the initials placeholder (already shown)
+      // (Make sure avatar stays hidden with the transparent gif as src)
     };
     probe.src = user.photoURL;
   }
