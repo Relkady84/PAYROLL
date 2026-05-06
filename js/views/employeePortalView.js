@@ -250,7 +250,6 @@ function absenceFormCardHTML() {
   return `
     <section class="ep-card ep-form-card">
       <div class="ep-card-title">🚫 Request an Absence</div>
-      <p class="ep-card-sub">A day you will not be coming to work — counts as <strong>−1 day</strong> on your pay slip.</p>
 
       <form id="ep-form" novalidate>
         <label class="ep-label" for="ep-date">Date</label>
@@ -288,7 +287,6 @@ function permanenceFormCardHTML() {
   return `
     <section class="ep-card ep-form-card">
       <div class="ep-card-title">🎯 Request a Permanence Day</div>
-      <p class="ep-card-sub">A day you came to work that was supposed to be off (holiday, vacation, weekend) — counts as <strong>+1 day</strong> on your pay slip.</p>
 
       <form id="ep-perm-form" novalidate>
         <label class="ep-label" for="ep-perm-date">Date you worked</label>
