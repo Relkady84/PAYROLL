@@ -408,6 +408,11 @@ function renderRows(container) {
       breakdownHint = `<div style="font-size:0.6rem;color:#ea580c;margin-top:2px;" title="Manual override — type a different number to change, or click Reset Days">manual</div>`;
     } else if (bd.isOutsideActivePeriod && !bd.permanence) {
       breakdownHint = `<div style="font-size:0.6rem;color:#94a3b8;margin-top:2px;" title="This month is outside the role's active period(s) for the academic year">off-period</div>`;
+    } else if (bd.hasEmployeeOverride) {
+      const parts = [`${bd.calendarDays} fixed`];
+      if (bd.absences   > 0) parts.push(`− ${bd.absences} abs`);
+      if (bd.permanence > 0) parts.push(`+ ${bd.permanence} perm`);
+      breakdownHint = `<div style="font-size:0.62rem;color:#ea580c;margin-top:2px;line-height:1.2;font-weight:600;" title="Days override is set on this employee's profile (replaces calendar). Edit the employee to change or clear it.">${parts.join(' ')}</div>`;
     } else {
       const parts = [`${bd.calendarDays} cal`];
       if (bd.holidays   > 0) parts.push(`− ${bd.holidays} hol`);

@@ -81,16 +81,30 @@ export function computeEffectiveDays({
     }
   }
 
-  const calendarDays = computeWorkingDaysInMonth(year, month, calendar, employee, {
-    activePeriods: activePeriods || undefined
-  });
+  // Per-employee monthly days override (set on the employee form). When present,
+  // replaces the calendar/schedule calc as the BASE — absences and permanence still apply.
+  // Useful for teachers with dynamic schedules.
+  const employeeOverride = (employee.defaultDaysPerMonth !== undefined
+                         && employee.defaultDaysPerMonth !== null
+                         && employee.defaultDaysPerMonth !== '')
+    ? Math.max(0, Math.min(31, parseInt(employee.defaultDaysPerMonth, 10) || 0))
+    : null;
+
+  const calendarDays = (employeeOverride !== null)
+    ? employeeOverride
+    : computeWorkingDaysInMonth(year, month, calendar, employee, {
+        activePeriods: activePeriods || undefined
+      });
+
   const holidays     = countHolidaysInMonth(year, month, calendar);
   const absences     = countApprovedAbsencesInMonth(absenceRequests, employee.id, year, month);
   const permanence   = countApprovedPermanenceInMonth(absenceRequests, employee.id, year, month);
 
-  // Outside active period? = no calendar days at all because none matched
-  const isOutsideActivePeriod = !!activePeriods && calendarDays === 0;
+  // Outside active period? = no calendar days at all because none matched.
+  // When the employee override is set we explicitly trust it, so off-period flag is false.
+  const isOutsideActivePeriod = !!activePeriods && employeeOverride === null && calendarDays === 0;
 
+  // Per-cell manual override (Payroll table input) — highest priority
   if (manualOverride !== undefined && manualOverride !== null && manualOverride !== '' && !isNaN(manualOverride)) {
     return {
       days: Math.max(0, parseInt(manualOverride, 10) || 0),
@@ -99,7 +113,8 @@ export function computeEffectiveDays({
       absences,
       permanence,
       isManualOverride: true,
-      isOutsideActivePeriod
+      isOutsideActivePeriod,
+      hasEmployeeOverride: employeeOverride !== null
     };
   }
 
@@ -110,7 +125,8 @@ export function computeEffectiveDays({
     absences,
     permanence,
     isManualOverride: false,
-    isOutsideActivePeriod
+    isOutsideActivePeriod,
+    hasEmployeeOverride: employeeOverride !== null
   };
 }
 

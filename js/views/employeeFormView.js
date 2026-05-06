@@ -75,6 +75,31 @@ function buildFormHTML(employee = null) {
           </div>
           <span class="form-hint">Days this employee normally works. Used to compute monthly working days for payroll.</span>
         </div>
+
+        <div class="form-group form-full">
+          <label class="form-label" for="ef-defaultDaysPerMonth">
+            Days worked per month <span class="form-hint" style="margin:0;font-weight:400;">(optional override)</span>
+          </label>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <div class="input-group" style="max-width:240px;flex:0 0 auto;">
+              <input class="form-control" id="ef-defaultDaysPerMonth" name="defaultDaysPerMonth"
+                type="number" min="0" max="31" step="1" placeholder="Leave empty to use schedule"
+                value="${e.defaultDaysPerMonth ?? ''}">
+              <span class="input-addon input-addon-right">days</span>
+            </div>
+            <button type="button" id="ef-clear-days" class="btn btn-secondary btn-sm" title="Clear the override and revert to calendar/schedule calculation">
+              ↺ Clear
+            </button>
+            <span id="ef-days-status" style="font-size:0.78rem;font-weight:600;
+              color:${e.defaultDaysPerMonth != null ? '#ea580c' : '#94a3b8'};">
+              ${e.defaultDaysPerMonth != null ? '⚠ Override is ACTIVE' : 'Using calendar (no override)'}
+            </span>
+          </div>
+          <span class="form-hint">
+            Useful for teachers with dynamic schedules. When set, this number replaces the calendar/schedule
+            calculation. Absences and permanences still apply on top. Click <strong>↺ Clear</strong> to undo.
+          </span>
+        </div>
       </div>
       <div id="form-errors" style="margin-top:12px;"></div>
     </form>
@@ -126,6 +151,32 @@ function bindScheduleControls() {
       if (preset) renderScheduleChecks(preset);
     });
   });
+
+  // Days-per-month override — clear button + live status
+  const daysInput  = document.getElementById('ef-defaultDaysPerMonth');
+  const clearBtn   = document.getElementById('ef-clear-days');
+  const statusEl   = document.getElementById('ef-days-status');
+
+  function updateDaysStatus() {
+    if (!statusEl) return;
+    const v = (daysInput?.value || '').trim();
+    if (v !== '' && !isNaN(parseInt(v, 10))) {
+      statusEl.textContent = '⚠ Override is ACTIVE';
+      statusEl.style.color = '#ea580c';
+    } else {
+      statusEl.textContent = 'Using calendar (no override)';
+      statusEl.style.color = '#94a3b8';
+    }
+  }
+
+  if (daysInput) daysInput.addEventListener('input', updateDaysStatus);
+  if (clearBtn)  clearBtn.addEventListener('click', () => {
+    if (daysInput) {
+      daysInput.value = '';
+      updateDaysStatus();
+      daysInput.focus();
+    }
+  });
 }
 
 function esc(val) {
@@ -168,6 +219,8 @@ function handleSubmit(existingId, onSaved) {
   // Tax category is inherited from the role (Teacher or Admin)
   const taxCategory = role?.taxCategory || 'Teacher';
 
+  const daysOverrideRaw = form.querySelector('#ef-defaultDaysPerMonth').value.trim();
+
   const data = {
     firstName:     form.querySelector('#ef-firstName').value,
     lastName:      form.querySelector('#ef-lastName').value,
@@ -178,7 +231,8 @@ function handleSubmit(existingId, onSaved) {
     baseSalaryLBP: form.querySelector('#ef-baseSalaryLBP').value,
     kmDistance:    form.querySelector('#ef-kmDistance').value,
     email:         form.querySelector('#ef-email').value,
-    workSchedule:  getSelectedSchedule()
+    workSchedule:  getSelectedSchedule(),
+    defaultDaysPerMonth: daysOverrideRaw === '' ? null : daysOverrideRaw
   };
 
   const errors = validateEmployee(data);

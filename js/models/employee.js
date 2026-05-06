@@ -15,6 +15,15 @@ function normalizeSchedule(input) {
 export function createEmployee(data) {
   const schedule = normalizeSchedule(data.workSchedule);
   const employeeType = EMPLOYEE_TYPES.includes(data.employeeType) ? data.employeeType : 'Teacher';
+  // Optional manual override for monthly working days. Mostly used for teachers
+  // whose schedules vary too much for fixed Mon-Fri checkboxes. When set, this
+  // value replaces the calendar/schedule calculation as the base; absences and
+  // permanences still adjust it.
+  let defaultDaysPerMonth = null;
+  if (data.defaultDaysPerMonth !== undefined && data.defaultDaysPerMonth !== '' && data.defaultDaysPerMonth !== null) {
+    const n = parseInt(data.defaultDaysPerMonth, 10);
+    if (!isNaN(n) && n >= 0 && n <= 31) defaultDaysPerMonth = n;
+  }
   return {
     id: crypto.randomUUID(),
     firstName:     String(data.firstName    || '').trim(),
@@ -26,7 +35,8 @@ export function createEmployee(data) {
     baseSalaryLBP: parseFloat(data.baseSalaryLBP) || 0,
     kmDistance:    parseFloat(data.kmDistance)    || 0,
     email:         String(data.email        || '').trim().toLowerCase(),
-    workSchedule:  schedule.length ? schedule : [...DEFAULT_EMPLOYEE_SCHEDULE]
+    workSchedule:  schedule.length ? schedule : [...DEFAULT_EMPLOYEE_SCHEDULE],
+    defaultDaysPerMonth          // null = use calendar; number = override base days
   };
 }
 
