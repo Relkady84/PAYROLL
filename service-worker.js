@@ -10,7 +10,7 @@
  * Version bump = bump CACHE_VERSION below.
  */
 
-const CACHE_VERSION = 'v10-2026-05-06-pdf-fix';
+const CACHE_VERSION = 'v11-2026-05-06-reports-days';
 const CACHE_SHELL   = `payroll-shell-${CACHE_VERSION}`;
 const CACHE_RUNTIME = `payroll-runtime-${CACHE_VERSION}`;
 

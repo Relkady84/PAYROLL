@@ -1,5 +1,9 @@
-import { getEmployees, getSettings, getCompanyMetadata } from '../data/store.js';
-import { calculatePayroll } from '../services/payroll.js';
+import {
+  getEmployees, getSettings, getCompanyMetadata,
+  getCalendar, getAbsenceRequests, getRoleRegistry,
+  findAcademicYearForMonth, getAcademicYears
+} from '../data/store.js';
+import { calculatePayroll, computeEffectiveDays } from '../services/payroll.js';
 import { exportPDF, exportExcel, printPaySlips, fmt } from '../services/reportExport.js';
 import { t } from '../i18n.js';
 
@@ -275,7 +279,37 @@ export async function render(selector) {
   let selYear   = now.getFullYear();
 
   function getPayroll() {
-    return calculatePayroll(employees, settings);
+    // Compute effective days per employee for the SELECTED month.
+    // Uses calendar (weekends + holidays), academic year + role active periods,
+    // approved absences (-1) and permanences (+1), and per-employee override
+    // if set on the employee's profile.
+    const calendar       = getCalendar();
+    const absenceRequests = getAbsenceRequests();
+    const roleRegistry   = getRoleRegistry();
+    // selMonth is 0-based (JS Date), but findAcademicYearForMonth + computeEffectiveDays
+    // expect 1-based month numbers
+    const month1based    = selMonth + 1;
+    const academicYear   = findAcademicYearForMonth(selYear, month1based);
+    const hasAnyYears    = getAcademicYears().length > 0;
+
+    const daysMap = {};
+    for (const emp of employees) {
+      // If academic years are defined but none covers this month → off-period (0 days)
+      const forceOffPeriod = !academicYear && hasAnyYears;
+      const bd = computeEffectiveDays({
+        employee:        emp,
+        calendar,
+        absenceRequests,
+        year:            selYear,
+        month:           month1based,
+        academicYear,
+        roleRegistry,
+        forceOffPeriod
+      });
+      daysMap[emp.id] = bd.days;
+    }
+
+    return calculatePayroll(employees, settings, daysMap);
   }
 
   function getContext() {
