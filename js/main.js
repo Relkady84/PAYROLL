@@ -18,6 +18,7 @@ import {
 } from './data/store.js';
 import { onAuthChanged, signInWithGoogle, signInWithMicrosoft, signOutUser } from './auth.js';
 import { t, getLanguage, setLanguage, SUPPORTED_LANGUAGES, applyTranslationsToDOM } from './i18n.js';
+import './pwa.js';   // self-registers the service worker + install prompt
 
 // Register all routes
 register('#dashboard',         () => renderDashboard('#app-content'));

@@ -36,10 +36,21 @@ export async function render(selector) {
         <span class="content-header-subtitle">Configure rates, formulas and exchange values</span>
       </div>
     </div>
+
+    <!-- Settings tabs -->
+    <div id="settings-tabs" style="display:flex;flex-wrap:wrap;gap:4px;padding:0 20px;margin:0 0 16px;border-bottom:2px solid var(--color-border);">
+      <button type="button" class="settings-tab" data-tab="company"><span>🏢</span> Company</button>
+      <button type="button" class="settings-tab" data-tab="display"><span>🎨</span> Display</button>
+      <button type="button" class="settings-tab" data-tab="calendar"><span>📅</span> Calendar</button>
+      <button type="button" class="settings-tab" data-tab="academic"><span>🎓</span> Academic Year & Roles</button>
+      <button type="button" class="settings-tab" data-tab="global"><span>⚙️</span> Global Configuration</button>
+      <button type="button" class="settings-tab" data-tab="language"><span>🌐</span> Language</button>
+    </div>
+
     <div class="page-body">
 
       <!-- Language -->
-      <div class="section-card" style="margin-bottom:20px;">
+      <div class="section-card settings-pane" data-pane="language" style="margin-bottom:20px;">
         <div class="section-card-header">
           <span class="section-card-title">${esc(t('settings.language'))}</span>
         </div>
@@ -50,7 +61,7 @@ export async function render(selector) {
       </div>
 
       <!-- Company Profile -->
-      <div class="section-card" style="margin-bottom:20px;">
+      <div class="section-card settings-pane" data-pane="company" style="margin-bottom:20px;">
         <div class="section-card-header">
           <span class="section-card-title">Company Profile</span>
         </div>
@@ -93,7 +104,7 @@ export async function render(selector) {
       </div>
 
       <!-- Display Settings -->
-      <div class="section-card" style="margin-bottom:20px;">
+      <div class="section-card settings-pane" data-pane="display" style="margin-bottom:20px;">
         <div class="section-card-header">
           <span class="section-card-title">Display &amp; Colors</span>
         </div>
@@ -153,7 +164,7 @@ export async function render(selector) {
       </div>
 
       <!-- School Calendar -->
-      <div class="section-card" id="calendar-card" style="margin-bottom:20px;">
+      <div class="section-card settings-pane" id="calendar-card" data-pane="calendar" style="margin-bottom:20px;">
         <div class="section-card-header">
           <span class="section-card-title">School Calendar</span>
         </div>
@@ -263,7 +274,7 @@ export async function render(selector) {
       </div>
 
       <!-- Academic Year + Roles -->
-      <div class="section-card" id="academic-year-card" style="margin-bottom:20px;">
+      <div class="section-card settings-pane" id="academic-year-card" data-pane="academic" style="margin-bottom:20px;">
         <div class="section-card-header">
           <span class="section-card-title">Academic Year & Roles</span>
         </div>
@@ -329,7 +340,7 @@ export async function render(selector) {
         </div>
       </div>
 
-      <div class="section-card">
+      <div class="section-card settings-pane" data-pane="global">
         <div class="section-card-header">
           <span class="section-card-title">Global Configuration</span>
         </div>
@@ -687,6 +698,9 @@ export async function render(selector) {
     }
   });
 
+  // ── Tabs ───────────────────────────────────────────────
+  initSettingsTabs();
+
   // ── Language picker ─────────────────────────────────────
   initLanguagePicker();
 
@@ -858,6 +872,71 @@ function handleSave(container) {
   const settings = denormalizeSettings(getSettings());
   const hint = form.querySelector('#exchangeRate').closest('.form-group').querySelector('.form-hint');
   if (hint) hint.textContent = `Current rate: 1 USD = ${settings.exchangeRate.toLocaleString()} LBP`;
+}
+
+// ── Settings tabs ──────────────────────────────────────────
+function initSettingsTabs() {
+  // Inject scoped styles once
+  if (!document.getElementById('settings-tabs-styles')) {
+    const style = document.createElement('style');
+    style.id = 'settings-tabs-styles';
+    style.textContent = `
+      .settings-tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 10px 16px;
+        border: none;
+        background: transparent;
+        font-family: inherit;
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: var(--color-text-secondary);
+        cursor: pointer;
+        border-bottom: 3px solid transparent;
+        margin-bottom: -2px;
+        transition: color 0.12s, border-color 0.12s, background 0.12s;
+        border-radius: 6px 6px 0 0;
+      }
+      .settings-tab:hover {
+        color: #1e293b;
+        background: #f1f5f9;
+      }
+      .settings-tab.active {
+        color: var(--color-primary);
+        border-bottom-color: var(--color-primary);
+        background: transparent;
+      }
+      .settings-pane { display: none; }
+      .settings-pane.active { display: block; }
+      @media (max-width: 768px) {
+        .settings-tab { padding: 8px 10px; font-size: 0.82rem; }
+        #settings-tabs { overflow-x: auto; flex-wrap: nowrap !important; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // Persist active tab in localStorage so the user lands back where they left
+  const STORAGE_KEY = 'payroll-settings-tab';
+  let activeTab = localStorage.getItem(STORAGE_KEY) || 'company';
+
+  function setActive(tab) {
+    activeTab = tab;
+    localStorage.setItem(STORAGE_KEY, tab);
+    document.querySelectorAll('.settings-tab').forEach(b => {
+      b.classList.toggle('active', b.dataset.tab === tab);
+    });
+    document.querySelectorAll('.settings-pane').forEach(p => {
+      p.classList.toggle('active', p.dataset.pane === tab);
+    });
+  }
+
+  document.querySelectorAll('.settings-tab').forEach(btn => {
+    btn.addEventListener('click', () => setActive(btn.dataset.tab));
+  });
+
+  setActive(activeTab);
 }
 
 // ── Language picker ────────────────────────────────────────
