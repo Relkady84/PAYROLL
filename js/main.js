@@ -83,76 +83,81 @@ function initSidebarToggle() {
 }
 
 // ── UI helpers ────────────────────────────────────────────
+//
+// Defensive showApp: ALL non-critical UI updates (avatar, colors, super-admin
+// controls) wrapped in try/catch so a single error never prevents the app shell
+// from displaying. The very last thing we do is show the app-shell — that's the
+// most important step.
+//
 async function showApp(user, { isSuperAdmin = false, companyName = null } = {}) {
-  document.getElementById('user-name').textContent  = user.displayName || user.email;
-  document.getElementById('user-email').textContent = user.email;
+  // 1. Basic info (rarely fails)
+  try {
+    const nameEl = document.getElementById('user-name');
+    const emailEl = document.getElementById('user-email');
+    if (nameEl)  nameEl.textContent  = user?.displayName || user?.email || '';
+    if (emailEl) emailEl.textContent = user?.email || '';
+  } catch (e) { console.warn('Name/email setup:', e); }
 
-  // Avatar: dead-simple approach.
-  // The placeholder is ALWAYS visible. If the user has a photoURL and it
-  // actually loads via a probe, we paint it as a CSS background-image on the
-  // placeholder. If it fails, the initials show. No <img> element involved at
-  // all → no broken-image icon possible on any platform.
+  // 2. Avatar — set background-image directly (CSS background can't show
+  //    a broken-image icon, so this is safe). If the URL fails to load, the
+  //    initials text underneath remains visible.
   try {
     const placeholder = document.getElementById('user-avatar-placeholder');
     if (placeholder) {
-      // Default: show initials
-      placeholder.textContent       = initialsFor(user);
-      placeholder.style.backgroundImage = '';
-      placeholder.style.color           = '';
-
-      if (user.photoURL) {
-        const probe = new Image();
-        probe.referrerPolicy = 'no-referrer';
-        probe.onload = () => {
-          // Image loaded successfully — paint it as background, hide initials text
-          placeholder.style.backgroundImage = `url("${user.photoURL.replace(/"/g, '%22')}")`;
-          placeholder.style.backgroundSize  = 'cover';
-          placeholder.style.backgroundPosition = 'center';
-          placeholder.style.color = 'transparent'; // hide the initials underneath
-        };
-        // probe.onerror — keep initials visible (nothing to do)
-        probe.src = user.photoURL;
+      placeholder.textContent = initialsFor(user);
+      if (user?.photoURL) {
+        const safe = user.photoURL.replace(/"/g, '%22');
+        placeholder.style.backgroundImage    = `url("${safe}")`;
+        placeholder.style.backgroundSize     = 'cover';
+        placeholder.style.backgroundPosition = 'center';
+        placeholder.style.color              = 'transparent';
+      } else {
+        placeholder.style.backgroundImage = '';
+        placeholder.style.color           = '';
       }
     }
-  } catch (e) {
-    console.warn('Avatar setup failed (non-fatal):', e);
-  }
+  } catch (e) { console.warn('Avatar setup:', e); }
 
-  // Load and display company name + logo + colors in sidebar
-  let name = companyName;
-  let logoUrl = '';
-  let displayColors = null;
-  if (!name) {
-    try {
-      const meta = await getCompanyMetadata();
-      name          = meta?.name         || '—';
-      logoUrl       = meta?.logoUrl      || '';
-      displayColors = meta?.displayColors || null;
-    } catch {
-      name = '—';
+  // 3. Company metadata (name/logo/colors)
+  try {
+    let name = companyName;
+    let logoUrl = '';
+    let displayColors = null;
+    if (!name) {
+      try {
+        const meta = await getCompanyMetadata();
+        name          = meta?.name          || '—';
+        logoUrl       = meta?.logoUrl       || '';
+        displayColors = meta?.displayColors || null;
+      } catch {
+        name = '—';
+      }
     }
-  }
-  document.getElementById('sidebar-company-name').textContent = name;
-  _applySidebarLogo(logoUrl);
-  applyDisplayColors(displayColors);
+    const nameEl = document.getElementById('sidebar-company-name');
+    if (nameEl) nameEl.textContent = name;
+    _applySidebarLogo(logoUrl);
+    applyDisplayColors(displayColors);
+  } catch (e) { console.warn('Company metadata setup:', e); }
 
-  // Show super admin controls
-  const saSection = document.getElementById('super-admin-nav-section');
-  const saBtn     = document.getElementById('switch-company-btn');
-  if (isSuperAdmin) {
-    saSection.style.display = '';
-    saBtn.style.display     = '';
-  } else {
-    saSection.style.display = 'none';
-    saBtn.style.display     = 'none';
-  }
+  // 4. Super-admin controls
+  try {
+    const saSection = document.getElementById('super-admin-nav-section');
+    const saBtn     = document.getElementById('switch-company-btn');
+    if (saSection) saSection.style.display = isSuperAdmin ? '' : 'none';
+    if (saBtn)     saBtn.style.display     = isSuperAdmin ? '' : 'none';
+  } catch (e) { console.warn('Super-admin controls:', e); }
 
-  document.getElementById('login-screen').style.display        = 'none';
-  document.getElementById('onboarding-screen').style.display   = 'none';
-  document.getElementById('super-admin-screen').style.display  = 'none';
-  const ep = document.getElementById('employee-portal-screen');
-  if (ep) ep.style.display = 'none';
-  document.getElementById('app-shell').style.display           = 'flex';
+  // 5. CRITICAL — show the app shell. Must run no matter what.
+  try {
+    document.getElementById('login-screen').style.display       = 'none';
+    document.getElementById('onboarding-screen').style.display  = 'none';
+    document.getElementById('super-admin-screen').style.display = 'none';
+    const ep = document.getElementById('employee-portal-screen');
+    if (ep) ep.style.display = 'none';
+    document.getElementById('app-shell').style.display          = 'flex';
+  } catch (e) {
+    console.error('Could not show app shell:', e);
+  }
 }
 
 function showLogin() {
