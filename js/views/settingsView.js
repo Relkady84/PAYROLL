@@ -32,19 +32,19 @@ export async function render(selector) {
   container.innerHTML = `
     <div class="content-header">
       <div class="content-header-left">
-        <h1>Settings</h1>
-        <span class="content-header-subtitle">Configure rates, formulas and exchange values</span>
+        <h1>${esc(t('settings.title'))}</h1>
+        <span class="content-header-subtitle">${esc(t('settings.subtitle'))}</span>
       </div>
     </div>
 
     <!-- Settings tabs -->
     <div id="settings-tabs" style="display:flex;flex-wrap:wrap;gap:4px;padding:0 20px;margin:0 0 16px;border-bottom:2px solid var(--color-border);">
-      <button type="button" class="settings-tab" data-tab="company"><span>🏢</span> Company</button>
-      <button type="button" class="settings-tab" data-tab="display"><span>🎨</span> Display</button>
-      <button type="button" class="settings-tab" data-tab="calendar"><span>📅</span> Calendar</button>
-      <button type="button" class="settings-tab" data-tab="academic"><span>🎓</span> Academic Year & Roles</button>
-      <button type="button" class="settings-tab" data-tab="global"><span>⚙️</span> Global Configuration</button>
-      <button type="button" class="settings-tab" data-tab="language"><span>🌐</span> Language</button>
+      <button type="button" class="settings-tab" data-tab="company">${esc(t('settings.tab.company'))}</button>
+      <button type="button" class="settings-tab" data-tab="display">${esc(t('settings.tab.display'))}</button>
+      <button type="button" class="settings-tab" data-tab="calendar">${esc(t('settings.tab.calendar'))}</button>
+      <button type="button" class="settings-tab" data-tab="academic">${esc(t('settings.tab.academic'))}</button>
+      <button type="button" class="settings-tab" data-tab="global">${esc(t('settings.tab.global'))}</button>
+      <button type="button" class="settings-tab" data-tab="language">${esc(t('settings.tab.language'))}</button>
     </div>
 
     <div class="page-body">
@@ -63,7 +63,7 @@ export async function render(selector) {
       <!-- Company Profile -->
       <div class="section-card settings-pane" data-pane="company" style="margin-bottom:20px;">
         <div class="section-card-header">
-          <span class="section-card-title">Company Profile</span>
+          <span class="section-card-title">${esc(t('settings.section.company'))}</span>
         </div>
         <div class="section-card-body">
           <div class="form-grid">
@@ -106,7 +106,7 @@ export async function render(selector) {
       <!-- Display Settings -->
       <div class="section-card settings-pane" data-pane="display" style="margin-bottom:20px;">
         <div class="section-card-header">
-          <span class="section-card-title">Display &amp; Colors</span>
+          <span class="section-card-title">${esc(t('settings.section.display'))}</span>
         </div>
         <div class="section-card-body">
 
@@ -166,7 +166,7 @@ export async function render(selector) {
       <!-- School Calendar -->
       <div class="section-card settings-pane" id="calendar-card" data-pane="calendar" style="margin-bottom:20px;">
         <div class="section-card-header">
-          <span class="section-card-title">School Calendar</span>
+          <span class="section-card-title">${esc(t('settings.section.calendar'))}</span>
         </div>
         <div class="section-card-body">
           <div class="alert alert-info" style="margin-bottom:14px;">
@@ -276,7 +276,7 @@ export async function render(selector) {
       <!-- Academic Year + Roles -->
       <div class="section-card settings-pane" id="academic-year-card" data-pane="academic" style="margin-bottom:20px;">
         <div class="section-card-header">
-          <span class="section-card-title">Academic Year & Roles</span>
+          <span class="section-card-title">${esc(t('settings.section.academic'))}</span>
         </div>
         <div class="section-card-body">
 
@@ -342,7 +342,7 @@ export async function render(selector) {
 
       <div class="section-card settings-pane" data-pane="global">
         <div class="section-card-header">
-          <span class="section-card-title">Global Configuration</span>
+          <span class="section-card-title">${esc(t('settings.section.global'))}</span>
         </div>
         <div class="section-card-body">
           <form id="settings-form" novalidate>

@@ -88,6 +88,13 @@
     --sidebar-width: 0px;
   }
 
+  /* Hide the floating ☰ button when the mobile sidebar is open */
+  body.sidebar-open-mobile .menu-toggle {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+  }
+
   /* Sidebar: off-screen by default, slides in when .open */
   .sidebar {
     transform: translateX(-240px);

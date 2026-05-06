@@ -7,6 +7,7 @@ import { calculatePayroll, calculateTotals, computeEffectiveDays } from '../serv
 import { exportCSV, exportExcel, exportPDF } from '../services/exportService.js';
 import { importCSV, importExcel } from '../services/importService.js';
 import { showToast } from './components/toast.js';
+import { t } from '../i18n.js';
 
 let _filterType    = 'all';
 let _sortKey       = 'firstName';
@@ -81,8 +82,8 @@ export function render(selector) {
   container.innerHTML = `
     <div class="content-header">
       <div class="content-header-left">
-        <h1>Payroll Report</h1>
-        <span class="content-header-subtitle" id="payroll-count-label">Loading…</span>
+        <h1>${t('payroll.title')}</h1>
+        <span class="content-header-subtitle" id="payroll-count-label">${t('common.loading')}</span>
       </div>
     </div>
     <div class="page-body">
@@ -91,11 +92,11 @@ export function render(selector) {
         <div class="toolbar">
           <div class="toolbar-left">
             <select class="filter-select" id="payroll-type-filter">
-              <option value="all">All Types</option>
-              <option value="Teacher">Teachers</option>
-              <option value="Admin">Administrators</option>
+              <option value="all">${t('employees.all_types')}</option>
+              <option value="Teacher">${t('employees.teachers')}</option>
+              <option value="Admin">${t('employees.administrators')}</option>
             </select>
-            <label style="font-size:0.8rem;color:var(--color-text-muted);font-weight:500;margin-left:8px;">Month:</label>
+            <label style="font-size:0.8rem;color:var(--color-text-muted);font-weight:500;margin-left:8px;">${t('payroll.month')}</label>
             <div id="pr-date-wrap" style="position:relative;display:inline-block;">
               <button type="button" id="pr-date-btn"
                 style="padding:6px 12px;border:1.5px solid var(--color-border);border-radius:6px;
@@ -135,19 +136,19 @@ export function render(selector) {
           <table class="data-table" id="payroll-table">
             <thead>
               <tr>
-                <th class="sortable" data-key="firstName">Name <span class="sort-icon">↕</span></th>
-                <th class="sortable" data-key="employeeType">Type <span class="sort-icon">↕</span></th>
-                <th class="sortable" data-key="daysWorked">Transport Days <span class="sort-icon">↕</span></th>
-                <th class="sortable" data-key="baseSalaryLBP">Base Salary (LBP) <span class="sort-icon">↕</span></th>
-                <th class="sortable" data-key="baseSalaryUSD">Base Salary (USD) <span class="sort-icon">↕</span></th>
-                <th class="sortable" data-key="transportPerDayLBP">Transport/Day (LBP) <span class="sort-icon">↕</span></th>
-                <th class="sortable" data-key="transportPerDayUSD">Transport/Day (USD) <span class="sort-icon">↕</span></th>
-                <th class="sortable" data-key="totalTransportLBP">Total Transport (LBP) <span class="sort-icon">↕</span></th>
-                <th class="sortable" data-key="totalTransportUSD">Total Transport (USD) <span class="sort-icon">↕</span></th>
-                <th class="sortable" data-key="taxLBP">Tax (LBP) <span class="sort-icon">↕</span></th>
-                <th class="sortable" data-key="nfsLBP">NFS (LBP) <span class="sort-icon">↕</span></th>
-                <th class="sortable" data-key="netSalaryLBP">Net Salary (LBP) <span class="sort-icon">↕</span></th>
-                <th class="sortable" data-key="netSalaryUSD">Net Salary (USD) <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="firstName">${t('payroll.col.name')} <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="employeeType">${t('payroll.col.type')} <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="daysWorked">${t('payroll.col.transport_days')} <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="baseSalaryLBP">${t('payroll.col.base_salary_lbp')} <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="baseSalaryUSD">${t('payroll.col.base_salary_usd')} <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="transportPerDayLBP">${t('payroll.col.transport_day_lbp')} <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="transportPerDayUSD">${t('payroll.col.transport_day_usd')} <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="totalTransportLBP">${t('payroll.col.total_transport_lbp')} <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="totalTransportUSD">${t('payroll.col.total_transport_usd')} <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="taxLBP">${t('payroll.col.tax_lbp')} <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="nfsLBP">${t('payroll.col.nfs_lbp')} <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="netSalaryLBP">${t('payroll.col.net_salary_lbp')} <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="netSalaryUSD">${t('payroll.col.net_salary_usd')} <span class="sort-icon">↕</span></th>
               </tr>
             </thead>
             <tbody id="payroll-tbody"></tbody>

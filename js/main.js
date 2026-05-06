@@ -55,8 +55,10 @@ function initSidebarToggle() {
 
   floatBtn.addEventListener('click', () => {
     if (isMobile()) {
+      const opening = !sidebar.classList.contains('open');
       sidebar.classList.toggle('open');
       overlay.classList.toggle('active');
+      document.body.classList.toggle('sidebar-open-mobile', opening);
     } else {
       document.body.classList.remove('sidebar-collapsed');
       localStorage.setItem('sidebar-collapsed', 'false');
@@ -66,6 +68,7 @@ function initSidebarToggle() {
   overlay.addEventListener('click', () => {
     sidebar.classList.remove('open');
     overlay.classList.remove('active');
+    document.body.classList.remove('sidebar-open-mobile');
   });
 
   sidebar.querySelectorAll('.nav-link').forEach(link => {
@@ -73,6 +76,7 @@ function initSidebarToggle() {
       if (isMobile()) {
         sidebar.classList.remove('open');
         overlay.classList.remove('active');
+        document.body.classList.remove('sidebar-open-mobile');
       }
     });
   });

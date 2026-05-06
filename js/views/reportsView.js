@@ -1,6 +1,7 @@
 import { getEmployees, getSettings, getCompanyMetadata } from '../data/store.js';
 import { calculatePayroll } from '../services/payroll.js';
 import { exportPDF, exportExcel, printPaySlips, fmt } from '../services/reportExport.js';
+import { t } from '../i18n.js';
 
 const MONTHS = [
   'January','February','March','April','May','June',
@@ -294,8 +295,8 @@ export async function render(selector) {
     container.innerHTML = `
       <div class="content-header">
         <div class="content-header-left">
-          <h1>Reports</h1>
-          <span class="content-header-subtitle">Export payroll data as PDF or Excel</span>
+          <h1>${t('reports.title')}</h1>
+          <span class="content-header-subtitle">${t('reports.title')}</span>
         </div>
         <div class="content-header-actions">
           <select id="report-month" class="form-control" style="width:130px;">

@@ -4,6 +4,7 @@ import { openAddModal, openEditModal } from './employeeFormView.js';
 import { openModal, closeModal } from './components/modal.js';
 import { showToast } from './components/toast.js';
 import { importCSV, importExcel } from '../services/importService.js';
+import { t } from '../i18n.js';
 
 let _filterType   = 'all';
 let _searchQuery  = '';
@@ -20,11 +21,11 @@ export function render(selector) {
   container.innerHTML = `
     <div class="content-header">
       <div class="content-header-left">
-        <h1>Employees</h1>
-        <span class="content-header-subtitle" id="emp-count-label">Loading…</span>
+        <h1>${t('employees.title')}</h1>
+        <span class="content-header-subtitle" id="emp-count-label">${t('common.loading')}</span>
       </div>
       <div class="content-header-actions">
-        <button class="btn btn-primary" id="add-employee-btn">+ Add Employee</button>
+        <button class="btn btn-primary" id="add-employee-btn">${t('employees.add')}</button>
       </div>
     </div>
     <div class="page-body">
@@ -33,26 +34,26 @@ export function render(selector) {
           <div class="toolbar-left">
             <div class="search-input-wrap">
               <span class="search-icon">🔍</span>
-              <input type="text" id="emp-search" placeholder="Search by name or location…">
+              <input type="text" id="emp-search" placeholder="${t('employees.search')}">
             </div>
             <select class="filter-select" id="emp-type-filter">
-              <option value="all">All Types</option>
-              <option value="Teacher">Teachers</option>
-              <option value="Admin">Administrators</option>
+              <option value="all">${t('employees.all_types')}</option>
+              <option value="Teacher">${t('employees.teachers')}</option>
+              <option value="Admin">${t('employees.administrators')}</option>
             </select>
           </div>
           <div class="toolbar-right">
             <label class="btn btn-primary btn-sm" style="cursor:pointer;" title="Import any spreadsheet (CSV, Excel) — file must include a Type column with values 'Teacher' or 'Admin'">
-              📥 Import Spreadsheet
+              ${t('employees.import_spreadsheet')}
               <input type="file" class="file-input-hidden" id="import-spreadsheet" accept=".csv,.xlsx,.xls">
             </label>
-            <span style="font-size:var(--font-size-xs);color:var(--color-text-muted);font-weight:500;margin-left:8px;">QUICK CSV:</span>
-            <label class="btn btn-secondary btn-sm badge-teacher" style="cursor:pointer;" title="Import Teachers from CSV (auto-sets type to Teacher)">
-              📂 Teachers
+            <span style="font-size:var(--font-size-xs);color:var(--color-text-muted);font-weight:500;margin-left:8px;">${t('employees.import_csv')}</span>
+            <label class="btn btn-secondary btn-sm badge-teacher" style="cursor:pointer;">
+              📂 ${t('employees.teachers')}
               <input type="file" class="file-input-hidden" id="import-teacher-csv" accept=".csv">
             </label>
-            <label class="btn btn-secondary btn-sm badge-admin" style="cursor:pointer;" title="Import Administrators from CSV (auto-sets type to Admin)">
-              📂 Administrators
+            <label class="btn btn-secondary btn-sm badge-admin" style="cursor:pointer;">
+              📂 ${t('employees.administrators')}
               <input type="file" class="file-input-hidden" id="import-admin-csv" accept=".csv">
             </label>
           </div>
@@ -61,13 +62,13 @@ export function render(selector) {
           <table class="data-table" id="emp-table">
             <thead>
               <tr>
-                <th class="sortable" data-key="firstName">Name <span class="sort-icon">↕</span></th>
-                <th>Type</th>
-                <th class="sortable" data-key="age">Age <span class="sort-icon">↕</span></th>
-                <th>Location</th>
-                <th class="sortable" data-key="baseSalaryLBP">Base Salary <span class="sort-icon">↕</span></th>
-                <th class="sortable" data-key="kmDistance">Distance <span class="sort-icon">↕</span></th>
-                <th>Actions</th>
+                <th class="sortable" data-key="firstName">${t('employees.col.name')} <span class="sort-icon">↕</span></th>
+                <th>${t('employees.col.type')}</th>
+                <th class="sortable" data-key="age">${t('employees.col.age')} <span class="sort-icon">↕</span></th>
+                <th>${t('employees.col.location')}</th>
+                <th class="sortable" data-key="baseSalaryLBP">${t('employees.col.base_salary')} <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="kmDistance">${t('employees.col.distance')} <span class="sort-icon">↕</span></th>
+                <th>${t('employees.col.actions')}</th>
               </tr>
             </thead>
             <tbody id="emp-tbody"></tbody>

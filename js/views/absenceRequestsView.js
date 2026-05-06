@@ -12,6 +12,7 @@ import { CATEGORY_LABELS, STATUS_LABELS, TYPE_LABELS, ABSENCE_CATEGORIES } from 
 import { showToast } from './components/toast.js';
 import { openModal, closeModal } from './components/modal.js';
 import { getCurrentUser } from '../auth.js';
+import { t } from '../i18n.js';
 
 let _activeTab      = 'pending';
 let _filterType     = 'all';       // 'all' | 'absence' | 'permanence'
@@ -51,8 +52,8 @@ export function render(selector) {
   container.innerHTML = `
     <div class="content-header">
       <div class="content-header-left">
-        <h1>Attendance Requests</h1>
-        <span class="content-header-subtitle" id="ar-summary">Loading…</span>
+        <h1>${t('attendance.title')}</h1>
+        <span class="content-header-subtitle" id="ar-summary">${t('common.loading')}</span>
       </div>
     </div>
 
@@ -63,15 +64,15 @@ export function render(selector) {
           <div class="toolbar-right" style="gap:6px;flex-wrap:wrap;">
             <select class="filter-select" id="ar-type-filter"
               style="padding:6px 10px;border:1.5px solid var(--color-border);border-radius:6px;font-size:0.85rem;font-family:inherit;outline:none;">
-              <option value="all">All types</option>
-              <option value="absence">🚫 Absence</option>
-              <option value="permanence">🎯 Permanence</option>
+              <option value="all">${t('attendance.all_types')}</option>
+              <option value="absence">🚫 ${t('type.absence')}</option>
+              <option value="permanence">🎯 ${t('type.permanence')}</option>
             </select>
             <select class="filter-select" id="ar-cat-filter"
               style="padding:6px 10px;border:1.5px solid var(--color-border);border-radius:6px;font-size:0.85rem;font-family:inherit;outline:none;">
-              <option value="all">All categories</option>
+              <option value="all">${t('attendance.all_categories')}</option>
               ${ABSENCE_CATEGORIES.map(c =>
-                `<option value="${c}">${CATEGORY_LABELS[c]}</option>`
+                `<option value="${c}">${t('category.' + c)}</option>`
               ).join('')}
             </select>
             <div id="ar-date-filter-wrap" style="position:relative;display:inline-block;">
@@ -90,7 +91,7 @@ export function render(selector) {
                        padding:6px;max-height:320px;overflow-y:auto;font-size:0.85rem;">
               </div>
             </div>
-            <input type="text" id="ar-search" placeholder="Search by name…"
+            <input type="text" id="ar-search" placeholder="${t('attendance.search')}"
               style="padding:6px 10px;border:1.5px solid var(--color-border);border-radius:6px;font-size:0.85rem;font-family:inherit;outline:none;">
           </div>
         </div>
@@ -99,12 +100,12 @@ export function render(selector) {
           <table class="data-table" id="ar-table">
             <thead>
               <tr>
-                <th class="sortable" data-key="employeeName">Employee <span class="sort-icon">↕</span></th>
-                <th class="sortable" data-key="date">Date <span class="sort-icon">↕</span></th>
-                <th class="sortable" data-key="typeCategory">Type / Category <span class="sort-icon">↕</span></th>
-                <th class="sortable" data-key="reason">Reason <span class="sort-icon">↕</span></th>
-                <th class="sortable" data-key="status">Status <span class="sort-icon">↕</span></th>
-                <th>Actions</th>
+                <th class="sortable" data-key="employeeName">${t('attendance.col.employee')} <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="date">${t('attendance.col.date')} <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="typeCategory">${t('attendance.col.type_cat')} <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="reason">${t('attendance.col.reason')} <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="status">${t('attendance.col.status')} <span class="sort-icon">↕</span></th>
+                <th>${t('attendance.col.actions')}</th>
               </tr>
             </thead>
             <tbody id="ar-tbody"></tbody>

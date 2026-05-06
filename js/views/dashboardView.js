@@ -1,6 +1,7 @@
 import { getEmployees, getSettings, getAbsenceRequests } from '../data/store.js';
 import { calculatePayroll, calculateTotals } from '../services/payroll.js';
 import { navigate } from '../router.js';
+import { t } from '../i18n.js';
 
 export function render(selector) {
   const container = document.querySelector(selector);
@@ -26,8 +27,8 @@ export function render(selector) {
   container.innerHTML = `
     <div class="content-header">
       <div class="content-header-left">
-        <h1>Dashboard</h1>
-        <span class="content-header-subtitle">Payroll overview — rate: 1 USD = ${settings.exchangeRate.toLocaleString()} ل.ل</span>
+        <h1>${t('dashboard.title')}</h1>
+        <span class="content-header-subtitle">1 USD = ${settings.exchangeRate.toLocaleString()} ل.ل</span>
       </div>
     </div>
     <div class="page-body">
@@ -55,15 +56,15 @@ export function render(selector) {
         <div class="stat-card">
           <div class="stat-card-icon blue">👥</div>
           <div class="stat-card-body">
-            <div class="stat-card-label">Total Employees</div>
+            <div class="stat-card-label">${t('dashboard.total_employees')}</div>
             <div class="stat-card-value">${employees.length}</div>
-            <div class="stat-card-sub">${teacherRows.length} teachers · ${adminRows.length} admins</div>
+            <div class="stat-card-sub">${teacherRows.length} ${t('employees.teachers').toLowerCase()} · ${adminRows.length} ${t('employees.administrators').toLowerCase()}</div>
           </div>
         </div>
         <div class="stat-card">
           <div class="stat-card-icon green">💰</div>
           <div class="stat-card-body">
-            <div class="stat-card-label">Total Net Payroll</div>
+            <div class="stat-card-label">${t('dashboard.total_payroll')}</div>
             <div class="stat-card-value">${fmtUSD(totals.netSalaryUSD)}</div>
             <div class="stat-card-sub">${fmtLBP(totals.netSalaryLBP)}</div>
           </div>
@@ -71,15 +72,15 @@ export function render(selector) {
         <div class="stat-card">
           <div class="stat-card-icon orange">📊</div>
           <div class="stat-card-body">
-            <div class="stat-card-label">Avg Net Salary</div>
+            <div class="stat-card-label">${t('dashboard.avg_salary')}</div>
             <div class="stat-card-value">${employees.length ? fmtUSD(totals.netSalaryUSD / employees.length) : '$0.00'}</div>
-            <div class="stat-card-sub">per employee / month</div>
+            <div class="stat-card-sub">${t('dashboard.per_employee')}</div>
           </div>
         </div>
         <div class="stat-card">
           <div class="stat-card-icon cyan">🚌</div>
           <div class="stat-card-body">
-            <div class="stat-card-label">Total Transport</div>
+            <div class="stat-card-label">${t('dashboard.total_transport')}</div>
             <div class="stat-card-value">${fmtUSD(totals.totalTransportUSD)}</div>
             <div class="stat-card-sub">${fmtLBP(totals.totalTransportLBP)}</div>
           </div>
