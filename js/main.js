@@ -86,10 +86,33 @@ function initSidebarToggle() {
 async function showApp(user, { isSuperAdmin = false, companyName = null } = {}) {
   document.getElementById('user-name').textContent  = user.displayName || user.email;
   document.getElementById('user-email').textContent = user.email;
-  if (user.photoURL) {
-    const avatar = document.getElementById('user-avatar');
-    avatar.src           = user.photoURL;
-    avatar.style.display = 'block';
+
+  // Avatar: show photo if available, fall back to emoji placeholder.
+  // referrerpolicy="no-referrer" is set on the img tag so Google's CDN
+  // accepts the request (mobile browsers often strip referer otherwise).
+  const avatar      = document.getElementById('user-avatar');
+  const placeholder = document.getElementById('user-avatar-placeholder');
+  if (user.photoURL && avatar && placeholder) {
+    avatar.onload = () => {
+      avatar.style.display      = 'block';
+      placeholder.style.display = 'none';
+    };
+    avatar.onerror = () => {
+      avatar.style.display      = 'none';
+      placeholder.style.display = 'flex';
+    };
+    avatar.src = user.photoURL;
+    // If the image is already cached and loaded synchronously, the events
+    // above might miss. Force a check on next tick.
+    setTimeout(() => {
+      if (avatar.complete && avatar.naturalWidth > 0) {
+        avatar.style.display      = 'block';
+        placeholder.style.display = 'none';
+      }
+    }, 0);
+  } else if (placeholder) {
+    placeholder.style.display = 'flex';
+    if (avatar) avatar.style.display = 'none';
   }
 
   // Load and display company name + logo + colors in sidebar
