@@ -386,12 +386,14 @@ export async function render(selector) {
       </div>
     `;
 
-    // Period picker
+    // Period picker — re-render so all data + export handlers use the new month/year
     document.getElementById('report-month').addEventListener('change', e => {
       selMonth = parseInt(e.target.value);
+      renderPage();
     });
     document.getElementById('report-year').addEventListener('change', e => {
       selYear = parseInt(e.target.value) || now.getFullYear();
+      renderPage();
     });
 
     // Pay slips button
