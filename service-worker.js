@@ -2,14 +2,15 @@
  * Service Worker — PWA offline support + update flow.
  *
  * Strategies:
- *   - App shell (/, /index.html, /css/*, /js/*, manifest, icons): cache-first
+ *   - App shell (/, /index.html, /css/*, /js/*, manifest, icons): network-first
+ *     with cache fallback. (Updates take effect on first reload; offline still works.)
  *   - CDN libs (jsdelivr, gstatic): stale-while-revalidate
  *   - Firestore / Auth API calls: NETWORK ONLY (Firestore SDK has its own offline cache)
  *
  * Version bump = bump CACHE_VERSION below.
  */
 
-const CACHE_VERSION = 'v8-2026-05-06-signout-label';
+const CACHE_VERSION = 'v9-2026-05-06-i18n-cached';
 const CACHE_SHELL   = `payroll-shell-${CACHE_VERSION}`;
 const CACHE_RUNTIME = `payroll-runtime-${CACHE_VERSION}`;
 
@@ -26,6 +27,9 @@ const APP_SHELL = [
   '/css/responsive.css',
   '/css/employeePortal.css',
   '/js/main.js',
+  '/js/i18n.js',
+  '/js/i18n/en.js',
+  '/js/i18n/fr.js',
   '/icons/icon-192.svg',
   '/icons/icon-512.svg'
 ];
@@ -98,20 +102,16 @@ self.addEventListener('fetch', event => {
 
 async function cacheFirst(request, cacheName) {
   const cache  = await caches.open(cacheName);
-  const cached = await cache.match(request);
-  if (cached) {
-    // Background refresh — fire and forget
-    fetch(request).then(res => {
-      if (res && res.ok) cache.put(request, res.clone()).catch(() => {});
-    }).catch(() => {});
-    return cached;
-  }
+  // Try network first if online (so updates take effect on next reload).
+  // Fall back to cache only if network fails (offline support).
   try {
     const res = await fetch(request);
     if (res && res.ok) cache.put(request, res.clone()).catch(() => {});
     return res;
   } catch (err) {
-    // Offline + nothing in cache. For navigation requests, fall back to index.html
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    // For navigation requests, fall back to cached index.html
     if (request.mode === 'navigate') {
       const fallback = await cache.match('/index.html');
       if (fallback) return fallback;
