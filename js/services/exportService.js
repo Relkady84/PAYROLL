@@ -5,20 +5,21 @@
 
 // ── Column definitions ────────────────────────────────────
 const COLUMNS = [
-  { key: 'firstName',     label: 'First Name' },
-  { key: 'lastName',      label: 'Last Name' },
-  { key: 'employeeType',  label: 'Type' },
-  { key: 'age',           label: 'Age' },
-  { key: 'homeLocation',  label: 'Home Location' },
-  { key: 'kmDistance',    label: 'Distance (km)' },
-  { key: 'baseSalaryLBP', label: 'Base Salary (LBP)' },
-  { key: 'baseSalaryUSD', label: 'Base Salary (USD)' },
-  { key: 'transportLBP',  label: 'Transport (LBP)' },
-  { key: 'transportUSD',  label: 'Transport (USD)' },
-  { key: 'taxLBP',        label: 'Tax (LBP)' },
-  { key: 'nfsLBP',        label: 'NFS (LBP)' },
-  { key: 'netSalaryLBP',  label: 'Net Salary (LBP)' },
-  { key: 'netSalaryUSD',  label: 'Net Salary (USD)' }
+  { key: 'firstName',          label: 'First Name' },
+  { key: 'lastName',           label: 'Last Name' },
+  { key: 'employeeType',       label: 'Type' },
+  { key: 'age',                label: 'Age' },
+  { key: 'homeLocation',       label: 'Home Location' },
+  { key: 'kmDistance',         label: 'Distance (km)' },
+  { key: 'daysWorked',         label: 'Days Worked' },
+  { key: 'baseSalaryLBP',      label: 'Base Salary (LBP)' },
+  { key: 'baseSalaryUSD',      label: 'Base Salary (USD)' },
+  { key: 'totalTransportLBP',  label: 'Transport (LBP)' },
+  { key: 'totalTransportUSD',  label: 'Transport (USD)' },
+  { key: 'taxLBP',             label: 'Tax (LBP)' },
+  { key: 'nfsLBP',             label: 'NFS (LBP)' },
+  { key: 'netSalaryLBP',       label: 'Net Salary (LBP)' },
+  { key: 'netSalaryUSD',       label: 'Net Salary (USD)' }
 ];
 
 function rowsToPlain(rows) {
@@ -89,8 +90,12 @@ export function exportPDF(rows, settings) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
-  const fmt    = n => Math.round(n).toLocaleString('en-US');
-  const fmtUSD = n => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Defensive formatters — handle null/undefined gracefully (just shows '—')
+  const fmt    = n => (typeof n === 'number' && !isNaN(n))
+    ? Math.round(n).toLocaleString('en-US') : '—';
+  const fmtUSD = n => (typeof n === 'number' && !isNaN(n))
+    ? '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : '—';
 
   // Title
   doc.setFontSize(16);
@@ -121,12 +126,12 @@ export function exportPDF(rows, settings) {
   ];
 
   const pdfRows = rows.map(r => ({
-    name:     `${r.firstName} ${r.lastName}`,
+    name:     `${r.firstName || ''} ${r.lastName || ''}`.trim(),
     type:     r.employeeType,
     baseLBP:  fmt(r.baseSalaryLBP),
     baseUSD:  fmtUSD(r.baseSalaryUSD),
-    transLBP: fmt(r.transportLBP),
-    transUSD: fmtUSD(r.transportUSD),
+    transLBP: fmt(r.totalTransportLBP),
+    transUSD: fmtUSD(r.totalTransportUSD),
     tax:      fmt(r.taxLBP),
     nfs:      fmt(r.nfsLBP),
     netLBP:   fmt(r.netSalaryLBP),
