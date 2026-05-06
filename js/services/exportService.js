@@ -106,7 +106,7 @@ export function exportPDF(rows, settings) {
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100);
   doc.text(
-    `Generated: ${new Date().toLocaleDateString('en-GB')}  |  Rate: 1 USD = ${settings.exchangeRate.toLocaleString()} LBP  |  Employees: ${rows.length}`,
+    `Generated: ${new Date().toLocaleDateString('en-US')}  |  Rate: 1 USD = ${settings.exchangeRate.toLocaleString('en-US')} LBP  |  Employees: ${rows.length}`,
     14, 22
   );
   doc.setTextColor(0);

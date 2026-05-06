@@ -55,7 +55,7 @@ export function getLocale() {
 }
 
 export const SUPPORTED_LANGUAGES = [
-  { code: 'en', label: 'English',  flag: '🇬🇧' },
+  { code: 'en', label: 'English',  flag: '🇺🇸' },
   { code: 'fr', label: 'Français', flag: '🇫🇷' }
 ];
 
