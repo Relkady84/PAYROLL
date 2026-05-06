@@ -87,33 +87,42 @@ async function showApp(user, { isSuperAdmin = false, companyName = null } = {}) 
   document.getElementById('user-name').textContent  = user.displayName || user.email;
   document.getElementById('user-email').textContent = user.email;
 
-  // Avatar: placeholder is default; swap to photo only when it actually loads.
-  // referrerpolicy="no-referrer" is set on the img tag so Google's CDN
-  // accepts the request (mobile browsers often strip referer otherwise).
-  const avatar      = document.getElementById('user-avatar');
+  // Avatar: bulletproof approach.
+  // The slot starts with the placeholder (initials) only — NO <img> element exists.
+  // We test-load the photo URL via a hidden Image probe. Only if it succeeds do we
+  // dynamically inject an <img>. This means there's no possibility of a broken-image
+  // icon ever showing on screen.
+  const slot        = document.getElementById('user-avatar-slot');
   const placeholder = document.getElementById('user-avatar-placeholder');
 
-  // Reset to placeholder state every time. Use 1x1 transparent gif as a
-  // safe "empty" src (some mobile browsers render a broken-image icon when
-  // src is "" or removed).
-  const TRANSPARENT_GIF = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
-  if (avatar)      { avatar.style.display      = 'none'; avatar.src = TRANSPARENT_GIF; }
-  if (placeholder) { placeholder.style.display = 'flex'; placeholder.textContent = initialsFor(user); }
+  // Remove any previously-injected <img> (in case showApp is called again)
+  const previousImg = slot?.querySelector('img.sidebar-user-avatar');
+  if (previousImg) previousImg.remove();
 
-  if (user.photoURL && avatar && placeholder) {
-    // Test-load via a hidden Image first. Only swap the visible avatar
-    // once the probe succeeds — so the user never sees a broken-image icon.
+  // Update placeholder text with initials
+  if (placeholder) {
+    placeholder.textContent  = initialsFor(user);
+    placeholder.style.display = 'flex';
+  }
+
+  if (user.photoURL && slot && placeholder) {
     const probe = new Image();
     probe.referrerPolicy = 'no-referrer';
     probe.onload = () => {
-      // Probe succeeded → show the actual photo
-      avatar.src                = user.photoURL;
-      avatar.style.display      = 'block';
+      // Probe succeeded — image is definitely loadable.
+      // Build the <img> dynamically and inject it.
+      const img = document.createElement('img');
+      img.className       = 'sidebar-user-avatar';
+      img.alt             = '';
+      img.referrerPolicy  = 'no-referrer';
+      img.src             = user.photoURL;
+      // Show it, hide the placeholder
+      img.style.display       = 'block';
       placeholder.style.display = 'none';
+      slot.insertBefore(img, placeholder);
     };
     probe.onerror = () => {
-      // Probe failed → keep the initials placeholder (already shown)
-      // (Make sure avatar stays hidden with the transparent gif as src)
+      // Probe failed — keep the initials placeholder. Nothing visible breaks.
     };
     probe.src = user.photoURL;
   }

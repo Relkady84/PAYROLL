@@ -144,12 +144,18 @@
       gap: 10px;
     }
 
+    .sidebar-user-avatar-slot {
+      width: 32px;
+      height: 32px;
+      flex-shrink: 0;
+      position: relative;
+    }
+
     .sidebar-user-avatar {
       width: 32px;
       height: 32px;
       border-radius: 50%;
       object-fit: cover;
-      display: none;
       flex-shrink: 0;
     }
 
@@ -161,7 +167,9 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 14px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #e2e8f0;
       flex-shrink: 0;
     }
 
@@ -324,9 +332,10 @@
 
     <!-- User info + sign out -->
     <div class="sidebar-user">
-      <img id="user-avatar" class="sidebar-user-avatar"
-           src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="" referrerpolicy="no-referrer">
-      <div class="sidebar-user-avatar-placeholder" id="user-avatar-placeholder">👤</div>
+      <!-- Avatar slot — img is dynamically inserted by JS only when load succeeds -->
+      <div class="sidebar-user-avatar-slot" id="user-avatar-slot">
+        <div class="sidebar-user-avatar-placeholder" id="user-avatar-placeholder">👤</div>
+      </div>
       <div class="sidebar-user-info">
         <div class="sidebar-user-name" id="user-name">—</div>
         <div class="sidebar-user-email" id="user-email">—</div>
