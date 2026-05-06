@@ -44,7 +44,7 @@ export const en = {
   'nav.settings':       'Settings',
   'nav.admin':          'Admin',
   'nav.switch_company': 'Switch Company',
-  'nav.signout_short':  'Out',
+  'nav.signout_short':  'Sign out',
 
   // ── Mobile bottom nav ──
   'nav_m.dashboard': 'Dashboard',

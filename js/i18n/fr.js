@@ -44,7 +44,7 @@ export const fr = {
   'nav.settings':       'Paramètres',
   'nav.admin':          'Admin',
   'nav.switch_company': 'Changer d\'établissement',
-  'nav.signout_short':  'Quitter',
+  'nav.signout_short':  'Déconnexion',
 
   // ── Mobile bottom nav ──
   'nav_m.dashboard': 'Accueil',

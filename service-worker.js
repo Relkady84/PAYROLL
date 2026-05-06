@@ -9,7 +9,7 @@
  * Version bump = bump CACHE_VERSION below.
  */
 
-const CACHE_VERSION = 'v7-2026-05-06-photo-direct';
+const CACHE_VERSION = 'v8-2026-05-06-signout-label';
 const CACHE_SHELL   = `payroll-shell-${CACHE_VERSION}`;
 const CACHE_RUNTIME = `payroll-runtime-${CACHE_VERSION}`;
 
