@@ -14,6 +14,7 @@ import {
 import {
   TAX_CATEGORIES, validateRole
 } from '../models/role.js';
+import { getLanguage, setLanguage, SUPPORTED_LANGUAGES, t } from '../i18n.js';
 import {
   makeAcademicYear, generateYearId, suggestCurrentAcademicYear,
   validatePeriod
@@ -36,6 +37,17 @@ export async function render(selector) {
       </div>
     </div>
     <div class="page-body">
+
+      <!-- Language -->
+      <div class="section-card" style="margin-bottom:20px;">
+        <div class="section-card-header">
+          <span class="section-card-title">${esc(t('settings.language'))}</span>
+        </div>
+        <div class="section-card-body">
+          <div id="lang-picker" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+          <span class="form-hint" style="margin-top:8px;">${esc(t('settings.lang_hint'))}</span>
+        </div>
+      </div>
 
       <!-- Company Profile -->
       <div class="section-card" style="margin-bottom:20px;">
@@ -675,6 +687,9 @@ export async function render(selector) {
     }
   });
 
+  // ── Language picker ─────────────────────────────────────
+  initLanguagePicker();
+
   // ── School Calendar ─────────────────────────────────────
   initCalendarSection();
 
@@ -843,6 +858,22 @@ function handleSave(container) {
   const settings = denormalizeSettings(getSettings());
   const hint = form.querySelector('#exchangeRate').closest('.form-group').querySelector('.form-hint');
   if (hint) hint.textContent = `Current rate: 1 USD = ${settings.exchangeRate.toLocaleString()} LBP`;
+}
+
+// ── Language picker ────────────────────────────────────────
+function initLanguagePicker() {
+  const wrap = document.getElementById('lang-picker');
+  if (!wrap) return;
+  const current = getLanguage();
+  wrap.innerHTML = SUPPORTED_LANGUAGES.map(lang => `
+    <button type="button" class="btn ${current === lang.code ? 'btn-primary' : 'btn-secondary'}"
+      data-lang="${lang.code}" style="display:inline-flex;align-items:center;gap:6px;">
+      <span>${lang.flag}</span><span>${lang.label}</span>
+    </button>
+  `).join('');
+  wrap.querySelectorAll('[data-lang]').forEach(btn => {
+    btn.addEventListener('click', () => setLanguage(btn.dataset.lang));
+  });
 }
 
 // ── Academic Year section logic ────────────────────────────

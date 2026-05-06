@@ -109,6 +109,17 @@
   color: #1e293b;
 }
 
+.ep-card-sub {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin: -8px 0 14px;
+  line-height: 1.45;
+}
+
+.ep-form-card {
+  border-left: 3px solid #2563eb;
+}
+
 /* ── Greeting ── */
 .ep-greeting {
   display: flex;

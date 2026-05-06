@@ -8,15 +8,50 @@ import { exportCSV, exportExcel, exportPDF } from '../services/exportService.js'
 import { importCSV, importExcel } from '../services/importService.js';
 import { showToast } from './components/toast.js';
 
-let _filterType  = 'all';
-let _sortKey     = 'firstName';
-let _sortDir     = 'asc';
-let _daysWorked  = {};       // manual overrides (empId -> days)
-let _selectedMonth = null;   // 'YYYY-MM' — default current month
+let _filterType    = 'all';
+let _sortKey       = 'firstName';
+let _sortDir       = 'asc';
+let _daysWorked    = {};       // manual overrides (empId -> days)
+let _selectedMonth = null;     // 'YYYY-MM' — default current month
+let _expandedYear  = null;     // for the date picker dropdown
+
+const PAYROLL_MONTH_OPTIONS = [
+  { v: '01', l: 'Jan' }, { v: '02', l: 'Feb' }, { v: '03', l: 'Mar' },
+  { v: '04', l: 'Apr' }, { v: '05', l: 'May' }, { v: '06', l: 'Jun' },
+  { v: '07', l: 'Jul' }, { v: '08', l: 'Aug' }, { v: '09', l: 'Sep' },
+  { v: '10', l: 'Oct' }, { v: '11', l: 'Nov' }, { v: '12', l: 'Dec' }
+];
 
 function defaultMonth() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function payrollMonthLabel(ym) {
+  if (!ym || !/^\d{4}-\d{2}$/.test(ym)) return 'Pick month';
+  const m = PAYROLL_MONTH_OPTIONS.find(x => x.v === ym.slice(5, 7));
+  return `${m ? m.l : ''} ${ym.slice(0, 4)}`.trim();
+}
+
+/** Years for the payroll picker — pulled from academic years + absence dates,
+ *  plus current year ± 1 to ensure it's always usable. */
+function getPayrollYears() {
+  const set = new Set();
+  // Current year ± 1
+  const now = new Date().getFullYear();
+  set.add(String(now - 1));
+  set.add(String(now));
+  set.add(String(now + 1));
+  // Academic year ranges
+  for (const y of getAcademicYears()) {
+    if (typeof y.startDate === 'string') set.add(y.startDate.slice(0, 4));
+    if (typeof y.endDate   === 'string') set.add(y.endDate.slice(0, 4));
+  }
+  // Absence request dates
+  for (const r of getAbsenceRequests()) {
+    if (typeof r.date === 'string') set.add(r.date.slice(0, 4));
+  }
+  return [...set].sort();
 }
 
 /** Compute effective day breakdown for an employee in the selected month. */
@@ -61,8 +96,22 @@ export function render(selector) {
               <option value="Admin">Administrators</option>
             </select>
             <label style="font-size:0.8rem;color:var(--color-text-muted);font-weight:500;margin-left:8px;">Month:</label>
-            <input type="month" id="payroll-month" value="${_selectedMonth}"
-              style="padding:6px 10px;border:1.5px solid var(--color-border);border-radius:6px;font-size:0.85rem;font-family:inherit;outline:none;">
+            <div id="pr-date-wrap" style="position:relative;display:inline-block;">
+              <button type="button" id="pr-date-btn"
+                style="padding:6px 12px;border:1.5px solid var(--color-border);border-radius:6px;
+                       font-size:0.85rem;font-family:inherit;outline:none;background:#fff;
+                       cursor:pointer;display:inline-flex;align-items:center;gap:6px;min-width:140px;">
+                <span>📅</span>
+                <span id="pr-date-label">${payrollMonthLabel(_selectedMonth)}</span>
+                <span style="font-size:0.7rem;margin-left:auto;">▼</span>
+              </button>
+              <div id="pr-date-menu"
+                style="display:none;position:absolute;top:100%;left:0;margin-top:4px;
+                       background:#fff;border:1.5px solid var(--color-border);border-radius:8px;
+                       box-shadow:0 4px 12px rgba(0,0,0,0.1);min-width:240px;z-index:1000;
+                       padding:6px;max-height:340px;overflow-y:auto;font-size:0.85rem;">
+              </div>
+            </div>
             <button class="btn btn-secondary btn-sm" id="payroll-reset-days" style="margin-left:8px;" title="Reset manual day overrides — recompute from approved absences">↺ Reset Days</button>
           </div>
           <div class="toolbar-right">
@@ -127,12 +176,28 @@ export function render(selector) {
     renderRows(container);
   });
 
-  // Month picker — recomputes days worked from approved absences for that month
-  document.getElementById('payroll-month').addEventListener('change', e => {
-    _selectedMonth = e.target.value || defaultMonth();
-    _daysWorked = {}; // clear manual overrides when changing month
-    renderRows(container);
-  });
+  // Month picker — hierarchical (year → months)
+  const dateBtn  = document.getElementById('pr-date-btn');
+  const dateMenu = document.getElementById('pr-date-menu');
+  if (dateBtn && dateMenu) {
+    dateBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (dateMenu.style.display === 'block') {
+        dateMenu.style.display = 'none';
+      } else {
+        // Default expanded year = current selection's year
+        if (!_expandedYear && _selectedMonth) _expandedYear = _selectedMonth.slice(0, 4);
+        renderPayrollDateMenu(container);
+        dateMenu.style.display = 'block';
+      }
+    });
+    dateMenu.addEventListener('click', e => e.stopPropagation());
+    document.addEventListener('click', e => {
+      if (!dateBtn.contains(e.target) && !dateMenu.contains(e.target)) {
+        dateMenu.style.display = 'none';
+      }
+    });
+  }
 
   // Reset manual overrides
   document.getElementById('payroll-reset-days').addEventListener('click', () => {
@@ -196,6 +261,72 @@ export function render(selector) {
       err   => showToast(err, 'error')
     );
     e.target.value = '';
+  });
+}
+
+function renderPayrollDateMenu(container) {
+  const menu = document.getElementById('pr-date-menu');
+  if (!menu) return;
+
+  const years = getPayrollYears();
+
+  let html = '';
+  for (const year of years) {
+    const isExpanded = _expandedYear === year;
+    const isMonthInYearSelected = _selectedMonth && _selectedMonth.startsWith(year + '-');
+    html += `
+      <div style="margin-bottom:2px;">
+        <button type="button" data-pr-toggle="${year}"
+          style="display:flex;width:100%;align-items:center;justify-content:space-between;
+                 padding:7px 10px;border:none;background:transparent;cursor:pointer;
+                 font-family:inherit;font-size:0.9rem;border-radius:6px;
+                 color:${isMonthInYearSelected ? '#1e40af' : '#1e293b'};
+                 font-weight:${isMonthInYearSelected ? '600' : '500'};">
+          <span>${year}${isMonthInYearSelected ? ` <small style="color:#64748b;">(${payrollMonthLabel(_selectedMonth)})</small>` : ''}</span>
+          <span style="font-size:0.7rem;color:#94a3b8;">${isExpanded ? '▼' : '▶'}</span>
+        </button>
+        ${isExpanded ? `
+          <div style="padding:4px 10px 6px 14px;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;">
+            ${PAYROLL_MONTH_OPTIONS.map(m => {
+              const code = `${year}-${m.v}`;
+              const sel = _selectedMonth === code;
+              return `
+                <button type="button" data-pr-pick="${code}"
+                  style="padding:6px 4px;border:1.5px solid ${sel ? '#2563eb' : '#e2e8f0'};
+                         background:${sel ? '#dbeafe' : '#fff'};
+                         color:${sel ? '#1e40af' : '#1e293b'};
+                         border-radius:5px;font-family:inherit;font-size:0.78rem;
+                         font-weight:${sel ? '600' : '500'};cursor:pointer;">
+                  ${m.l}
+                </button>
+              `;
+            }).join('')}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  menu.innerHTML = html;
+
+  menu.querySelectorAll('[data-pr-toggle]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const year = btn.dataset.prToggle;
+      _expandedYear = (_expandedYear === year) ? null : year;
+      renderPayrollDateMenu(container);
+    });
+  });
+  menu.querySelectorAll('[data-pr-pick]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      _selectedMonth = btn.dataset.prPick;
+      _daysWorked    = {}; // clear manual overrides when changing month
+      const lbl = document.getElementById('pr-date-label');
+      if (lbl) lbl.textContent = payrollMonthLabel(_selectedMonth);
+      menu.style.display = 'none';
+      renderRows(container);
+    });
   });
 }
 

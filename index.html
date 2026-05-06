@@ -202,8 +202,8 @@
 <div id="login-screen">
   <div class="login-card">
     <div class="login-logo">💼</div>
-    <div class="login-title">Payroll System</div>
-    <div class="login-sub">Lebanon — Sign in to access payroll data</div>
+    <div class="login-title" data-i18n="login.title">Payroll System</div>
+    <div class="login-sub" data-i18n="login.subtitle">Lebanon — Sign in to access payroll data</div>
     <button id="google-signin-btn">
       <svg class="google-icon" viewBox="0 0 48 48">
         <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -211,12 +211,12 @@
         <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
         <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
       </svg>
-      Sign in with Google
+      <span data-i18n="login.google">Sign in with Google</span>
     </button>
 
     <div style="display:flex;align-items:center;gap:10px;margin:12px 0;">
       <div style="flex:1;height:1px;background:#e2e8f0;"></div>
-      <span style="font-size:0.75rem;color:#94a3b8;">or</span>
+      <span style="font-size:0.75rem;color:#94a3b8;" data-i18n="login.or">or</span>
       <div style="flex:1;height:1px;background:#e2e8f0;"></div>
     </div>
 
@@ -227,10 +227,15 @@
         <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
         <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
       </svg>
-      Sign in with Microsoft
+      <span data-i18n="login.microsoft">Sign in with Microsoft</span>
     </button>
 
     <div id="login-error"></div>
+
+    <!-- Language picker -->
+    <div id="login-lang-picker" style="margin-top:18px;display:flex;justify-content:center;gap:6px;">
+      <!-- Filled by JS -->
+    </div>
   </div>
 </div>
 
@@ -272,38 +277,38 @@
     </div>
 
     <nav class="sidebar-nav">
-      <span class="nav-section-label">Main</span>
+      <span class="nav-section-label" data-i18n="nav.main">Main</span>
       <a href="#dashboard" class="nav-link active">
         <span class="nav-link-icon">📊</span>
-        Dashboard
+        <span data-i18n="nav.dashboard">Dashboard</span>
       </a>
       <a href="#employees" class="nav-link">
         <span class="nav-link-icon">👥</span>
-        Employees
+        <span data-i18n="nav.employees">Employees</span>
       </a>
       <a href="#payroll" class="nav-link">
         <span class="nav-link-icon">💰</span>
-        Payroll Report
+        <span data-i18n="nav.payroll">Payroll Report</span>
       </a>
       <a href="#reports" class="nav-link">
         <span class="nav-link-icon">📄</span>
-        Reports
+        <span data-i18n="nav.reports">Reports</span>
       </a>
       <a href="#absence-requests" class="nav-link">
         <span class="nav-link-icon">📅</span>
-        Absence Requests
+        <span data-i18n="nav.attendance">Attendance Requests</span>
       </a>
-      <span class="nav-section-label" style="margin-top:12px;">Configuration</span>
+      <span class="nav-section-label" style="margin-top:12px;" data-i18n="nav.config">Configuration</span>
       <a href="#settings" class="nav-link">
         <span class="nav-link-icon">⚙️</span>
-        Settings
+        <span data-i18n="nav.settings">Settings</span>
       </a>
 
       <!-- Super admin only -->
-      <span class="nav-section-label" id="super-admin-nav-section" style="margin-top:12px;display:none;">Admin</span>
+      <span class="nav-section-label" id="super-admin-nav-section" style="margin-top:12px;display:none;" data-i18n="nav.admin">Admin</span>
       <a href="#" class="nav-link" id="switch-company-btn" style="display:none;">
         <span class="nav-link-icon">🔧</span>
-        Switch Company
+        <span data-i18n="nav.switch_company">Switch Company</span>
       </a>
     </nav>
 

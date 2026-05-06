@@ -34,6 +34,7 @@ import {
 } from '../models/absenceRequest.js';
 import { calculateNetSalary, computeEffectiveDays } from '../services/payroll.js';
 import { signOutUser } from '../auth.js';
+import { t, getLanguage, setLanguage, SUPPORTED_LANGUAGES } from '../i18n.js';
 
 // ── State ─────────────────────────────────────────────
 let _user        = null;
@@ -53,8 +54,28 @@ let _drawerOpen  = false;
 let _paySlipMonth = null;
 
 // history filter state
-let _histStatus   = 'all';            // 'all' | 'pending' | 'approved' | 'rejected'
-let _histCategory = 'all';            // 'all' | 'sick' | ...
+let _histStatus     = 'all';          // 'all' | 'pending' | 'approved' | 'rejected'
+let _histCategory   = 'all';          // 'all' | 'sick' | ...
+let _histDate       = 'all';          // 'all' | 'YYYY' | 'YYYY-MM'
+let _histExpandedY  = null;           // for the date picker: which year is currently expanded
+let _histDateOpen   = false;          // is the date picker menu open?
+
+const HIST_MONTH_OPTIONS = [
+  { v: '01', l: 'Jan' }, { v: '02', l: 'Feb' }, { v: '03', l: 'Mar' },
+  { v: '04', l: 'Apr' }, { v: '05', l: 'May' }, { v: '06', l: 'Jun' },
+  { v: '07', l: 'Jul' }, { v: '08', l: 'Aug' }, { v: '09', l: 'Sep' },
+  { v: '10', l: 'Oct' }, { v: '11', l: 'Nov' }, { v: '12', l: 'Dec' }
+];
+
+function histDateLabel(filter) {
+  if (filter === 'all' || !filter) return 'All dates';
+  if (/^\d{4}$/.test(filter)) return `All ${filter}`;
+  if (/^\d{4}-\d{2}$/.test(filter)) {
+    const m = HIST_MONTH_OPTIONS.find(x => x.v === filter.slice(5, 7));
+    return `${m ? m.l : ''} ${filter.slice(0, 4)}`.trim();
+  }
+  return 'All dates';
+}
 
 function defaultMonth() {
   const d = new Date();
@@ -116,9 +137,8 @@ function draw() {
 }
 
 function renderSection() {
-  if (_section === 'payslip')    return paySlipSectionHTML();
-  if (_section === 'history')    return historySectionHTML();
-  if (_section === 'permanence') return permanenceSectionHTML();
+  if (_section === 'payslip') return paySlipSectionHTML();
+  if (_section === 'history') return historySectionHTML();
   return homeSectionHTML();
 }
 
@@ -143,9 +163,8 @@ function headerHTML() {
 }
 
 function sectionTitle(section) {
-  if (section === 'payslip')    return 'My Pay Slip';
-  if (section === 'history')    return 'Absence History';
-  if (section === 'permanence') return 'Permanence Day';
+  if (section === 'payslip') return 'My Pay Slip';
+  if (section === 'history') return 'Attendance History';
   return 'Employee Portal';
 }
 
@@ -173,14 +192,25 @@ function drawerHTML() {
       </div>
 
       <nav class="ep-drawer-nav">
-        ${item('home',       '🏠', 'Home')}
-        ${item('permanence', '🎯', 'Permanence Day')}
-        ${item('payslip',    '💰', 'My Pay Slip')}
-        ${item('history',    '📋', 'Absence History')}
+        ${item('home',    '🏠', 'Home')}
+        ${item('payslip', '💰', 'My Pay Slip')}
+        ${item('history', '📋', 'Attendance History')}
       </nav>
 
       <div class="ep-drawer-footer">
-        <button id="ep-signout" class="ep-link-btn">Sign out</button>
+        <div style="display:flex;justify-content:center;gap:6px;margin-bottom:10px;">
+          ${SUPPORTED_LANGUAGES.map(lang => `
+            <button type="button" data-lang="${lang.code}"
+              style="padding:4px 10px;border:1.5px solid ${getLanguage() === lang.code ? '#2563eb' : '#e2e8f0'};
+                     border-radius:6px;background:${getLanguage() === lang.code ? '#dbeafe' : '#fff'};
+                     color:${getLanguage() === lang.code ? '#1e40af' : '#64748b'};
+                     font-size:0.72rem;font-weight:600;cursor:pointer;font-family:inherit;
+                     display:inline-flex;align-items:center;gap:4px;">
+              <span>${lang.flag}</span><span>${lang.label}</span>
+            </button>
+          `).join('')}
+        </div>
+        <button id="ep-signout" class="ep-link-btn">${esc(t('common.signout'))}</button>
       </div>
     </aside>
   `;
@@ -194,7 +224,8 @@ function homeSectionHTML() {
 
   return `
     ${greetingCardHTML()}
-    ${requestFormCardHTML()}
+    ${absenceFormCardHTML()}
+    ${permanenceFormCardHTML()}
     ${recentRequestsHTML(requests)}
   `;
 }
@@ -213,12 +244,13 @@ function greetingCardHTML() {
   `;
 }
 
-function requestFormCardHTML() {
+function absenceFormCardHTML() {
   const today    = todayISO();
   const earliest = dateNDaysAgo(MAX_BACKDATE_DAYS);
   return `
-    <section class="ep-card">
-      <div class="ep-card-title">📝 Request an Absence</div>
+    <section class="ep-card ep-form-card">
+      <div class="ep-card-title">🚫 Request an Absence</div>
+      <p class="ep-card-sub">A day you will not be coming to work — counts as <strong>−1 day</strong> on your pay slip.</p>
 
       <form id="ep-form" novalidate>
         <label class="ep-label" for="ep-date">Date</label>
@@ -243,7 +275,38 @@ function requestFormCardHTML() {
         <div id="ep-form-errors" class="ep-errors"></div>
 
         <button type="submit" class="ep-btn ep-btn-primary">
-          ✓ Submit Request
+          ✓ Submit Absence Request
+        </button>
+      </form>
+    </section>
+  `;
+}
+
+function permanenceFormCardHTML() {
+  const today    = todayISO();
+  const earliest = dateNDaysAgo(MAX_BACKDATE_DAYS);
+  return `
+    <section class="ep-card ep-form-card">
+      <div class="ep-card-title">🎯 Request a Permanence Day</div>
+      <p class="ep-card-sub">A day you came to work that was supposed to be off (holiday, vacation, weekend) — counts as <strong>+1 day</strong> on your pay slip.</p>
+
+      <form id="ep-perm-form" novalidate>
+        <label class="ep-label" for="ep-perm-date">Date you worked</label>
+        <input class="ep-input" type="date" id="ep-perm-date"
+          min="${earliest}" value="${today}" required>
+        <div class="ep-hint">From ${earliest} to any future date.</div>
+
+        <label class="ep-label" for="ep-perm-reason">
+          Reason for working <span class="ep-muted">(required)</span>
+        </label>
+        <textarea class="ep-input" id="ep-perm-reason" rows="3"
+          maxlength="500"
+          placeholder="e.g., Year-end closing, exam supervision, urgent task…"></textarea>
+
+        <div id="ep-perm-form-errors" class="ep-errors"></div>
+
+        <button type="submit" class="ep-btn ep-btn-primary">
+          ✓ Submit Permanence Request
         </button>
       </form>
     </section>
@@ -415,119 +478,129 @@ function paySlipSectionHTML() {
   `;
 }
 
-// ── Section: PERMANENCE DAY ──────────────────────────────
-function permanenceSectionHTML() {
-  const today    = todayISO();
-  const earliest = dateNDaysAgo(MAX_BACKDATE_DAYS);
-
-  // Show only PERMANENCE requests in the recent list (not absences)
-  const myPerm = getAbsenceRequests()
-    .filter(r => (r.type || 'absence') === 'permanence')
-    .sort((a, b) => (b.requestedAt || 0) - (a.requestedAt || 0))
-    .slice(0, 5);
-
-  return `
-    <section class="ep-card">
-      <div class="ep-card-title">🎯 Request a Permanence Day</div>
-      <p style="font-size:0.82rem;color:var(--color-text-muted);margin-bottom:14px;">
-        Use this when you came in on a day that was supposed to be off
-        (holiday, vacation, weekend). Once approved, the day adds <strong>+1</strong>
-        to your transport days for that month.
-      </p>
-
-      <form id="ep-perm-form" novalidate>
-        <label class="ep-label" for="ep-perm-date">Date you worked</label>
-        <input class="ep-input" type="date" id="ep-perm-date"
-          min="${earliest}" value="${today}" required>
-        <div class="ep-hint">From ${earliest} to any future date.</div>
-
-        <label class="ep-label" for="ep-perm-reason">
-          Reason for working <span class="ep-muted">(required)</span>
-        </label>
-        <textarea class="ep-input" id="ep-perm-reason" rows="3"
-          maxlength="500"
-          placeholder="e.g., Year-end closing, exam supervision, urgent task…"></textarea>
-
-        <div id="ep-perm-form-errors" class="ep-errors"></div>
-
-        <button type="submit" class="ep-btn ep-btn-primary">
-          ✓ Submit Request
-        </button>
-      </form>
-    </section>
-
-    ${myPerm.length ? `
-      <section class="ep-card">
-        <div class="ep-card-title">📋 Recent Permanence Requests</div>
-        <div class="ep-list">
-          ${myPerm.map(r => requestItemHTML(r)).join('')}
-        </div>
-      </section>
-    ` : `
-      <section class="ep-card ep-empty">
-        <div class="ep-empty-icon">📭</div>
-        <div class="ep-empty-text">No permanence requests yet.</div>
-      </section>
-    `}
-  `;
-}
-
 // ── Section: HISTORY ─────────────────────────────────────
 function historySectionHTML() {
-  let rows = [...getAbsenceRequests()];
-  if (_histStatus !== 'all')   rows = rows.filter(r => r.status === _histStatus);
-  if (_histCategory !== 'all') rows = rows.filter(r => r.category === _histCategory);
+  const all = getAbsenceRequests();
 
-  rows.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  // Apply status + category + date filters
+  function filterRows(rows) {
+    if (_histStatus   !== 'all') rows = rows.filter(r => r.status === _histStatus);
+    if (_histCategory !== 'all') rows = rows.filter(r => r.category === _histCategory);
+    if (_histDate     !== 'all' && typeof _histDate === 'string') {
+      rows = rows.filter(r => typeof r.date === 'string' && r.date.startsWith(_histDate));
+    }
+    return rows.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  }
 
-  const counts = {
-    total:    getAbsenceRequests().length,
-    pending:  getAbsenceRequests().filter(r => r.status === 'pending').length,
-    approved: getAbsenceRequests().filter(r => r.status === 'approved').length,
-    rejected: getAbsenceRequests().filter(r => r.status === 'rejected').length
+  // Split by type
+  const absences   = filterRows(all.filter(r => (r.type || 'absence') === 'absence'));
+  const permanence = filterRows(all.filter(r => (r.type || 'absence') === 'permanence'));
+
+  // Counters (ignore filters for the totals — these reflect the full picture)
+  const allAbsences   = all.filter(r => (r.type || 'absence') === 'absence');
+  const allPermanence = all.filter(r => (r.type || 'absence') === 'permanence');
+
+  const absStatusCounts = {
+    pending:  allAbsences.filter(r => r.status === 'pending').length,
+    approved: allAbsences.filter(r => r.status === 'approved').length,
+    rejected: allAbsences.filter(r => r.status === 'rejected').length
+  };
+  const permStatusCounts = {
+    pending:  allPermanence.filter(r => r.status === 'pending').length,
+    approved: allPermanence.filter(r => r.status === 'approved').length,
+    rejected: allPermanence.filter(r => r.status === 'rejected').length
   };
 
   return `
+    <!-- Filters -->
     <section class="ep-card">
-      <div class="ep-card-title">📋 Absence History</div>
+      <div class="ep-card-title">📋 ${esc(t('portal.history_title'))}</div>
 
-      <div class="ep-stat-grid">
-        <div class="ep-stat"><div class="ep-stat-value">${counts.total}</div><div class="ep-stat-label">Total</div></div>
-        <div class="ep-stat"><div class="ep-stat-value" style="color:#92400e;">${counts.pending}</div><div class="ep-stat-label">Pending</div></div>
-        <div class="ep-stat"><div class="ep-stat-value" style="color:#166534;">${counts.approved}</div><div class="ep-stat-label">Approved</div></div>
-        <div class="ep-stat"><div class="ep-stat-value" style="color:#991b1b;">${counts.rejected}</div><div class="ep-stat-label">Rejected</div></div>
-      </div>
-
-      <label class="ep-label">Filter by status</label>
+      <label class="ep-label">${esc(t('portal.history.filter_status'))}</label>
       <select class="ep-input" id="ep-hist-status">
-        <option value="all"      ${_histStatus === 'all'      ? 'selected' : ''}>All</option>
-        <option value="pending"  ${_histStatus === 'pending'  ? 'selected' : ''}>Pending</option>
-        <option value="approved" ${_histStatus === 'approved' ? 'selected' : ''}>Approved</option>
-        <option value="rejected" ${_histStatus === 'rejected' ? 'selected' : ''}>Rejected</option>
+        <option value="all"      ${_histStatus === 'all'      ? 'selected' : ''}>${esc(t('portal.history.all'))}</option>
+        <option value="pending"  ${_histStatus === 'pending'  ? 'selected' : ''}>${esc(t('status.pending'))}</option>
+        <option value="approved" ${_histStatus === 'approved' ? 'selected' : ''}>${esc(t('status.approved'))}</option>
+        <option value="rejected" ${_histStatus === 'rejected' ? 'selected' : ''}>${esc(t('status.rejected'))}</option>
       </select>
 
-      <label class="ep-label" style="margin-top:10px;">Filter by category</label>
+      <label class="ep-label" style="margin-top:10px;">${esc(t('portal.history.filter_cat'))}</label>
       <select class="ep-input" id="ep-hist-category">
-        <option value="all" ${_histCategory === 'all' ? 'selected' : ''}>All</option>
+        <option value="all" ${_histCategory === 'all' ? 'selected' : ''}>${esc(t('portal.history.all'))}</option>
         ${ABSENCE_CATEGORIES.map(c =>
-          `<option value="${c}" ${_histCategory === c ? 'selected' : ''}>${CATEGORY_LABELS[c]}</option>`
+          `<option value="${c}" ${_histCategory === c ? 'selected' : ''}>${esc(t('category.' + c))}</option>`
         ).join('')}
       </select>
+
+      <label class="ep-label" style="margin-top:10px;">Date</label>
+      <div style="position:relative;">
+        <button type="button" id="ep-hist-date-btn"
+          style="width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:9px;
+                 font-size:0.95rem;font-family:inherit;background:#fff;color:#1e293b;
+                 text-align:left;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+          <span>📅 ${esc(histDateLabel(_histDate))}</span>
+          <span style="font-size:0.75rem;color:#94a3b8;">▼</span>
+        </button>
+        <div id="ep-hist-date-menu"
+          style="display:${_histDateOpen ? 'block' : 'none'};position:absolute;top:100%;left:0;right:0;margin-top:4px;
+                 background:#fff;border:1.5px solid #e2e8f0;border-radius:8px;
+                 box-shadow:0 6px 18px rgba(0,0,0,0.12);z-index:50;
+                 padding:6px;max-height:340px;overflow-y:auto;font-size:0.85rem;">
+        </div>
+      </div>
+
+      <span class="ep-hint">Category filter only applies to absences.</span>
     </section>
 
-    ${rows.length ? `
-      <section class="ep-card">
-        <div class="ep-card-title">${rows.length} request${rows.length !== 1 ? 's' : ''}</div>
-        <div class="ep-list">
-          ${rows.map(r => requestItemHTML(r)).join('')}
+    <!-- Absences section -->
+    <section class="ep-card">
+      <div class="ep-card-title" style="display:flex;align-items:center;gap:8px;">
+        <span>🚫 ${esc(t('type.absence'))}s</span>
+        <span style="font-size:0.7rem;color:var(--color-text-muted);font-weight:500;">(${allAbsences.length})</span>
+      </div>
+      <div class="ep-stat-grid">
+        <div class="ep-stat"><div class="ep-stat-value">${allAbsences.length}</div><div class="ep-stat-label">${esc(t('portal.history.total'))}</div></div>
+        <div class="ep-stat"><div class="ep-stat-value" style="color:#92400e;">${absStatusCounts.pending}</div><div class="ep-stat-label">${esc(t('status.pending'))}</div></div>
+        <div class="ep-stat"><div class="ep-stat-value" style="color:#166534;">${absStatusCounts.approved}</div><div class="ep-stat-label">${esc(t('status.approved'))}</div></div>
+        <div class="ep-stat"><div class="ep-stat-value" style="color:#991b1b;">${absStatusCounts.rejected}</div><div class="ep-stat-label">${esc(t('status.rejected'))}</div></div>
+      </div>
+
+      ${absences.length ? `
+        <div class="ep-list" style="margin-top:12px;">
+          ${absences.map(r => requestItemHTML(r)).join('')}
         </div>
-      </section>
-    ` : `
-      <section class="ep-card ep-empty">
-        <div class="ep-empty-icon">📭</div>
-        <div class="ep-empty-text">No requests match.</div>
-      </section>
-    `}
+      ` : `
+        <div class="ep-empty" style="padding:18px;">
+          <div class="ep-empty-icon">📭</div>
+          <div class="ep-empty-text">${esc(t('portal.history.empty'))}</div>
+        </div>
+      `}
+    </section>
+
+    <!-- Permanences section -->
+    <section class="ep-card">
+      <div class="ep-card-title" style="display:flex;align-items:center;gap:8px;">
+        <span>🎯 ${esc(t('type.permanence'))}s</span>
+        <span style="font-size:0.7rem;color:var(--color-text-muted);font-weight:500;">(${allPermanence.length})</span>
+      </div>
+      <div class="ep-stat-grid">
+        <div class="ep-stat"><div class="ep-stat-value">${allPermanence.length}</div><div class="ep-stat-label">${esc(t('portal.history.total'))}</div></div>
+        <div class="ep-stat"><div class="ep-stat-value" style="color:#92400e;">${permStatusCounts.pending}</div><div class="ep-stat-label">${esc(t('status.pending'))}</div></div>
+        <div class="ep-stat"><div class="ep-stat-value" style="color:#166534;">${permStatusCounts.approved}</div><div class="ep-stat-label">${esc(t('status.approved'))}</div></div>
+        <div class="ep-stat"><div class="ep-stat-value" style="color:#991b1b;">${permStatusCounts.rejected}</div><div class="ep-stat-label">${esc(t('status.rejected'))}</div></div>
+      </div>
+
+      ${permanence.length ? `
+        <div class="ep-list" style="margin-top:12px;">
+          ${permanence.map(r => requestItemHTML(r)).join('')}
+        </div>
+      ` : `
+        <div class="ep-empty" style="padding:18px;">
+          <div class="ep-empty-icon">📭</div>
+          <div class="ep-empty-text">${esc(t('portal.history.empty'))}</div>
+        </div>
+      `}
+    </section>
   `;
 }
 
@@ -552,6 +625,11 @@ function bindGlobalEvents() {
     });
   });
 
+  // Language picker
+  document.querySelectorAll('.ep-drawer-footer [data-lang]').forEach(btn => {
+    btn.addEventListener('click', () => setLanguage(btn.dataset.lang));
+  });
+
   // Sign out
   bindSignOut();
 }
@@ -559,6 +637,7 @@ function bindGlobalEvents() {
 function bindSectionEvents() {
   if (_section === 'home') {
     bindFormEvents();
+    bindPermanenceEvents();
     bindListEvents();
     // Also handle the "View all →" shortcut button
     document.querySelectorAll('[data-section]').forEach(b => {
@@ -573,9 +652,6 @@ function bindSectionEvents() {
     bindPaySlipEvents();
   } else if (_section === 'history') {
     bindHistoryEvents();
-    bindListEvents();
-  } else if (_section === 'permanence') {
-    bindPermanenceEvents();
     bindListEvents();
   }
 }
@@ -703,6 +779,131 @@ function bindHistoryEvents() {
   document.getElementById('ep-hist-category').addEventListener('change', e => {
     _histCategory = e.target.value;
     draw();
+  });
+
+  // Date picker (hierarchical year → month)
+  const dateBtn  = document.getElementById('ep-hist-date-btn');
+  const dateMenu = document.getElementById('ep-hist-date-menu');
+  if (dateBtn && dateMenu) {
+    dateBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      _histDateOpen = !_histDateOpen;
+      dateMenu.style.display = _histDateOpen ? 'block' : 'none';
+      if (_histDateOpen) renderHistDatePickerMenu();
+    });
+    dateMenu.addEventListener('click', e => e.stopPropagation());
+    document.addEventListener('click', e => {
+      if (!dateBtn.contains(e.target) && !dateMenu.contains(e.target)) {
+        if (_histDateOpen) {
+          _histDateOpen = false;
+          dateMenu.style.display = 'none';
+        }
+      }
+    });
+    if (_histDateOpen) renderHistDatePickerMenu();
+  }
+}
+
+function renderHistDatePickerMenu() {
+  const menu = document.getElementById('ep-hist-date-menu');
+  if (!menu) return;
+
+  // Build year → set-of-months from current data
+  const map = {};
+  for (const r of getAbsenceRequests()) {
+    if (typeof r.date !== 'string' || r.date.length < 7) continue;
+    const y = r.date.slice(0, 4);
+    const m = r.date.slice(5, 7);
+    if (!map[y]) map[y] = new Set();
+    map[y].add(m);
+  }
+  const years = Object.keys(map).sort();
+
+  if (!years.length) {
+    menu.innerHTML = `<div style="padding:10px;color:#94a3b8;font-size:0.82rem;">No requests submitted yet.</div>`;
+    return;
+  }
+
+  let html = `
+    <button type="button" data-hpick="all"
+      style="display:block;width:100%;text-align:left;padding:8px 10px;border:none;
+             background:${_histDate === 'all' ? '#dbeafe' : 'transparent'};
+             color:${_histDate === 'all' ? '#1e40af' : '#1e293b'};
+             font-weight:${_histDate === 'all' ? '600' : '500'};
+             border-radius:6px;cursor:pointer;font-family:inherit;font-size:0.85rem;
+             border-bottom:1px solid #e2e8f0;margin-bottom:4px;">
+      📅 All dates
+    </button>
+  `;
+
+  for (const year of years) {
+    const isExpanded = _histExpandedY === year;
+    const isYearSel  = _histDate === year;
+    const isMonthSel = typeof _histDate === 'string' && _histDate.startsWith(year + '-');
+    const monthsAvailable = [...map[year]].sort();
+
+    html += `
+      <div style="margin-bottom:2px;">
+        <button type="button" data-htoggle="${year}"
+          style="display:flex;width:100%;align-items:center;justify-content:space-between;
+                 padding:7px 10px;border:none;background:transparent;cursor:pointer;
+                 font-family:inherit;font-size:0.9rem;border-radius:6px;
+                 color:${(isYearSel || isMonthSel) ? '#1e40af' : '#1e293b'};
+                 font-weight:${(isYearSel || isMonthSel) ? '600' : '500'};">
+          <span>${year}${isMonthSel ? ` <small style="color:#64748b;">(${histDateLabel(_histDate)})</small>` : ''}</span>
+          <span style="font-size:0.7rem;color:#94a3b8;">${isExpanded ? '▼' : '▶'}</span>
+        </button>
+        ${isExpanded ? `
+          <div style="padding:4px 10px 6px 14px;display:flex;flex-direction:column;gap:3px;">
+            <button type="button" data-hpick="${year}"
+              style="display:block;width:100%;text-align:left;padding:5px 8px;border:none;
+                     background:${isYearSel ? '#dbeafe' : 'transparent'};
+                     color:${isYearSel ? '#1e40af' : '#475569'};
+                     font-weight:${isYearSel ? '600' : '500'};
+                     border-radius:5px;cursor:pointer;font-family:inherit;font-size:0.8rem;">
+              All ${year}
+            </button>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:3px;">
+              ${HIST_MONTH_OPTIONS.map(m => {
+                const code = `${year}-${m.v}`;
+                const exists = monthsAvailable.includes(m.v);
+                const sel = _histDate === code;
+                return `
+                  <button type="button" data-hpick="${code}" ${exists ? '' : 'disabled'}
+                    style="padding:6px 4px;border:1.5px solid ${sel ? '#2563eb' : '#e2e8f0'};
+                           background:${sel ? '#dbeafe' : (exists ? '#fff' : '#f8fafc')};
+                           color:${sel ? '#1e40af' : (exists ? '#1e293b' : '#cbd5e1')};
+                           border-radius:5px;font-family:inherit;font-size:0.78rem;
+                           font-weight:${sel ? '600' : '500'};
+                           cursor:${exists ? 'pointer' : 'not-allowed'};">
+                    ${m.l}
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  menu.innerHTML = html;
+
+  menu.querySelectorAll('[data-htoggle]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const year = btn.dataset.htoggle;
+      _histExpandedY = (_histExpandedY === year) ? null : year;
+      renderHistDatePickerMenu();
+    });
+  });
+  menu.querySelectorAll('[data-hpick]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      _histDate = btn.dataset.hpick;
+      _histDateOpen = false;
+      draw();
+    });
   });
 }
 

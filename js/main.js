@@ -17,6 +17,7 @@ import {
   SUPER_ADMIN_EMAIL
 } from './data/store.js';
 import { onAuthChanged, signInWithGoogle, signInWithMicrosoft, signOutUser } from './auth.js';
+import { t, getLanguage, setLanguage, SUPPORTED_LANGUAGES, applyTranslationsToDOM } from './i18n.js';
 
 // Register all routes
 register('#dashboard',         () => renderDashboard('#app-content'));
@@ -140,10 +141,35 @@ function hideLoader() {
   document.getElementById('app-loader').style.display = 'none';
 }
 
+// ── Login screen language picker ──────────────────────────
+function initLoginLangPicker() {
+  const wrap = document.getElementById('login-lang-picker');
+  if (!wrap) return;
+  const current = getLanguage();
+  wrap.innerHTML = SUPPORTED_LANGUAGES.map(lang => `
+    <button type="button" data-lang="${lang.code}"
+      style="padding:5px 12px;border:1.5px solid ${current === lang.code ? '#2563eb' : '#e2e8f0'};
+             border-radius:6px;background:${current === lang.code ? '#dbeafe' : '#fff'};
+             color:${current === lang.code ? '#1e40af' : '#64748b'};
+             font-size:0.78rem;font-weight:600;cursor:pointer;font-family:inherit;
+             display:inline-flex;align-items:center;gap:5px;">
+      <span>${lang.flag}</span><span>${lang.label}</span>
+    </button>
+  `).join('');
+  wrap.querySelectorAll('[data-lang]').forEach(btn => {
+    btn.addEventListener('click', () => setLanguage(btn.dataset.lang));
+  });
+}
+
 // ── Auth flow ─────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   initModal();
   initSidebarToggle();
+
+  // Apply translations to all static [data-i18n] elements (login screen, sidebar, etc.)
+  applyTranslationsToDOM();
+  // Render language picker on login screen
+  initLoginLangPicker();
 
   document.getElementById('google-signin-btn').addEventListener('click', async () => {
     try {

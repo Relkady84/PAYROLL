@@ -44,7 +44,7 @@ export function render(selector) {
         return pending > 0 ? `
           <div class="alert alert-info" style="margin-bottom:20px;">
             <span>📅</span>
-            <span><strong>${pending} request${pending !== 1 ? 's' : ''}</strong> (absence / permanence) waiting for review.
+            <span><strong>${pending} attendance request${pending !== 1 ? 's' : ''}</strong> waiting for review.
               <a href="#absence-requests" style="color:inherit;font-weight:600;text-decoration:underline;">Review now →</a>
             </span>
           </div>
