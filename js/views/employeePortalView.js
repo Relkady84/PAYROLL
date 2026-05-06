@@ -189,12 +189,17 @@ function drawerHTML() {
           <div class="ep-drawer-name">${esc(fullName)}</div>
           <div class="ep-drawer-meta">${esc(typeLabel)}</div>
         </div>
+        <button id="ep-drawer-close" aria-label="Close menu"
+          style="background:rgba(255,255,255,0.12);color:#fff;border:none;
+                 width:34px;height:34px;border-radius:8px;font-size:1.1rem;
+                 cursor:pointer;font-family:inherit;flex-shrink:0;
+                 display:flex;align-items:center;justify-content:center;">×</button>
       </div>
 
       <nav class="ep-drawer-nav">
-        ${item('home',    '🏠', 'Home')}
-        ${item('payslip', '💰', 'My Pay Slip')}
-        ${item('history', '📋', 'Attendance History')}
+        ${item('home',    '🏠', t('portal.drawer.home'))}
+        ${item('payslip', '💰', t('portal.drawer.payslip'))}
+        ${item('history', '📋', t('portal.drawer.history'))}
       </nav>
 
       <div class="ep-drawer-footer">
@@ -231,13 +236,15 @@ function homeSectionHTML() {
 }
 
 function greetingCardHTML() {
-  const fullName = `${_employee.firstName || ''} ${_employee.lastName || ''}`.trim();
-  const typeLabel = _employee.employeeType === 'Admin' ? 'Administrator' : 'Teacher';
+  const fullName  = `${_employee.firstName || ''} ${_employee.lastName || ''}`.trim();
+  const typeLabel = _employee.employeeType === 'Admin'
+    ? t('portal.role.administrator')
+    : t('portal.role.teacher');
   return `
     <section class="ep-card ep-greeting">
       <div class="ep-avatar">${initials(fullName)}</div>
       <div class="ep-greeting-text">
-        <div class="ep-greeting-name">Hi, ${esc(_employee.firstName || 'there')} 👋</div>
+        <div class="ep-greeting-name">${esc(t('portal.greeting', { name: _employee.firstName || '' }))}</div>
         <div class="ep-greeting-meta">${esc(typeLabel)} · ${esc(_employee.homeLocation || '')}</div>
       </div>
     </section>
@@ -249,32 +256,32 @@ function absenceFormCardHTML() {
   const earliest = dateNDaysAgo(MAX_BACKDATE_DAYS);
   return `
     <section class="ep-card ep-form-card">
-      <div class="ep-card-title">🚫 Request an Absence</div>
+      <div class="ep-card-title">${esc(t('portal.absence.title'))}</div>
 
       <form id="ep-form" novalidate>
-        <label class="ep-label" for="ep-date">Date</label>
+        <label class="ep-label" for="ep-date">${esc(t('portal.absence.date'))}</label>
         <input class="ep-input" type="date" id="ep-date"
           min="${earliest}" value="${today}" required>
-        <div class="ep-hint">From ${earliest} to any future date.</div>
+        <div class="ep-hint">${esc(t('portal.absence.date_hint', { earliest }))}</div>
 
-        <label class="ep-label" for="ep-category">Category</label>
+        <label class="ep-label" for="ep-category">${esc(t('portal.absence.category'))}</label>
         <select class="ep-input" id="ep-category" required>
           ${ABSENCE_CATEGORIES.map(c =>
-            `<option value="${c}">${CATEGORY_LABELS[c]}</option>`
+            `<option value="${c}">${esc(t('category.' + c))}</option>`
           ).join('')}
         </select>
 
         <label class="ep-label" for="ep-reason">
-          Reason / Note <span id="ep-reason-required" class="ep-muted"></span>
+          ${esc(t('portal.absence.reason'))} <span id="ep-reason-required" class="ep-muted"></span>
         </label>
         <textarea class="ep-input" id="ep-reason" rows="3"
           maxlength="500"
-          placeholder="Optional — e.g., medical appointment"></textarea>
+          placeholder="${esc(t('portal.absence.placeholder'))}"></textarea>
 
         <div id="ep-form-errors" class="ep-errors"></div>
 
         <button type="submit" class="ep-btn ep-btn-primary">
-          ✓ Submit Absence Request
+          ${esc(t('portal.absence.submit'))}
         </button>
       </form>
     </section>
@@ -286,25 +293,25 @@ function permanenceFormCardHTML() {
   const earliest = dateNDaysAgo(MAX_BACKDATE_DAYS);
   return `
     <section class="ep-card ep-form-card">
-      <div class="ep-card-title">🎯 Request a Permanence Day</div>
+      <div class="ep-card-title">${esc(t('portal.permanence.title'))}</div>
 
       <form id="ep-perm-form" novalidate>
-        <label class="ep-label" for="ep-perm-date">Date you worked</label>
+        <label class="ep-label" for="ep-perm-date">${esc(t('portal.permanence.date'))}</label>
         <input class="ep-input" type="date" id="ep-perm-date"
           min="${earliest}" value="${today}" required>
-        <div class="ep-hint">From ${earliest} to any future date.</div>
+        <div class="ep-hint">${esc(t('portal.absence.date_hint', { earliest }))}</div>
 
         <label class="ep-label" for="ep-perm-reason">
-          Reason for working <span class="ep-muted">(required)</span>
+          ${esc(t('portal.permanence.reason'))} <span class="ep-muted">${esc(t('common.required'))}</span>
         </label>
         <textarea class="ep-input" id="ep-perm-reason" rows="3"
           maxlength="500"
-          placeholder="e.g., Year-end closing, exam supervision, urgent task…"></textarea>
+          placeholder="${esc(t('portal.permanence.placeholder'))}"></textarea>
 
         <div id="ep-perm-form-errors" class="ep-errors"></div>
 
         <button type="submit" class="ep-btn ep-btn-primary">
-          ✓ Submit Permanence Request
+          ${esc(t('portal.permanence.submit'))}
         </button>
       </form>
     </section>
@@ -609,10 +616,15 @@ function bindGlobalEvents() {
     _drawerOpen = true;
     document.getElementById('ep-drawer').classList.add('open');
     document.getElementById('ep-drawer-overlay').classList.add('open');
+    document.body.classList.add('ep-drawer-open');   // hides burger via CSS
   });
 
   // Drawer overlay close
   document.getElementById('ep-drawer-overlay').addEventListener('click', closeDrawer);
+
+  // Close X inside drawer
+  const closeBtn = document.getElementById('ep-drawer-close');
+  if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
 
   // Drawer items
   document.querySelectorAll('.ep-drawer-item').forEach(btn => {
@@ -661,7 +673,7 @@ function bindFormEvents() {
   const reasonRequired = document.getElementById('ep-reason-required');
 
   function updateReasonHint() {
-    reasonRequired.textContent = catEl.value === 'other' ? '(required)' : '(optional)';
+    reasonRequired.textContent = catEl.value === 'other' ? t('common.required') : t('common.optional');
   }
   catEl.addEventListener('change', updateReasonHint);
   updateReasonHint();
@@ -909,6 +921,7 @@ function closeDrawer() {
   _drawerOpen = false;
   document.getElementById('ep-drawer')?.classList.remove('open');
   document.getElementById('ep-drawer-overlay')?.classList.remove('open');
+  document.body.classList.remove('ep-drawer-open');
 }
 
 function bindSignOut() {

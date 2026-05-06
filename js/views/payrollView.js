@@ -136,16 +136,16 @@ export function render(selector) {
             <thead>
               <tr>
                 <th class="sortable" data-key="firstName">Name <span class="sort-icon">↕</span></th>
-                <th>Type</th>
-                <th>Transport Days</th>
+                <th class="sortable" data-key="employeeType">Type <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="daysWorked">Transport Days <span class="sort-icon">↕</span></th>
                 <th class="sortable" data-key="baseSalaryLBP">Base Salary (LBP) <span class="sort-icon">↕</span></th>
-                <th>Base Salary (USD)</th>
-                <th>Transport/Day (LBP)</th>
-                <th>Transport/Day (USD)</th>
-                <th>Total Transport (LBP)</th>
-                <th>Total Transport (USD)</th>
-                <th>Tax (LBP)</th>
-                <th>NFS (LBP)</th>
+                <th class="sortable" data-key="baseSalaryUSD">Base Salary (USD) <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="transportPerDayLBP">Transport/Day (LBP) <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="transportPerDayUSD">Transport/Day (USD) <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="totalTransportLBP">Total Transport (LBP) <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="totalTransportUSD">Total Transport (USD) <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="taxLBP">Tax (LBP) <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="nfsLBP">NFS (LBP) <span class="sort-icon">↕</span></th>
                 <th class="sortable" data-key="netSalaryLBP">Net Salary (LBP) <span class="sort-icon">↕</span></th>
                 <th class="sortable" data-key="netSalaryUSD">Net Salary (USD) <span class="sort-icon">↕</span></th>
               </tr>

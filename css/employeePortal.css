@@ -41,9 +41,15 @@
   cursor: pointer;
   font-family: inherit;
   flex-shrink: 0;
-  transition: background 0.15s;
+  transition: background 0.15s, opacity 0.2s;
 }
 .ep-burger:hover { background: rgba(255,255,255,0.15); }
+
+/* When drawer is open, hide the burger so it doesn't cover the company logo */
+body.ep-drawer-open .ep-burger {
+  opacity: 0;
+  pointer-events: none;
+}
 
 .ep-header-title {
   display: flex;
