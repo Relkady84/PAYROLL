@@ -46,6 +46,39 @@ function ensureOverlay() {
   return el;
 }
 
+// Deep equality that ignores object key order and treats null/undefined/empty
+// strings as equivalent. Required because Firestore re-orders keys when
+// reading data back, which made simple JSON.stringify comparisons unreliable.
+function isEmpty(v) {
+  return v === null || v === undefined || v === '';
+}
+function deepEqual(a, b) {
+  if (isEmpty(a) && isEmpty(b)) return true;
+  if (a === b) return true;
+  if (typeof a !== typeof b) {
+    // Number 5 == string "5" → treat as equal (Firestore sometimes returns numbers)
+    if ((typeof a === 'number' || typeof a === 'string') &&
+        (typeof b === 'number' || typeof b === 'string')) {
+      return String(a) === String(b);
+    }
+    return false;
+  }
+  if (typeof a !== 'object' || a === null || b === null) return a === b;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    if (a.length !== b.length) return false;
+    return a.every((item, i) => deepEqual(item, b[i]));
+  }
+  // Object: compare keys, IGNORING entries whose value is null/undefined/empty
+  const meaningfulKeys = obj =>
+    Object.keys(obj).filter(k => !isEmpty(obj[k]));
+  const aKeys = meaningfulKeys(a);
+  const bKeys = meaningfulKeys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  if (!aKeys.every(k => bKeys.includes(k))) return false;
+  return aKeys.every(k => deepEqual(a[k], b[k]));
+}
+
 // Display count of "items" for a section header (slightly different from
 // what the diff function counts — e.g., calendar = 1 doc but we want to
 // show holiday count to the user).
@@ -74,22 +107,18 @@ function diffSection(sectionId) {
     const keys = Object.keys(backup);
     let changed = 0;
     for (const k of keys) {
-      if (JSON.stringify(backup[k]) !== JSON.stringify(current[k])) changed++;
+      if (!deepEqual(backup[k], current[k])) changed++;
     }
     return { totalInBackup: keys.length, missingFromCurrent: 0, changed, identical: keys.length - changed };
   }
 
   if (sectionId === 'calendar') {
-    const backup = b.calendar || {};
-    const current = getCalendar();
-    const same = JSON.stringify(backup) === JSON.stringify(current);
+    const same = deepEqual(b.calendar || {}, getCalendar());
     return { totalInBackup: 1, missingFromCurrent: 0, changed: same ? 0 : 1, identical: same ? 1 : 0 };
   }
 
   if (sectionId === 'roleRegistry') {
-    const backup = b.roleRegistry || { roles: [] };
-    const current = getRoleRegistry();
-    const same = JSON.stringify(backup) === JSON.stringify(current);
+    const same = deepEqual(b.roleRegistry || { roles: [] }, getRoleRegistry());
     return { totalInBackup: 1, missingFromCurrent: 0, changed: same ? 0 : 1, identical: same ? 1 : 0 };
   }
 
@@ -100,7 +129,7 @@ function diffSection(sectionId) {
     for (const y of backup) {
       const cur = currentMap.get(y.yearId);
       if (!cur) missing++;
-      else if (JSON.stringify(y) !== JSON.stringify(cur)) changed++;
+      else if (!deepEqual(y, cur)) changed++;
       else identical++;
     }
     return { totalInBackup: backup.length, missingFromCurrent: missing, changed, identical };
@@ -114,7 +143,7 @@ function diffSection(sectionId) {
     for (const e of backup) {
       const cur = currentMap.get(e.id);
       if (!cur) { missing++; continue; }
-      const differs = fields.some(f => JSON.stringify(e[f]) !== JSON.stringify(cur[f]));
+      const differs = fields.some(f => !deepEqual(e[f], cur[f]));
       if (differs) changed++;
       else identical++;
     }
@@ -125,10 +154,13 @@ function diffSection(sectionId) {
     const backup = b.absenceRequests || [];
     const currentMap = new Map(getAbsenceRequests().map(r => [r.id, r]));
     let missing = 0, changed = 0, identical = 0;
+    // Compare meaningful fields, not the full record (Firestore can add timestamps etc.)
+    const fields = ['employeeId','employeeName','employeeEmail','date','type','category','reason','status','reviewedBy','reviewNotes'];
     for (const r of backup) {
       const cur = currentMap.get(r.id);
-      if (!cur) missing++;
-      else if (JSON.stringify(r) !== JSON.stringify(cur)) changed++;
+      if (!cur) { missing++; continue; }
+      const differs = fields.some(f => !deepEqual(r[f], cur[f]));
+      if (differs) changed++;
       else identical++;
     }
     return { totalInBackup: backup.length, missingFromCurrent: missing, changed, identical };
@@ -174,9 +206,30 @@ function drawSummary() {
     };
   });
 
-  const exportedAt = b.exportedAt
-    ? new Date(b.exportedAt).toLocaleString()
-    : 'unknown';
+  // Show exact backup time (date + time + seconds) plus "X hours/days ago"
+  let exportedAt = 'unknown';
+  let agoText    = '';
+  if (b.exportedAt) {
+    const d = new Date(b.exportedAt);
+    if (!isNaN(d.getTime())) {
+      exportedAt = d.toLocaleString(undefined, {
+        year:   'numeric',
+        month:  'short',
+        day:    'numeric',
+        hour:   '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      const diffMs = Date.now() - d.getTime();
+      const mins   = Math.floor(diffMs / 60000);
+      const hours  = Math.floor(mins / 60);
+      const days   = Math.floor(hours / 24);
+      if (days > 0)        agoText = `${days} day${days !== 1 ? 's' : ''} ago`;
+      else if (hours > 0)  agoText = `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+      else if (mins > 0)   agoText = `${mins} minute${mins !== 1 ? 's' : ''} ago`;
+      else                 agoText = `just now`;
+    }
+  }
 
   _container.innerHTML = `
     <div style="background:#fff;border-radius:14px;max-width:760px;width:100%;
@@ -188,8 +241,8 @@ function drawSummary() {
                   justify-content:space-between;">
         <div>
           <div style="font-weight:700;font-size:1.05rem;">📂 Restore from Backup</div>
-          <div style="font-size:0.78rem;color:rgba(255,255,255,0.7);margin-top:4px;">
-            Exported: ${exportedAt}
+          <div style="font-size:0.82rem;color:rgba(255,255,255,0.85);margin-top:4px;">
+            🕐 ${exportedAt}${agoText ? ` <span style="color:rgba(255,255,255,0.6);">(${agoText})</span>` : ''}
           </div>
         </div>
         <button id="br-close"
@@ -477,8 +530,8 @@ function renderEmployeeRow(emp, current) {
 }
 
 function buildEmployeeDiff(backup, current) {
-  const fields = ['firstName','lastName','employeeType','role','baseSalaryLBP','kmDistance','homeLocation','email','age','defaultDaysPerMonth'];
-  return fields.filter(f => (backup[f] ?? '') !== (current[f] ?? ''));
+  const fields = ['firstName','lastName','employeeType','role','baseSalaryLBP','kmDistance','homeLocation','email','age','defaultDaysPerMonth','workSchedule'];
+  return fields.filter(f => !deepEqual(backup[f], current[f]));
 }
 
 function drawRequestsViewer() {
