@@ -179,6 +179,22 @@ export async function render(selector) {
         </div>
         <div class="section-card-body">
 
+          <!-- Light / Dark / Auto mode toggle -->
+          <div style="margin-bottom:22px;padding:14px;background:var(--color-surface);
+                      border:1.5px solid var(--color-border);border-radius:10px;">
+            <div class="form-label" style="margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+              <span>🌗 Appearance</span>
+              <span style="font-weight:400;font-size:0.78rem;color:var(--color-text-secondary);">
+                — applies to this device only
+              </span>
+            </div>
+            <div id="app-theme-picker" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+            <div style="font-size:0.75rem;color:var(--color-text-secondary);margin-top:8px;">
+              Tip: if your phone's browser darkens images strangely, picking <b>Dark</b> here
+              keeps colors consistent.
+            </div>
+          </div>
+
           <!-- Preset themes -->
           <div style="margin-bottom:20px;">
             <div class="form-label" style="margin-bottom:10px;">Quick Themes (sidebar / header colors)</div>
@@ -833,6 +849,9 @@ export async function render(selector) {
   // ── Quick Links manager ────────────────────────────────
   initQuickLinksSection(meta);
 
+  // ── Light / Dark / Auto theme picker ──────────────────
+  initAppThemePicker();
+
   // Convert fuel price value when switching currency (USD ↔ LBP)
   container.querySelectorAll('[name="fuelPriceCurrency"]').forEach(radio => {
     radio.addEventListener('change', () => {
@@ -919,13 +938,29 @@ export async function render(selector) {
   });
 }
 
+// Last-applied palette — kept so we can re-apply it after a theme switch
+let _lastDisplayColors = null;
+
 export function applyDisplayColors(colors) {
-  if (!colors) return;
+  if (colors) _lastDisplayColors = colors;
+  if (!_lastDisplayColors) return;
+  const c = _lastDisplayColors;
   const r = document.documentElement.style;
-  if (colors.sidebarBg)     r.setProperty('--color-sidebar-bg',        colors.sidebarBg);
-  if (colors.sidebarActive) r.setProperty('--color-sidebar-active-bg', colors.sidebarActive);
-  if (colors.headerBg)      r.setProperty('--color-header-bg',         colors.headerBg);
-  if (colors.pageBg)        r.setProperty('--color-bg',                colors.pageBg);
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+  // Sidebar colors apply in any theme (sidebar is dark by default anyway)
+  if (c.sidebarBg)     r.setProperty('--color-sidebar-bg',        c.sidebarBg);
+  if (c.sidebarActive) r.setProperty('--color-sidebar-active-bg', c.sidebarActive);
+
+  if (isDark) {
+    // In dark mode, the light page/header palette would clash — let dark
+    // theme variables apply. Clear any previous inline overrides.
+    r.removeProperty('--color-header-bg');
+    r.removeProperty('--color-bg');
+  } else {
+    if (c.headerBg) r.setProperty('--color-header-bg', c.headerBg);
+    if (c.pageBg)   r.setProperty('--color-bg',        c.pageBg);
+  }
 }
 
 // ── Appearance (Light / Dark / Auto) ─────────────────────
@@ -950,6 +985,8 @@ export function applyAppTheme(pref) {
   const tc = document.querySelector('meta[name="theme-color"]');
   if (tc) tc.setAttribute('content', resolved === 'dark' ? '#0f172a' : '#0f172a');
   try { localStorage.setItem('app-theme', safe); } catch (e) {}
+  // Re-apply the saved company palette so dark/light bgs refresh
+  applyDisplayColors();
 }
 
 function initAppThemePicker() {

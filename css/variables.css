@@ -50,6 +50,107 @@
   --font-size-3xl: 1.875rem;
 }
 
-/* Dark theme is applied SCOPED to the employee portal only.
-   See css/employeePortal.css → :root[data-theme="dark"] .ep-portal selectors.
-   Admin pages always render in light. */
+/* ── Dark theme overrides ── */
+:root[data-theme="dark"] {
+  --color-bg:              #0f172a;
+  --color-surface:         #1e293b;
+  --color-border:          #334155;
+  --color-border-hover:    #475569;
+
+  --color-text:            #f1f5f9;
+  --color-text-secondary:  #cbd5e1;
+  --color-text-muted:      #94a3b8;
+
+  --color-header-bg:       #1e293b;
+
+  --color-primary-light:   #1e3a8a;
+  --color-danger-light:    #7f1d1d;
+  --color-success-light:   #14532d;
+  --color-warning-light:   #78350f;
+  --color-info-light:      #155e75;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5), 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Dark theme — inline-style overrides ──
+   Many admin views use inline `background:#fff` etc. These attribute selectors
+   catch them so the page doesn't end up half-white half-dark. */
+:root[data-theme="dark"] [style*="background:#fff"],
+:root[data-theme="dark"] [style*="background: #fff"],
+:root[data-theme="dark"] [style*="background:#ffffff"],
+:root[data-theme="dark"] [style*="background:white"],
+:root[data-theme="dark"] [style*="background: white"] {
+  background: var(--color-surface) !important;
+}
+
+:root[data-theme="dark"] [style*="background:#f8fafc"],
+:root[data-theme="dark"] [style*="background: #f8fafc"],
+:root[data-theme="dark"] [style*="background:#f1f5f9"],
+:root[data-theme="dark"] [style*="background: #f1f5f9"] {
+  background: #0f172a !important;
+}
+
+/* Hard-coded dark text colors → light in dark theme */
+:root[data-theme="dark"] [style*="color:#1e293b"],
+:root[data-theme="dark"] [style*="color: #1e293b"],
+:root[data-theme="dark"] [style*="color:#0f172a"],
+:root[data-theme="dark"] [style*="color: #0f172a"],
+:root[data-theme="dark"] [style*="color:#000"],
+:root[data-theme="dark"] [style*="color: #000"] {
+  color: var(--color-text) !important;
+}
+
+/* Hard-coded light gray text → muted in dark theme */
+:root[data-theme="dark"] [style*="color:#64748b"],
+:root[data-theme="dark"] [style*="color: #64748b"],
+:root[data-theme="dark"] [style*="color:#475569"] {
+  color: var(--color-text-secondary) !important;
+}
+
+/* Hard-coded light borders → dark */
+:root[data-theme="dark"] [style*="border:1.5px solid #e2e8f0"],
+:root[data-theme="dark"] [style*="border:1px solid #e2e8f0"],
+:root[data-theme="dark"] [style*="border: 1px solid #e2e8f0"],
+:root[data-theme="dark"] [style*="border-color:#e2e8f0"] {
+  border-color: var(--color-border) !important;
+}
+
+/* Table row hover — components.css hardcodes #f8fafc */
+:root[data-theme="dark"] .data-table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+/* Section card body / title — they inherit but be explicit */
+:root[data-theme="dark"] .section-card-title { color: var(--color-text); }
+:root[data-theme="dark"] .section-card-header { background: transparent; }
+
+/* Avoid white-on-white inputs — already use var(--color-surface) but force placeholder */
+:root[data-theme="dark"] .form-control::placeholder,
+:root[data-theme="dark"] input::placeholder,
+:root[data-theme="dark"] textarea::placeholder { color: #64748b; }
+
+/* Theme-preset chips and color-picker swatches stay readable */
+:root[data-theme="dark"] #theme-presets button {
+  background: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text);
+}
+
+/* Settings tabs */
+:root[data-theme="dark"] .settings-tab { color: var(--color-text-secondary); }
+:root[data-theme="dark"] .settings-tab.active { color: var(--color-text); }
+
+/* Alerts: keep accent colors but darken the surface */
+:root[data-theme="dark"] .alert-info    { background: #0e3a4f; color: #cffafe; border-color: #155e75; }
+:root[data-theme="dark"] .alert-warning { background: #422006; color: #fef3c7; border-color: #78350f; }
+:root[data-theme="dark"] .alert-success { background: #052e16; color: #dcfce7; border-color: #166534; }
+:root[data-theme="dark"] .alert-danger  { background: #450a0a; color: #fee2e2; border-color: #991b1b; }
+
+/* Badges with very light bgs — keep readable */
+:root[data-theme="dark"] [class*="badge"][style*="background:#f1f5f9"],
+:root[data-theme="dark"] [class*="badge"][style*="background: #f1f5f9"] {
+  background: #334155 !important;
+  color: #cbd5e1 !important;
+}
