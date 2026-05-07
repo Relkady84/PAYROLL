@@ -109,27 +109,57 @@ export async function render(selector) {
             <div class="settings-section-title">🔗 Quick Links (Employee Portal Home)</div>
             <div class="alert alert-info" style="margin-bottom:12px;">
               <span>ℹ</span>
-              <span>These tiles appear on the Employee Portal home page. Each opens in a new tab.</span>
+              <span>These tiles appear on the Employee Portal home page. Each opens in a new tab.
+                Icons can be an emoji (📚), an image URL, or an uploaded image file.</span>
             </div>
 
             <div id="quicklinks-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;"></div>
 
-            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;background:#f8fafc;padding:12px;border-radius:8px;">
-              <div style="flex:0 0 70px;">
-                <label class="form-label" style="font-size:0.78rem;">Icon</label>
-                <input type="text" class="form-control" id="ql-add-icon" maxlength="4" placeholder="📚" style="text-align:center;font-size:1.1rem;">
+            <div style="background:#f8fafc;padding:14px;border-radius:8px;border:1.5px solid var(--color-border);">
+              <div id="ql-form-title" style="font-weight:700;font-size:0.85rem;margin-bottom:10px;">+ Add a new tile</div>
+
+              <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;">
+                <!-- Icon — emoji or upload -->
+                <div style="flex:0 0 110px;">
+                  <label class="form-label" style="font-size:0.78rem;">Icon (emoji)</label>
+                  <input type="text" class="form-control" id="ql-add-icon" maxlength="200"
+                         placeholder="📚" style="text-align:center;font-size:1.1rem;">
+                </div>
+                <!-- Or upload -->
+                <div style="flex:0 0 auto;">
+                  <label class="form-label" style="font-size:0.78rem;">&nbsp;</label>
+                  <label class="btn btn-secondary btn-sm" style="cursor:pointer;display:block;text-align:center;">
+                    📂 Upload
+                    <input type="file" id="ql-add-upload" accept="image/*" class="file-input-hidden">
+                  </label>
+                </div>
+                <!-- Preview -->
+                <div style="flex:0 0 auto;">
+                  <label class="form-label" style="font-size:0.78rem;">Preview</label>
+                  <div id="ql-add-preview"
+                       style="width:42px;height:42px;border:1.5px solid var(--color-border);
+                              border-radius:8px;display:flex;align-items:center;justify-content:center;
+                              background:#fff;font-size:1.4rem;overflow:hidden;">🔗</div>
+                </div>
+                <!-- Label -->
+                <div style="flex:1 1 160px;">
+                  <label class="form-label" style="font-size:0.78rem;">Label</label>
+                  <input type="text" class="form-control" id="ql-add-label" maxlength="40"
+                         placeholder="e.g., Pronote">
+                </div>
+                <!-- URL -->
+                <div style="flex:2 1 220px;">
+                  <label class="form-label" style="font-size:0.78rem;">URL</label>
+                  <input type="url" class="form-control" id="ql-add-url" placeholder="https://...">
+                </div>
               </div>
-              <div style="flex:1 1 160px;">
-                <label class="form-label" style="font-size:0.78rem;">Label</label>
-                <input type="text" class="form-control" id="ql-add-label" maxlength="40" placeholder="e.g., Pronote">
+
+              <div style="display:flex;gap:8px;margin-top:10px;">
+                <button type="button" class="btn btn-secondary" id="ql-add-btn">+ Add tile</button>
+                <button type="button" class="btn btn-secondary" id="ql-cancel-btn" style="display:none;">Cancel</button>
               </div>
-              <div style="flex:2 1 220px;">
-                <label class="form-label" style="font-size:0.78rem;">URL</label>
-                <input type="url" class="form-control" id="ql-add-url" placeholder="https://...">
-              </div>
-              <button type="button" class="btn btn-secondary" id="ql-add-btn">+ Add</button>
+              <div id="ql-add-error" style="font-size:0.78rem;color:var(--color-danger);margin-top:6px;min-height:18px;"></div>
             </div>
-            <div id="ql-add-error" style="font-size:0.78rem;color:var(--color-danger);margin-top:6px;min-height:18px;"></div>
 
             <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
               <button type="button" class="btn btn-primary" id="ql-save-btn">💾 Save Quick Links</button>
@@ -1157,30 +1187,80 @@ function initQuickLinksSection(meta) {
     ? structuredClone(meta.quickLinks)
     : structuredClone(DEFAULT_LINKS);
 
-  const listEl    = document.getElementById('quicklinks-list');
-  const iconInput = document.getElementById('ql-add-icon');
-  const labelInput= document.getElementById('ql-add-label');
-  const urlInput  = document.getElementById('ql-add-url');
-  const errEl     = document.getElementById('ql-add-error');
-  const addBtn    = document.getElementById('ql-add-btn');
-  const saveBtn   = document.getElementById('ql-save-btn');
+  let editingIdx = null;   // index of link being edited (null = adding new)
+
+  const listEl      = document.getElementById('quicklinks-list');
+  const iconInput   = document.getElementById('ql-add-icon');
+  const uploadInput = document.getElementById('ql-add-upload');
+  const previewEl   = document.getElementById('ql-add-preview');
+  const labelInput  = document.getElementById('ql-add-label');
+  const urlInput    = document.getElementById('ql-add-url');
+  const errEl       = document.getElementById('ql-add-error');
+  const addBtn      = document.getElementById('ql-add-btn');
+  const cancelBtn   = document.getElementById('ql-cancel-btn');
+  const formTitle   = document.getElementById('ql-form-title');
+  const saveBtn     = document.getElementById('ql-save-btn');
   const defaultsBtn = document.getElementById('ql-defaults-btn');
 
   if (!listEl) return;
 
+  // Renders the icon properly: image if URL/data, emoji if text
+  function renderIcon(icon, size = '1.4rem') {
+    if (!icon) return '<span style="font-size:' + size + ';">🔗</span>';
+    if (/^(https?:|data:)/.test(icon)) {
+      return `<img src="${esc(icon)}" alt="" referrerpolicy="no-referrer"
+                style="max-width:100%;max-height:100%;object-fit:contain;">`;
+    }
+    return `<span style="font-size:${size};">${esc(icon)}</span>`;
+  }
+
+  function updatePreview() {
+    if (previewEl) previewEl.innerHTML = renderIcon(iconInput.value.trim(), '1.4rem');
+  }
+
+  function resetForm() {
+    iconInput.value  = '';
+    labelInput.value = '';
+    urlInput.value   = '';
+    errEl.textContent = '';
+    editingIdx = null;
+    formTitle.textContent = '+ Add a new tile';
+    addBtn.textContent    = '+ Add tile';
+    cancelBtn.style.display = 'none';
+    updatePreview();
+  }
+
+  function loadIntoForm(idx) {
+    const link = links[idx];
+    if (!link) return;
+    iconInput.value  = link.icon  || '';
+    labelInput.value = link.label || '';
+    urlInput.value   = link.url   || '';
+    errEl.textContent = '';
+    editingIdx = idx;
+    formTitle.textContent = `Editing: ${link.label || ''}`;
+    addBtn.textContent    = '💾 Save changes';
+    cancelBtn.style.display = '';
+    updatePreview();
+    document.getElementById('quicklinks-list')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
   function renderList() {
     if (!links.length) {
-      listEl.innerHTML = `<div style="padding:14px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;text-align:center;color:#94a3b8;font-size:0.85rem;">No quick links yet.</div>`;
+      listEl.innerHTML = `<div style="padding:14px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;text-align:center;color:#94a3b8;font-size:0.85rem;">No quick links yet. Add one below.</div>`;
       return;
     }
     listEl.innerHTML = links.map((link, i) => `
       <div style="display:flex;gap:10px;align-items:center;padding:10px 12px;background:#f8fafc;border:1px solid var(--color-border);border-radius:8px;">
-        <div style="font-size:1.4rem;flex-shrink:0;width:32px;text-align:center;">${esc(link.icon || '🔗')}</div>
+        <div style="flex-shrink:0;width:42px;height:42px;border:1px solid var(--color-border);border-radius:8px;display:flex;align-items:center;justify-content:center;background:#fff;overflow:hidden;">
+          ${renderIcon(link.icon, '1.4rem')}
+        </div>
         <div style="flex:1;min-width:0;">
           <div style="font-weight:600;font-size:0.9rem;">${esc(link.label)}</div>
           <div style="font-size:0.72rem;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(link.url)}</div>
         </div>
         <div style="display:flex;gap:4px;flex-shrink:0;">
+          <button type="button" class="btn btn-secondary btn-sm" data-edit="${i}" title="Edit">✏️</button>
           <button type="button" class="btn btn-secondary btn-sm" data-up="${i}"   ${i === 0 ? 'disabled' : ''} title="Move up">↑</button>
           <button type="button" class="btn btn-secondary btn-sm" data-down="${i}" ${i === links.length - 1 ? 'disabled' : ''} title="Move down">↓</button>
           <button type="button" class="btn btn-danger btn-sm" data-del="${i}" title="Remove">🗑</button>
@@ -1188,6 +1268,9 @@ function initQuickLinksSection(meta) {
       </div>
     `).join('');
 
+    listEl.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => {
+      loadIntoForm(parseInt(b.dataset.edit, 10));
+    }));
     listEl.querySelectorAll('[data-up]').forEach(b => b.addEventListener('click', () => {
       const i = parseInt(b.dataset.up, 10);
       if (i > 0) [links[i - 1], links[i]] = [links[i], links[i - 1]];
@@ -1200,12 +1283,42 @@ function initQuickLinksSection(meta) {
     }));
     listEl.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
       const i = parseInt(b.dataset.del, 10);
+      if (!confirm(`Remove "${links[i].label}"?`)) return;
       links.splice(i, 1);
+      if (editingIdx === i) resetForm();
       renderList();
     }));
   }
 
-  // Add new link
+  // Live preview when icon field changes
+  iconInput.addEventListener('input', updatePreview);
+
+  // File upload → encode as data URL → put into icon field
+  uploadInput.addEventListener('change', () => {
+    const file = uploadInput.files[0];
+    if (!file) return;
+    if (file.size > 200 * 1024) {
+      errEl.textContent = 'Image too large (max 200 KB). Resize it first.';
+      uploadInput.value = '';
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      errEl.textContent = 'Please choose an image file.';
+      uploadInput.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => {
+      iconInput.value = e.target.result;  // data URL
+      updatePreview();
+      errEl.textContent = '';
+    };
+    reader.onerror = () => { errEl.textContent = 'Could not read file.'; };
+    reader.readAsDataURL(file);
+    uploadInput.value = '';
+  });
+
+  // Add or save edit
   addBtn.addEventListener('click', () => {
     const icon  = iconInput.value.trim() || '🔗';
     const label = labelInput.value.trim();
@@ -1216,15 +1329,24 @@ function initQuickLinksSection(meta) {
       errEl.textContent = 'URL must start with https:// or http://';
       return;
     }
-    links.push({
-      id:    label.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30) + '-' + Date.now(),
-      label, url, icon
-    });
-    iconInput.value = '';
-    labelInput.value = '';
-    urlInput.value = '';
+
+    if (editingIdx !== null) {
+      // Edit existing
+      const existing = links[editingIdx];
+      links[editingIdx] = { ...existing, icon, label, url };
+    } else {
+      // Add new
+      links.push({
+        id:    label.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30) + '-' + Date.now(),
+        label, url, icon
+      });
+    }
+    resetForm();
     renderList();
   });
+
+  // Cancel editing
+  cancelBtn.addEventListener('click', resetForm);
 
   // Save to Firestore
   saveBtn.addEventListener('click', async () => {
@@ -1246,9 +1368,11 @@ function initQuickLinksSection(meta) {
   defaultsBtn.addEventListener('click', () => {
     if (!confirm('Replace current links with the default Lycée Montaigne set?')) return;
     links = structuredClone(DEFAULT_LINKS);
+    resetForm();
     renderList();
   });
 
+  resetForm();
   renderList();
 }
 
