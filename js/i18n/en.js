@@ -273,7 +273,7 @@ export const en = {
 
   // Notes section
   'portal.notes_title':           'My Notes',
-  'portal.notes.new':             'New note',
+  'portal.notes.new':             'New Note',
   'portal.notes.edit':            'Edit note',
   'portal.notes.title_field':     'Title',
   'portal.notes.title_placeholder': 'e.g., Class 5A login, Printer code',

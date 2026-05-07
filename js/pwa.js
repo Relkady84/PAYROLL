@@ -54,7 +54,12 @@ function registerSW() {
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (refreshing) return;
       refreshing = true;
-      location.reload();
+      // Append a cache-busting query param so the browser HTTP cache is bypassed
+      // on the immediate post-update reload (the browser sometimes still serves
+      // stale files even after SW activation).
+      const url = new URL(window.location.href);
+      url.searchParams.set('_t', Date.now().toString());
+      window.location.replace(url.href);
     });
   });
 }

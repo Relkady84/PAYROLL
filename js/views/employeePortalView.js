@@ -54,19 +54,19 @@ let _roleRegistry = null;
 let _academicYearsCache = {};   // yearId -> year doc, lazy-loaded
 
 // Default quick-launch tools shown on Home if the company hasn't configured custom ones.
-// Each entry has a `tKey` so the label translates dynamically based on the current language.
-// Icons are URLs (when available, official brand SVGs from Wikimedia) or emoji fallbacks.
+// Icons use simple-icons CDN for known brands (high-quality SVG) or Google's favicon
+// service for sites without a recognized brand icon (returns the site's own favicon).
 const DEFAULT_QUICK_LINKS = [
   { id: 'pronote',    tKey: 'quicklinks.pronote',    url: 'https://2050048n.index-education.net/pronote/',
-    icon: 'https://www.index-education.com/contenu/img/favicon-pronote.png' },
+    icon: 'https://www.google.com/s2/favicons?domain=2050048n.index-education.net&sz=64' },
   { id: 'website',    tKey: 'quicklinks.website',    url: 'https://www.lycee-montaigne.edu.lb/',
-    icon: '🌐' },
+    icon: 'https://www.google.com/s2/favicons?domain=lycee-montaigne.edu.lb&sz=64' },
   { id: 'outlook',    tKey: 'quicklinks.outlook',    url: 'https://outlook.office365.com/',
-    icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Microsoft_Office_Outlook_%282018%E2%80%93present%29.svg/240px-Microsoft_Office_Outlook_%282018%E2%80%93present%29.svg.png' },
+    icon: 'https://cdn.simpleicons.org/microsoftoutlook/0078D4' },
   { id: 'sharepoint', tKey: 'quicklinks.sharepoint', url: 'https://sharepoint-explorer.web.app/',
-    icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Microsoft_Office_SharePoint_%282019%E2%80%93present%29.svg/240px-Microsoft_Office_SharePoint_%282019%E2%80%93present%29.svg.png' },
+    icon: 'https://cdn.simpleicons.org/microsoftsharepoint/036C70' },
   { id: 'padlet',     tKey: 'quicklinks.padlet',     url: 'https://padlet.com/michelinechaaban/bonne-rentree-2025-ipmmo5sypaxr4pl7',
-    icon: '🎓' }
+    icon: 'https://www.google.com/s2/favicons?domain=padlet.com&sz=64' }
 ];
 
 // Resolve a link's display label — uses tKey for translation if present, else literal label
@@ -77,14 +77,14 @@ function linkLabel(link) {
 
 // Render the icon for a link — supports image URLs OR emoji
 function renderLinkIcon(icon) {
-  if (!icon) return '<div style="font-size:1.6rem;">🔗</div>';
+  if (!icon) return '<span style="font-size:1.6rem;">🔗</span>';
   if (/^https?:\/\//.test(icon)) {
+    // If the image fails to load, hide it and show 🔗 fallback emoji
     return `<img src="${esc(icon)}" alt="" referrerpolicy="no-referrer"
-              style="width:36px;height:36px;object-fit:contain;
-                     forced-color-adjust:none;filter:none;"
-              onerror="this.outerHTML='<div style=\\'font-size:1.6rem;\\'>🔗</div>'">`;
+              style="width:36px;height:36px;object-fit:contain;forced-color-adjust:none;filter:none;"
+              onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span style=&quot;font-size:1.6rem;&quot;>🔗</span>')">`;
   }
-  return `<div style="font-size:1.6rem;">${esc(icon)}</div>`;
+  return `<span style="font-size:1.6rem;">${esc(icon)}</span>`;
 }
 
 // Sub-tab state inside the Attendance section
@@ -838,14 +838,26 @@ function notesSectionHTML() {
   const sorted = [..._notes].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   return `
     <section class="ep-card">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
-        <div class="ep-card-title" style="margin:0;">🔐 ${esc(t('portal.notes_title'))}</div>
-        <button id="ep-note-new" class="ep-btn ep-btn-primary" style="padding:6px 12px;font-size:0.82rem;">
-          ➕ ${esc(t('portal.notes.new'))}
+      <!-- Header: title on one line + small blue + New Note button -->
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:nowrap;">
+        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          <span style="font-size:1.4rem;flex-shrink:0;">🔐</span>
+          <span style="font-weight:700;font-size:1.05rem;color:#1e293b;">${esc(t('portal.notes_title'))}</span>
+        </div>
+        <button id="ep-note-new"
+          style="flex-shrink:0;background:#2563eb;color:#fff;border:none;
+                 padding:6px 12px;border-radius:8px;font-size:0.78rem;font-weight:600;
+                 cursor:pointer;font-family:inherit;
+                 box-shadow:0 1px 3px rgba(37,99,235,0.3);
+                 transition:background 0.15s, transform 0.05s;"
+          onmouseover="this.style.background='#1d4ed8';"
+          onmouseout="this.style.background='#2563eb';">
+          + ${esc(t('portal.notes.new'))}
         </button>
       </div>
-      <p class="ep-card-sub">${esc(t('portal.notes.intro'))}</p>
-      <div style="font-size:0.72rem;color:#94a3b8;background:#fef9c3;border:1px solid #fef08a;border-radius:8px;padding:8px 10px;margin-bottom:14px;">
+
+      <p class="ep-card-sub" style="margin-bottom:10px;">${esc(t('portal.notes.intro'))}</p>
+      <div style="font-size:0.72rem;color:#92400e;background:#fef9c3;border:1px solid #fef08a;border-radius:8px;padding:8px 10px;margin-bottom:14px;">
         ⚠️ ${esc(t('portal.notes.warning'))}
       </div>
 
@@ -854,7 +866,7 @@ function notesSectionHTML() {
           ${sorted.map(n => noteCardHTML(n)).join('')}
         </div>
       ` : `
-        <div class="ep-empty" style="padding:18px;">
+        <div class="ep-empty" style="padding:24px;background:#f8fafc;border:1.5px dashed #cbd5e1;border-radius:12px;">
           <div class="ep-empty-icon">📝</div>
           <div class="ep-empty-text">${esc(t('portal.notes.empty'))}</div>
           <div class="ep-empty-sub">${esc(t('portal.notes.empty_sub'))}</div>
@@ -865,14 +877,29 @@ function notesSectionHTML() {
 }
 
 function noteCardHTML(n) {
-  const preview = (n.body || '').slice(0, 80).replace(/\s+/g, ' ');
+  const preview = (n.body || '').slice(0, 100).replace(/\s+/g, ' ');
   const updated = n.updatedAt ? new Date(n.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
   return `
     <div class="ep-note-card" data-note-id="${esc(n.id)}"
-      style="padding:12px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;cursor:pointer;">
-      <div style="font-weight:700;color:#1e293b;font-size:0.95rem;">${esc(n.title || t('portal.notes.untitled'))}</div>
-      ${preview ? `<div style="font-size:0.78rem;color:#64748b;margin-top:4px;line-height:1.4;">${esc(preview)}${(n.body || '').length > 80 ? '…' : ''}</div>` : ''}
-      ${updated ? `<div style="font-size:0.68rem;color:#94a3b8;margin-top:6px;">${updated}</div>` : ''}
+      style="padding:14px 16px;background:linear-gradient(180deg,#fff,#f8fafc);
+             border:1px solid #e2e8f0;border-left:4px solid #2563eb;border-radius:10px;
+             cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,0.03);
+             transition:transform 0.1s, box-shadow 0.1s, border-left-color 0.15s;"
+      onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 3px 8px rgba(0,0,0,0.06)';this.style.borderLeftColor='#1d4ed8';"
+      onmouseout="this.style.transform='';this.style.boxShadow='0 1px 2px rgba(0,0,0,0.03)';this.style.borderLeftColor='#2563eb';">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <div style="font-weight:700;color:#1e293b;font-size:0.95rem;flex:1;min-width:0;
+                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          ${esc(n.title || t('portal.notes.untitled'))}
+        </div>
+        <span style="color:#94a3b8;font-size:0.85rem;flex-shrink:0;">›</span>
+      </div>
+      ${preview ? `<div style="font-size:0.8rem;color:#64748b;margin-top:6px;line-height:1.45;
+                           display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+                           overflow:hidden;">${esc(preview)}${(n.body || '').length > 100 ? '…' : ''}</div>` : ''}
+      ${updated ? `<div style="font-size:0.68rem;color:#94a3b8;margin-top:8px;display:flex;align-items:center;gap:4px;">
+        🕐 ${updated}
+      </div>` : ''}
     </div>
   `;
 }
