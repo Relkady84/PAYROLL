@@ -1,12 +1,13 @@
-import { getEmployees, getSettings, getAbsenceRequests } from '../data/store.js';
+import { getEmployees, getSettings, getAbsenceRequests, getCompanyMetadata } from '../data/store.js';
 import { calculatePayroll, calculateTotals } from '../services/payroll.js';
 import { navigate } from '../router.js';
 import { t } from '../i18n.js';
 
-export function render(selector) {
+export async function render(selector) {
   const container = document.querySelector(selector);
   const settings  = getSettings();
   const employees = getEmployees();
+  const meta      = (await getCompanyMetadata()) || {};
   const rows      = calculatePayroll(employees, settings);
   const totals    = calculateTotals(rows);
 
@@ -50,6 +51,26 @@ export function render(selector) {
             </span>
           </div>
         ` : '';
+      })()}
+
+      ${(() => {
+        const FREQUENCY_DAYS = { daily: 1, weekly: 7, monthly: 30, never: null };
+        const schedule = meta.backupSchedule || 'never';
+        const dueDays  = FREQUENCY_DAYS[schedule];
+        const lastBackup = meta.lastBackupAt;
+        if (!dueDays) return ''; // 'never' or unset → no reminder
+        const daysSince = lastBackup
+          ? Math.floor((Date.now() - lastBackup) / (1000 * 60 * 60 * 24))
+          : 999;
+        if (daysSince < dueDays) return '';
+        return `
+          <div class="alert alert-warning" style="margin-bottom:20px;">
+            <span>💾</span>
+            <span><strong>Backup overdue</strong> — last download ${lastBackup ? daysSince + ' days ago' : 'never'}.
+              <a href="#settings" style="color:inherit;font-weight:600;text-decoration:underline;">Download now →</a>
+            </span>
+          </div>
+        `;
       })()}
 
       <div class="stat-cards">

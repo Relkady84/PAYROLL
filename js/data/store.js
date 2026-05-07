@@ -493,6 +493,36 @@ export async function createUserRecord(uid, data) {
   await setDoc(doc(db, 'users', uid), data);
 }
 
+// ── Company-level backup metadata ─────────────────────────
+// Stored at /companies/{X}/metadata/info under fields:
+//   backupSchedule:    'never' | 'daily' | 'weekly' | 'monthly'
+//   lastBackupAt:      timestamp (ms since epoch) — when admin last clicked "Download backup"
+export async function setCompanyBackupSchedule(schedule) {
+  await updateCompanyMetadata({ backupSchedule: schedule });
+}
+
+export async function recordBackupTaken() {
+  await updateCompanyMetadata({ lastBackupAt: Date.now() });
+}
+
+/**
+ * Bundle the company's data into a single object for export.
+ * Reads from in-memory caches — call after initStore() so data is loaded.
+ */
+export function buildCompanyBackup() {
+  return {
+    exportedAt:       new Date().toISOString(),
+    companyId:        _companyId,
+    settings:         _settings,
+    calendar:         _calendar,
+    academicYears:    _academicYears,
+    roleRegistry:     _roleRegistry,
+    employees:        _employees,
+    absenceRequests:  _absenceRequests,
+    schemaVersion:    1
+  };
+}
+
 // ── Personal Notes (private to each user) ─────────────────
 // Stored at /users/{uid}/notes/{noteId}. Firestore rules ensure ONLY the user
 // can read/write their own notes — not even company admin or super admin.

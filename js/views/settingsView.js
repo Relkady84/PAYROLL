@@ -4,7 +4,8 @@ import {
   getCalendar, saveCalendar,
   getAcademicYears, getCurrentAcademicYear, getCurrentAcademicYearId,
   saveAcademicYear, setCurrentAcademicYear, deleteAcademicYear,
-  getRoleRegistry, saveRoleRegistry
+  getRoleRegistry, saveRoleRegistry,
+  setCompanyBackupSchedule, recordBackupTaken, buildCompanyBackup
 } from '../data/store.js';
 import { validateSettings, normalizeSettings, denormalizeSettings } from '../models/settings.js';
 import {
@@ -44,6 +45,7 @@ export async function render(selector) {
       <button type="button" class="settings-tab" data-tab="calendar">${esc(t('settings.tab.calendar'))}</button>
       <button type="button" class="settings-tab" data-tab="academic">${esc(t('settings.tab.academic'))}</button>
       <button type="button" class="settings-tab" data-tab="global">${esc(t('settings.tab.global'))}</button>
+      <button type="button" class="settings-tab" data-tab="backup">${esc(t('settings.tab.backup'))}</button>
       <button type="button" class="settings-tab" data-tab="language">${esc(t('settings.tab.language'))}</button>
     </div>
 
@@ -337,6 +339,49 @@ export async function render(selector) {
               like "Service Financier" inherit their tax/NFS rates from the chosen tax category.</span>
           </div>
 
+        </div>
+      </div>
+
+      <!-- Backup -->
+      <div class="section-card settings-pane" data-pane="backup" style="margin-bottom:20px;">
+        <div class="section-card-header">
+          <span class="section-card-title">${esc(t('settings.section.backup'))}</span>
+        </div>
+        <div class="section-card-body">
+
+          <div class="alert alert-info" style="margin-bottom:14px;">
+            <span>ℹ</span>
+            <span>${esc(t('settings.backup.info'))}</span>
+          </div>
+
+          <div id="backup-status" style="margin-bottom:14px;"></div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">${esc(t('settings.backup.frequency'))}</label>
+              <select class="form-control" id="backup-frequency">
+                <option value="never">${esc(t('settings.backup.freq.never'))}</option>
+                <option value="daily">${esc(t('settings.backup.freq.daily'))}</option>
+                <option value="weekly">${esc(t('settings.backup.freq.weekly'))}</option>
+                <option value="monthly">${esc(t('settings.backup.freq.monthly'))}</option>
+              </select>
+              <span class="form-hint">${esc(t('settings.backup.freq_hint'))}</span>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;padding-top:8px;">
+            <button type="button" class="btn btn-primary" id="backup-download-btn">
+              📥 ${esc(t('settings.backup.download'))}
+            </button>
+            <button type="button" class="btn btn-secondary" id="backup-save-freq-btn">
+              💾 ${esc(t('settings.backup.save_freq'))}
+            </button>
+          </div>
+
+          <div style="margin-top:18px;padding:12px;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;font-size:0.82rem;">
+            <strong>💡 ${esc(t('settings.backup.tip_title'))}</strong><br>
+            ${esc(t('settings.backup.tip_body'))}
+          </div>
         </div>
       </div>
 
@@ -711,6 +756,9 @@ export async function render(selector) {
   initAcademicYearSection();
   initRolesSection();
 
+  // ── Backup ─────────────────────────────────────────────
+  initBackupSection(meta);
+
   // Convert fuel price value when switching currency (USD ↔ LBP)
   container.querySelectorAll('[name="fuelPriceCurrency"]').forEach(radio => {
     radio.addEventListener('change', () => {
@@ -872,6 +920,113 @@ function handleSave(container) {
   const settings = denormalizeSettings(getSettings());
   const hint = form.querySelector('#exchangeRate').closest('.form-group').querySelector('.form-hint');
   if (hint) hint.textContent = `Current rate: 1 USD = ${settings.exchangeRate.toLocaleString()} LBP`;
+}
+
+// ── Backup section logic ───────────────────────────────────
+function initBackupSection(meta) {
+  const FREQUENCY_DAYS = { daily: 1, weekly: 7, monthly: 30, never: null };
+
+  const freqSelect = document.getElementById('backup-frequency');
+  const dlBtn      = document.getElementById('backup-download-btn');
+  const saveBtn    = document.getElementById('backup-save-freq-btn');
+
+  if (!freqSelect || !dlBtn || !saveBtn) return;
+
+  // Initialize from current company metadata
+  let currentSchedule = meta?.backupSchedule || 'never';
+  freqSelect.value = currentSchedule;
+
+  function refreshStatus() {
+    const wrap = document.getElementById('backup-status');
+    if (!wrap) return;
+
+    // Re-fetch latest from cache (set after a backup)
+    const lastBackup = meta?.lastBackupAt;
+
+    if (!lastBackup) {
+      wrap.innerHTML = `
+        <div style="padding:10px 12px;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;font-size:0.85rem;color:#92400e;">
+          ⚠️ ${esc(t('settings.backup.never_taken'))}
+        </div>
+      `;
+      return;
+    }
+
+    const days = Math.floor((Date.now() - lastBackup) / (1000 * 60 * 60 * 24));
+    const dueDays = FREQUENCY_DAYS[currentSchedule];
+    const isOverdue = dueDays !== null && days >= dueDays;
+
+    const lastDate = new Date(lastBackup).toLocaleDateString();
+    if (isOverdue) {
+      wrap.innerHTML = `
+        <div style="padding:10px 12px;background:#fee2e2;border:1px solid #fecaca;border-radius:8px;font-size:0.85rem;color:#991b1b;">
+          🔴 ${esc(t('settings.backup.overdue', { days, last: lastDate }))}
+        </div>
+      `;
+    } else {
+      wrap.innerHTML = `
+        <div style="padding:10px 12px;background:#dcfce7;border:1px solid #bbf7d0;border-radius:8px;font-size:0.85rem;color:#166534;">
+          ✅ ${esc(t('settings.backup.ok', { days, last: lastDate }))}
+        </div>
+      `;
+    }
+  }
+
+  // Save the chosen frequency
+  saveBtn.addEventListener('click', async () => {
+    const newSchedule = freqSelect.value;
+    saveBtn.disabled = true;
+    saveBtn.textContent = '...';
+    try {
+      await setCompanyBackupSchedule(newSchedule);
+      currentSchedule = newSchedule;
+      meta = { ...meta, backupSchedule: newSchedule };
+      showToast(t('settings.backup.freq_saved'), 'success');
+      refreshStatus();
+    } catch (e) {
+      console.error(e);
+      showToast(t('settings.backup.save_failed'), 'error');
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = '💾 ' + t('settings.backup.save_freq');
+    }
+  });
+
+  // Download backup
+  dlBtn.addEventListener('click', async () => {
+    dlBtn.disabled = true;
+    const originalText = dlBtn.textContent;
+    dlBtn.textContent = '...';
+    try {
+      const data = buildCompanyBackup();
+      const filename = `payroll-backup-${data.companyId || 'company'}-${new Date().toISOString().slice(0, 10)}.json`;
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+
+      // Trigger download
+      const url = URL.createObjectURL(blob);
+      const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      // Record in Firestore
+      await recordBackupTaken();
+      meta = { ...meta, lastBackupAt: Date.now() };
+      showToast(t('settings.backup.downloaded'), 'success');
+      refreshStatus();
+    } catch (e) {
+      console.error(e);
+      showToast(t('settings.backup.download_failed'), 'error');
+    } finally {
+      dlBtn.disabled = false;
+      dlBtn.textContent = originalText;
+    }
+  });
+
+  // Initial render
+  refreshStatus();
 }
 
 // ── Settings tabs ──────────────────────────────────────────
