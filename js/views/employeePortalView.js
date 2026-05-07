@@ -54,19 +54,32 @@ let _roleRegistry = null;
 let _academicYearsCache = {};   // yearId -> year doc, lazy-loaded
 
 // Default quick-launch tools shown on Home if the company hasn't configured custom ones.
-// Icons use simple-icons CDN for known brands (high-quality SVG) or Google's favicon
-// service for sites without a recognized brand icon (returns the site's own favicon).
+// All icons are inline SVG data URLs — guaranteed to load offline, no CSP/CORS/network issues.
+function svgDataUrl(svgText) {
+  // URL-encode rather than base64 — smaller and works without btoa
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svgText);
+}
+
+// Brand SVGs (using the simple-icons paths, color-fill the brand color)
+const SVG_OUTLOOK = svgDataUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="4" fill="#0078D4"/><path fill="#fff" d="M7 10.5q-.5 0-.85.4t-.35 1.1q0 .7.35 1.1.35.4.85.4t.85-.4q.35-.4.35-1.1 0-.7-.35-1.1Q7.5 10.5 7 10.5zM7 9q1.1 0 1.85.85.75.85.75 2.15 0 1.3-.75 2.15Q8.1 15 7 15q-1.1 0-1.85-.85Q4.4 13.3 4.4 12q0-1.3.75-2.15Q5.9 9 7 9zm6 1.5h-2v-1l3-1V18h-1v-7.5z"/></svg>`);
+
+const SVG_SHAREPOINT = svgDataUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="4" fill="#036C70"/><path fill="#fff" d="M11.5 7c2.5 0 4 1.4 4 3.5 0 2.4-2 3.6-4.5 3.6h-.5V17H8.5V7h3zm-.5 5.6h.4c1.5 0 2.4-.6 2.4-1.9 0-1.2-.8-1.8-2.3-1.8H11v3.7z"/></svg>`);
+
+// Letter-based icon helper — colored square with a white letter (used for sites without a brand SVG)
+function letterIcon(letter, bgColor) {
+  return svgDataUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="4" fill="${bgColor}"/><text x="12" y="17" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="14" fill="#fff">${letter}</text></svg>`);
+}
+
+const SVG_PRONOTE = letterIcon('P', '#16a34a');   // green
+const SVG_PADLET  = letterIcon('P', '#ea580c');   // orange
+const SVG_SCHOOL  = letterIcon('🏫', '#1e3a8a');  // blue with school emoji
+
 const DEFAULT_QUICK_LINKS = [
-  { id: 'pronote',    tKey: 'quicklinks.pronote',    url: 'https://2050048n.index-education.net/pronote/',
-    icon: 'https://www.google.com/s2/favicons?domain=2050048n.index-education.net&sz=64' },
-  { id: 'website',    tKey: 'quicklinks.website',    url: 'https://www.lycee-montaigne.edu.lb/',
-    icon: 'https://www.google.com/s2/favicons?domain=lycee-montaigne.edu.lb&sz=64' },
-  { id: 'outlook',    tKey: 'quicklinks.outlook',    url: 'https://outlook.office365.com/',
-    icon: 'https://cdn.simpleicons.org/microsoftoutlook/0078D4' },
-  { id: 'sharepoint', tKey: 'quicklinks.sharepoint', url: 'https://sharepoint-explorer.web.app/',
-    icon: 'https://cdn.simpleicons.org/microsoftsharepoint/036C70' },
-  { id: 'padlet',     tKey: 'quicklinks.padlet',     url: 'https://padlet.com/michelinechaaban/bonne-rentree-2025-ipmmo5sypaxr4pl7',
-    icon: 'https://www.google.com/s2/favicons?domain=padlet.com&sz=64' }
+  { id: 'pronote',    tKey: 'quicklinks.pronote',    url: 'https://2050048n.index-education.net/pronote/', icon: SVG_PRONOTE },
+  { id: 'website',    tKey: 'quicklinks.website',    url: 'https://www.lycee-montaigne.edu.lb/',          icon: SVG_SCHOOL },
+  { id: 'outlook',    tKey: 'quicklinks.outlook',    url: 'https://outlook.office365.com/',               icon: SVG_OUTLOOK },
+  { id: 'sharepoint', tKey: 'quicklinks.sharepoint', url: 'https://sharepoint-explorer.web.app/',         icon: SVG_SHAREPOINT },
+  { id: 'padlet',     tKey: 'quicklinks.padlet',     url: 'https://padlet.com/michelinechaaban/bonne-rentree-2025-ipmmo5sypaxr4pl7', icon: SVG_PADLET }
 ];
 
 // Resolve a link's display label — uses tKey for translation if present, else literal label

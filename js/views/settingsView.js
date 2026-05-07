@@ -899,32 +899,33 @@ export function _applySidebarLogo(logoUrl) {
   const el = document.getElementById('sidebar-logo-icon');
   if (!el) return;
   if (logoUrl) {
-    // Wrap in a div with a stable white background + forced-color-adjust:none
-    // so Windows High Contrast / browser auto-dark-mode CAN'T touch the image.
-    // The wrapper guarantees the logo sits on a fixed white background regardless
-    // of the dark sidebar behind it.
-    el.innerHTML = '';
-    const wrapper = document.createElement('div');
-    wrapper.style.cssText = `
-      width:40px;height:40px;background:#fff;border-radius:8px;
-      display:flex;align-items:center;justify-content:center;padding:3px;
+    // Apply white-bg + color-protection styles DIRECTLY to the existing
+    // sidebar-logo-icon element (parent), so any external CSS sizing it
+    // also gets the white background. Belt-and-suspenders approach with
+    // every known dark-mode-suppression CSS property.
+    el.style.cssText = `
+      background:#fff !important;
+      border-radius:8px;
+      padding:3px;
       box-sizing:border-box;
-      forced-color-adjust:none;-webkit-forced-color-adjust:none;
-      filter:none !important;-webkit-filter:none !important;
-      isolation:isolate;color-scheme:light;
+      display:flex;align-items:center;justify-content:center;
+      forced-color-adjust:none !important;
+      -webkit-forced-color-adjust:none !important;
+      filter:none !important;
+      -webkit-filter:none !important;
+      isolation:isolate;
+      color-scheme:light only;
+      mix-blend-mode:normal;
     `;
-    const img = document.createElement('img');
-    img.src = logoUrl;
-    img.alt = 'Logo';
-    img.referrerPolicy = 'no-referrer';
-    img.style.cssText = `
-      max-width:100%;max-height:100%;object-fit:contain;
-      forced-color-adjust:none;-webkit-forced-color-adjust:none;
-      filter:none !important;-webkit-filter:none !important;
+    el.innerHTML = `
+      <img src="${logoUrl.replace(/"/g, '%22')}" alt="Logo"
+           referrerpolicy="no-referrer"
+           style="max-width:100%;max-height:100%;object-fit:contain;
+                  forced-color-adjust:none !important;filter:none !important;">
     `;
-    wrapper.appendChild(img);
-    el.appendChild(wrapper);
   } else {
+    // Reset any logo-image styles when reverting to the default emoji
+    el.style.cssText = '';
     el.textContent = '💼';
   }
 }
