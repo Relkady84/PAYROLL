@@ -88,15 +88,17 @@ function linkLabel(link) {
   return link.label || '';
 }
 
-// Render the icon for a link — supports image URLs OR emoji
+// Render the icon for a link — supports image URLs (http(s):), inline SVG (data:), OR emoji
 function renderLinkIcon(icon) {
   if (!icon) return '<span style="font-size:1.6rem;">🔗</span>';
-  if (/^https?:\/\//.test(icon)) {
+  // Detect any image source (http URL or inline data URL)
+  if (/^(https?:|data:)/.test(icon)) {
     // If the image fails to load, hide it and show 🔗 fallback emoji
     return `<img src="${esc(icon)}" alt="" referrerpolicy="no-referrer"
               style="width:36px;height:36px;object-fit:contain;forced-color-adjust:none;filter:none;"
               onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span style=&quot;font-size:1.6rem;&quot;>🔗</span>')">`;
   }
+  // Otherwise treat as emoji/text
   return `<span style="font-size:1.6rem;">${esc(icon)}</span>`;
 }
 
