@@ -242,6 +242,9 @@ export const en = {
   'portal.drawer.payslip':    'My Pay Slip',
   'portal.drawer.history':    'Attendance History',
   'portal.drawer.notes':      'My Notes',
+  'portal.theme.light':       'Light',
+  'portal.theme.dark':        'Dark',
+  'portal.theme.auto':        'Auto',
 
   // Home dashboard
   'portal.home.days_month':       'days this month',

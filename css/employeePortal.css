@@ -574,3 +574,51 @@ textarea.ep-input {
   letter-spacing: 0.04em;
   margin-top: 2px;
 }
+
+/* ── Employee portal dark theme overrides ───────────────── */
+:root[data-theme="dark"] .ep-portal {
+  background: #0f172a;
+  color: #f1f5f9;
+}
+:root[data-theme="dark"] .ep-card {
+  background: #1e293b;
+  color: #f1f5f9;
+  border: 1px solid #334155;
+}
+:root[data-theme="dark"] .ep-card-title { color: #f1f5f9; }
+:root[data-theme="dark"] .ep-card-sub   { color: #94a3b8; }
+:root[data-theme="dark"] .ep-stat       { background: #0f172a; border-color: #334155; }
+:root[data-theme="dark"] .ep-stat-value { color: #f1f5f9; }
+:root[data-theme="dark"] .ep-stat-label { color: #94a3b8; }
+:root[data-theme="dark"] .ep-empty-text { color: #f1f5f9; }
+:root[data-theme="dark"] .ep-empty-sub  { color: #94a3b8; }
+
+/* Form controls inside the portal */
+:root[data-theme="dark"] .ep-portal input,
+:root[data-theme="dark"] .ep-portal select,
+:root[data-theme="dark"] .ep-portal textarea {
+  background: #0f172a;
+  color: #f1f5f9;
+  border-color: #334155;
+}
+:root[data-theme="dark"] .ep-portal input::placeholder,
+:root[data-theme="dark"] .ep-portal textarea::placeholder { color: #64748b; }
+
+/* Quick-tools tiles & action buttons */
+:root[data-theme="dark"] .ep-portal a[href][target="_blank"] {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+:root[data-theme="dark"] .ep-portal .ep-btn:not(.ep-btn-primary) {
+  background: #334155;
+  color: #f1f5f9;
+}
+
+/* Drawer stays dark already, but ensure footer buttons read correctly */
+:root[data-theme="dark"] .ep-drawer-footer button[data-lang],
+:root[data-theme="dark"] .ep-drawer-footer button[data-theme-opt] {
+  background: #1e293b;
+  color: #cbd5e1;
+  border-color: #334155;
+}

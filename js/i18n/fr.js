@@ -242,6 +242,9 @@ export const fr = {
   'portal.drawer.payslip':    'Fiche de paie',
   'portal.drawer.history':    'Historique',
   'portal.drawer.notes':      'Mes notes',
+  'portal.theme.light':       'Clair',
+  'portal.theme.dark':        'Sombre',
+  'portal.theme.auto':        'Auto',
 
   // Home dashboard
   'portal.home.days_month':       'jours ce mois',

@@ -40,6 +40,7 @@ import { calculateNetSalary, computeEffectiveDays } from '../services/payroll.js
 import { signOutUser } from '../auth.js';
 import { t, getLanguage, setLanguage, SUPPORTED_LANGUAGES } from '../i18n.js';
 import { showToast } from './components/toast.js';
+import { applyAppTheme } from './settingsView.js';
 
 // ── State ─────────────────────────────────────────────
 let _user        = null;
@@ -250,6 +251,35 @@ function sectionTitle(section) {
   return t('portal.title');
 }
 
+// Returns the currently saved theme preference: 'light' | 'dark' | 'auto'
+function currentThemePref() {
+  try { return localStorage.getItem('app-theme') || 'light'; } catch { return 'light'; }
+}
+
+// Theme picker row shown in the drawer footer
+function themePickerRowHTML() {
+  const cur = currentThemePref();
+  const opts = [
+    { id: 'light', icon: '☀️', label: t('portal.theme.light') || 'Light' },
+    { id: 'dark',  icon: '🌙', label: t('portal.theme.dark')  || 'Dark'  },
+    { id: 'auto',  icon: '🖥', label: t('portal.theme.auto')  || 'Auto'  },
+  ];
+  return `
+    <div style="display:flex;justify-content:center;gap:6px;margin-bottom:10px;">
+      ${opts.map(o => `
+        <button type="button" data-theme-opt="${o.id}"
+          style="padding:4px 10px;border:1.5px solid ${cur === o.id ? '#2563eb' : '#e2e8f0'};
+                 border-radius:6px;background:${cur === o.id ? '#dbeafe' : '#fff'};
+                 color:${cur === o.id ? '#1e40af' : '#64748b'};
+                 font-size:0.72rem;font-weight:600;cursor:pointer;font-family:inherit;
+                 display:inline-flex;align-items:center;gap:4px;">
+          <span>${o.icon}</span><span>${esc(o.label)}</span>
+        </button>
+      `).join('')}
+    </div>
+  `;
+}
+
 // ── Drawer (slide-out menu) ──────────────────────────────
 function drawerHTML() {
   const fullName = `${_employee.firstName || ''} ${_employee.lastName || ''}`.trim();
@@ -286,6 +316,7 @@ function drawerHTML() {
       </nav>
 
       <div class="ep-drawer-footer">
+        ${themePickerRowHTML()}
         <div style="display:flex;justify-content:center;gap:6px;margin-bottom:10px;">
           ${SUPPORTED_LANGUAGES.map(lang => `
             <button type="button" data-lang="${lang.code}"
@@ -1040,6 +1071,14 @@ function bindGlobalEvents() {
   // Language picker
   document.querySelectorAll('.ep-drawer-footer [data-lang]').forEach(btn => {
     btn.addEventListener('click', () => setLanguage(btn.dataset.lang));
+  });
+
+  // Theme picker (Light / Dark / Auto)
+  document.querySelectorAll('.ep-drawer-footer [data-theme-opt]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      applyAppTheme(btn.dataset.themeOpt);
+      draw();   // re-render the drawer so the active button updates
+    });
   });
 
   // Sign out
