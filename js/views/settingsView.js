@@ -103,6 +103,39 @@ export async function render(selector) {
           <button type="button" id="save-profile-btn" class="btn btn-primary">
             💾 Save Company Profile
           </button>
+
+          <!-- Quick Links — shown on Employee Portal Home page -->
+          <div class="settings-section" style="margin-top:24px;border-top:1px solid var(--color-border);padding-top:18px;">
+            <div class="settings-section-title">🔗 Quick Links (Employee Portal Home)</div>
+            <div class="alert alert-info" style="margin-bottom:12px;">
+              <span>ℹ</span>
+              <span>These tiles appear on the Employee Portal home page. Each opens in a new tab.</span>
+            </div>
+
+            <div id="quicklinks-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;"></div>
+
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;background:#f8fafc;padding:12px;border-radius:8px;">
+              <div style="flex:0 0 70px;">
+                <label class="form-label" style="font-size:0.78rem;">Icon</label>
+                <input type="text" class="form-control" id="ql-add-icon" maxlength="4" placeholder="📚" style="text-align:center;font-size:1.1rem;">
+              </div>
+              <div style="flex:1 1 160px;">
+                <label class="form-label" style="font-size:0.78rem;">Label</label>
+                <input type="text" class="form-control" id="ql-add-label" maxlength="40" placeholder="e.g., Pronote">
+              </div>
+              <div style="flex:2 1 220px;">
+                <label class="form-label" style="font-size:0.78rem;">URL</label>
+                <input type="url" class="form-control" id="ql-add-url" placeholder="https://...">
+              </div>
+              <button type="button" class="btn btn-secondary" id="ql-add-btn">+ Add</button>
+            </div>
+            <div id="ql-add-error" style="font-size:0.78rem;color:var(--color-danger);margin-top:6px;min-height:18px;"></div>
+
+            <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
+              <button type="button" class="btn btn-primary" id="ql-save-btn">💾 Save Quick Links</button>
+              <button type="button" class="btn btn-secondary" id="ql-defaults-btn">↺ Restore default links</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -764,6 +797,9 @@ export async function render(selector) {
   // ── Backup ─────────────────────────────────────────────
   initBackupSection(meta);
 
+  // ── Quick Links manager ────────────────────────────────
+  initQuickLinksSection(meta);
+
   // Convert fuel price value when switching currency (USD ↔ LBP)
   container.querySelectorAll('[name="fuelPriceCurrency"]').forEach(radio => {
     radio.addEventListener('change', () => {
@@ -1085,6 +1121,115 @@ function initBackupSection(meta) {
 
   // Initial render
   refreshStatus();
+}
+
+// ── Quick Links manager (Company Profile section) ─────────
+function initQuickLinksSection(meta) {
+  const DEFAULT_LINKS = [
+    { id: 'pronote',    label: 'Pronote',         url: 'https://2050048n.index-education.net/pronote/', icon: '📚' },
+    { id: 'website',    label: 'School Website',  url: 'https://www.lycee-montaigne.edu.lb/',          icon: '🌐' },
+    { id: 'outlook',    label: 'Outlook',         url: 'https://outlook.office365.com/',               icon: '📧' },
+    { id: 'sharepoint', label: 'SharePoint',      url: 'https://sharepoint-explorer.web.app/',         icon: '📁' },
+    { id: 'padlet',     label: 'Padlet',          url: 'https://padlet.com/michelinechaaban/bonne-rentree-2025-ipmmo5sypaxr4pl7', icon: '🎓' }
+  ];
+
+  let links = Array.isArray(meta?.quickLinks) && meta.quickLinks.length
+    ? structuredClone(meta.quickLinks)
+    : structuredClone(DEFAULT_LINKS);
+
+  const listEl    = document.getElementById('quicklinks-list');
+  const iconInput = document.getElementById('ql-add-icon');
+  const labelInput= document.getElementById('ql-add-label');
+  const urlInput  = document.getElementById('ql-add-url');
+  const errEl     = document.getElementById('ql-add-error');
+  const addBtn    = document.getElementById('ql-add-btn');
+  const saveBtn   = document.getElementById('ql-save-btn');
+  const defaultsBtn = document.getElementById('ql-defaults-btn');
+
+  if (!listEl) return;
+
+  function renderList() {
+    if (!links.length) {
+      listEl.innerHTML = `<div style="padding:14px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;text-align:center;color:#94a3b8;font-size:0.85rem;">No quick links yet.</div>`;
+      return;
+    }
+    listEl.innerHTML = links.map((link, i) => `
+      <div style="display:flex;gap:10px;align-items:center;padding:10px 12px;background:#f8fafc;border:1px solid var(--color-border);border-radius:8px;">
+        <div style="font-size:1.4rem;flex-shrink:0;width:32px;text-align:center;">${esc(link.icon || '🔗')}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;font-size:0.9rem;">${esc(link.label)}</div>
+          <div style="font-size:0.72rem;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(link.url)}</div>
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0;">
+          <button type="button" class="btn btn-secondary btn-sm" data-up="${i}"   ${i === 0 ? 'disabled' : ''} title="Move up">↑</button>
+          <button type="button" class="btn btn-secondary btn-sm" data-down="${i}" ${i === links.length - 1 ? 'disabled' : ''} title="Move down">↓</button>
+          <button type="button" class="btn btn-danger btn-sm" data-del="${i}" title="Remove">🗑</button>
+        </div>
+      </div>
+    `).join('');
+
+    listEl.querySelectorAll('[data-up]').forEach(b => b.addEventListener('click', () => {
+      const i = parseInt(b.dataset.up, 10);
+      if (i > 0) [links[i - 1], links[i]] = [links[i], links[i - 1]];
+      renderList();
+    }));
+    listEl.querySelectorAll('[data-down]').forEach(b => b.addEventListener('click', () => {
+      const i = parseInt(b.dataset.down, 10);
+      if (i < links.length - 1) [links[i + 1], links[i]] = [links[i], links[i + 1]];
+      renderList();
+    }));
+    listEl.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
+      const i = parseInt(b.dataset.del, 10);
+      links.splice(i, 1);
+      renderList();
+    }));
+  }
+
+  // Add new link
+  addBtn.addEventListener('click', () => {
+    const icon  = iconInput.value.trim() || '🔗';
+    const label = labelInput.value.trim();
+    const url   = urlInput.value.trim();
+    errEl.textContent = '';
+    if (!label) { errEl.textContent = 'Label is required.'; return; }
+    if (!url || !/^https?:\/\//.test(url)) {
+      errEl.textContent = 'URL must start with https:// or http://';
+      return;
+    }
+    links.push({
+      id:    label.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30) + '-' + Date.now(),
+      label, url, icon
+    });
+    iconInput.value = '';
+    labelInput.value = '';
+    urlInput.value = '';
+    renderList();
+  });
+
+  // Save to Firestore
+  saveBtn.addEventListener('click', async () => {
+    saveBtn.disabled = true;
+    saveBtn.textContent = '...';
+    try {
+      await updateCompanyMetadata({ quickLinks: links });
+      showToast('Quick links saved.', 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to save quick links.', 'error');
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = '💾 Save Quick Links';
+    }
+  });
+
+  // Restore defaults
+  defaultsBtn.addEventListener('click', () => {
+    if (!confirm('Replace current links with the default Lycée Montaigne set?')) return;
+    links = structuredClone(DEFAULT_LINKS);
+    renderList();
+  });
+
+  renderList();
 }
 
 // ── Settings tabs ──────────────────────────────────────────

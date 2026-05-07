@@ -46,10 +46,23 @@ let _employee    = null;
 let _companyId   = null;
 let _companyName = '';
 let _companyLogo = '';
+let _quickLinks  = null;        // [{ label, url, icon }, ...] from company metadata, or defaults
 let _settings    = null;
 let _calendar    = null;
 let _roleRegistry = null;
 let _academicYearsCache = {};   // yearId -> year doc, lazy-loaded
+
+// Default quick-launch tools shown on Home if the company hasn't configured custom ones
+const DEFAULT_QUICK_LINKS = [
+  { id: 'pronote',    label: 'Pronote',           url: 'https://2050048n.index-education.net/pronote/', icon: '📚' },
+  { id: 'website',    label: 'School Website',    url: 'https://www.lycee-montaigne.edu.lb/',          icon: '🌐' },
+  { id: 'outlook',    label: 'Outlook',           url: 'https://outlook.office365.com/',               icon: '📧' },
+  { id: 'sharepoint', label: 'SharePoint',        url: 'https://sharepoint-explorer.web.app/',         icon: '📁' },
+  { id: 'padlet',     label: 'Padlet',            url: 'https://padlet.com/michelinechaaban/bonne-rentree-2025-ipmmo5sypaxr4pl7', icon: '🎓' }
+];
+
+// Sub-tab state inside the Attendance section
+let _attendanceTab = 'request';   // 'request' | 'history'
 
 let _section     = 'home';            // 'home' | 'payslip' | 'history'
 let _drawerOpen  = false;
@@ -116,6 +129,9 @@ export async function renderEmployeePortal({ user, companyId, employeeId }) {
   _employee     = emp;
   _companyName  = meta?.name    || '—';
   _companyLogo  = meta?.logoUrl || '';
+  _quickLinks   = (Array.isArray(meta?.quickLinks) && meta.quickLinks.length)
+    ? meta.quickLinks
+    : DEFAULT_QUICK_LINKS;
   _settings     = settings;
   _calendar     = calendar;
   _roleRegistry = roleRegistry;
@@ -152,9 +168,9 @@ function draw() {
 }
 
 function renderSection() {
-  if (_section === 'payslip') return paySlipSectionHTML();
-  if (_section === 'history') return historySectionHTML();
-  if (_section === 'notes')   return notesSectionHTML();
+  if (_section === 'payslip')    return paySlipSectionHTML();
+  if (_section === 'attendance') return attendanceSectionHTML();
+  if (_section === 'notes')      return notesSectionHTML();
   return homeSectionHTML();
 }
 
@@ -179,9 +195,9 @@ function headerHTML() {
 }
 
 function sectionTitle(section) {
-  if (section === 'payslip') return t('portal.payslip_title');
-  if (section === 'history') return t('portal.history_title');
-  if (section === 'notes')   return t('portal.notes_title');
+  if (section === 'payslip')    return t('portal.payslip_title');
+  if (section === 'attendance') return t('portal.attendance_title');
+  if (section === 'notes')      return t('portal.notes_title');
   return t('portal.title');
 }
 
@@ -214,10 +230,10 @@ function drawerHTML() {
       </div>
 
       <nav class="ep-drawer-nav">
-        ${item('home',    '🏠', t('portal.drawer.home'))}
-        ${item('payslip', '💰', t('portal.drawer.payslip'))}
-        ${item('history', '📋', t('portal.drawer.history'))}
-        ${item('notes',   '🔐', t('portal.drawer.notes'))}
+        ${item('home',       '🏠', t('portal.drawer.home'))}
+        ${item('attendance', '📅', t('portal.drawer.attendance'))}
+        ${item('payslip',    '💰', t('portal.drawer.payslip'))}
+        ${item('notes',      '🔐', t('portal.drawer.notes'))}
       </nav>
 
       <div class="ep-drawer-footer">
@@ -239,21 +255,128 @@ function drawerHTML() {
   `;
 }
 
-// ── Section: HOME ────────────────────────────────────────
+// ── Section: HOME (dashboard) ────────────────────────────
 function homeSectionHTML() {
-  const requests = [...getAbsenceRequests()]
-    .sort((a, b) => (b.requestedAt || 0) - (a.requestedAt || 0))
-    .slice(0, 5); // recent only — full list lives in History
+  const all      = getAbsenceRequests();
+  const pending  = all.filter(r => r.status === 'pending').length;
+  const approved = all.filter(r => r.status === 'approved').length;
+
+  // Days for current month
+  const now      = new Date();
+  const monthIdx = now.getMonth() + 1;
+  const yr       = now.getFullYear();
+  let daysThisMonth = 0;
+  let daysTotal     = _settings?.workingDaysPerMonth || 22;
+  try {
+    const probe   = `${yr}-${String(monthIdx).padStart(2, '0')}-15`;
+    const candId  = monthIdx >= 8 ? `${yr}-${yr + 1}` : `${yr - 1}-${yr}`;
+    const ay      = _academicYearsCache[candId] || null;
+    const bd      = computeEffectiveDays({
+      employee:        _employee,
+      calendar:        _calendar,
+      absenceRequests: all,
+      year:            yr,
+      month:           monthIdx,
+      academicYear:    ay,
+      roleRegistry:    _roleRegistry
+    });
+    daysThisMonth = bd.days;
+    daysTotal     = bd.calendarDays || daysTotal;
+  } catch {}
+
+  const todayLabel = now.toLocaleDateString(undefined, {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  });
 
   return `
-    ${greetingCardHTML()}
-    ${absenceFormCardHTML()}
-    ${permanenceFormCardHTML()}
-    ${recentRequestsHTML(requests)}
+    ${greetingCardHTML(todayLabel)}
+
+    <!-- Quick stats -->
+    <section class="ep-card">
+      <div class="ep-stat-grid" style="grid-template-columns:repeat(3,1fr);">
+        <div class="ep-stat">
+          <div class="ep-stat-value">${daysThisMonth}<span style="font-size:0.7rem;color:#94a3b8;">/${daysTotal}</span></div>
+          <div class="ep-stat-label">${esc(t('portal.home.days_month'))}</div>
+        </div>
+        <div class="ep-stat">
+          <div class="ep-stat-value" style="color:${pending > 0 ? '#92400e' : '#1e293b'};">${pending}</div>
+          <div class="ep-stat-label">${esc(t('portal.home.pending'))}</div>
+        </div>
+        <div class="ep-stat">
+          <div class="ep-stat-value" style="color:#166534;">${approved}</div>
+          <div class="ep-stat-label">${esc(t('portal.home.approved'))}</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick tools -->
+    <section class="ep-card">
+      <div class="ep-card-title">🔗 ${esc(t('portal.home.tools'))}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;">
+        ${(_quickLinks || []).map(link => `
+          <a href="${esc(link.url)}" target="_blank" rel="noopener noreferrer"
+             style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+                    padding:14px 8px;border:1.5px solid #e2e8f0;border-radius:12px;
+                    background:#f8fafc;text-decoration:none;color:#1e293b;
+                    transition:transform 0.1s, box-shadow 0.1s;cursor:pointer;text-align:center;"
+             onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.08)';"
+             onmouseout="this.style.transform='';this.style.boxShadow='';">
+            <div style="font-size:1.6rem;margin-bottom:6px;">${esc(link.icon || '🔗')}</div>
+            <div style="font-size:0.72rem;font-weight:600;line-height:1.2;">${esc(link.label)}</div>
+          </a>
+        `).join('')}
+      </div>
+    </section>
+
+    <!-- Quick actions -->
+    <section class="ep-card">
+      <div class="ep-card-title">⚡ ${esc(t('portal.home.actions'))}</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="ep-btn ep-btn-primary" data-go-section="attendance" data-attendance-tab="request">
+          📝 ${esc(t('portal.absence.title'))}
+        </button>
+        <button class="ep-btn ep-btn-ghost" data-go-section="payslip" style="background:#dbeafe;color:#1e40af;border:1.5px solid #bfdbfe;">
+          💰 ${esc(t('portal.drawer.payslip'))}
+        </button>
+      </div>
+    </section>
   `;
 }
 
-function greetingCardHTML() {
+// ── Section: ATTENDANCE (Request + History tabs) ─────────
+function attendanceSectionHTML() {
+  const tabBtn = (id, icon, label) => `
+    <button class="ep-att-tab ${_attendanceTab === id ? 'active' : ''}" data-att-tab="${id}"
+      style="flex:1;padding:10px 14px;border:none;background:${_attendanceTab === id ? '#2563eb' : '#f1f5f9'};
+             color:${_attendanceTab === id ? '#fff' : '#475569'};
+             font-weight:600;font-size:0.88rem;font-family:inherit;cursor:pointer;
+             border-radius:8px;transition:all 0.15s;">
+      ${icon} ${esc(label)}
+    </button>
+  `;
+
+  const tabsHTML = `
+    <section class="ep-card">
+      <div style="display:flex;gap:6px;background:#e2e8f0;padding:4px;border-radius:10px;">
+        ${tabBtn('request', '📝', t('portal.attendance.tab_request'))}
+        ${tabBtn('history', '📋', t('portal.attendance.tab_history'))}
+      </div>
+    </section>
+  `;
+
+  if (_attendanceTab === 'history') {
+    return tabsHTML + historySectionHTML();
+  }
+
+  // Request tab — show both forms (Absence + Permanence)
+  return `
+    ${tabsHTML}
+    ${absenceFormCardHTML()}
+    ${permanenceFormCardHTML()}
+  `;
+}
+
+function greetingCardHTML(todayLabel = '') {
   const fullName  = `${_employee.firstName || ''} ${_employee.lastName || ''}`.trim();
   const typeLabel = _employee.employeeType === 'Admin'
     ? t('portal.role.administrator')
@@ -263,7 +386,8 @@ function greetingCardHTML() {
       <div class="ep-avatar">${initials(fullName)}</div>
       <div class="ep-greeting-text">
         <div class="ep-greeting-name">${esc(t('portal.greeting', { name: _employee.firstName || '' }))}</div>
-        <div class="ep-greeting-meta">${esc(typeLabel)} · ${esc(_employee.homeLocation || '')}</div>
+        <div class="ep-greeting-meta">${esc(typeLabel)}${_employee.homeLocation ? ' · ' + esc(_employee.homeLocation) : ''}</div>
+        ${todayLabel ? `<div style="font-size:0.75rem;color:#64748b;margin-top:6px;">📅 ${esc(todayLabel)}</div>` : ''}
       </div>
     </section>
   `;
@@ -830,23 +954,32 @@ function bindGlobalEvents() {
 
 function bindSectionEvents() {
   if (_section === 'home') {
-    bindFormEvents();
-    bindPermanenceEvents();
-    bindListEvents();
-    // Also handle the "View all →" shortcut button
-    document.querySelectorAll('[data-section]').forEach(b => {
-      if (!b.classList.contains('ep-drawer-item')) {
-        b.addEventListener('click', () => {
-          _section = b.dataset.section;
-          draw();
-        });
-      }
+    // Quick action buttons that navigate to other sections
+    document.querySelectorAll('[data-go-section]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _section = btn.dataset.goSection;
+        if (btn.dataset.attendanceTab) _attendanceTab = btn.dataset.attendanceTab;
+        draw();
+      });
     });
+  } else if (_section === 'attendance') {
+    // Sub-tab switching
+    document.querySelectorAll('[data-att-tab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _attendanceTab = btn.dataset.attTab;
+        draw();
+      });
+    });
+    if (_attendanceTab === 'request') {
+      bindFormEvents();
+      bindPermanenceEvents();
+      bindListEvents();
+    } else if (_attendanceTab === 'history') {
+      bindHistoryEvents();
+      bindListEvents();
+    }
   } else if (_section === 'payslip') {
     bindPaySlipEvents();
-  } else if (_section === 'history') {
-    bindHistoryEvents();
-    bindListEvents();
   } else if (_section === 'notes') {
     bindNotesEvents();
   }

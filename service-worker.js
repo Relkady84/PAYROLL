@@ -10,7 +10,7 @@
  * Version bump = bump CACHE_VERSION below.
  */
 
-const CACHE_VERSION = 'v25-2026-05-07-per-row-reset';
+const CACHE_VERSION = 'v26-2026-05-07-portal-dashboard';
 const CACHE_SHELL   = `payroll-shell-${CACHE_VERSION}`;
 const CACHE_RUNTIME = `payroll-runtime-${CACHE_VERSION}`;
 

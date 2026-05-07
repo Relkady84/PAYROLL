@@ -237,10 +237,23 @@ export const en = {
   'portal.role.administrator': 'Administrator',
 
   // Drawer
-  'portal.drawer.home':    'Home',
-  'portal.drawer.payslip': 'My Pay Slip',
-  'portal.drawer.history': 'Attendance History',
-  'portal.drawer.notes':   'My Notes',
+  'portal.drawer.home':       'Home',
+  'portal.drawer.attendance': 'Attendance',
+  'portal.drawer.payslip':    'My Pay Slip',
+  'portal.drawer.history':    'Attendance History',
+  'portal.drawer.notes':      'My Notes',
+
+  // Home dashboard
+  'portal.home.days_month':   'days this month',
+  'portal.home.pending':      'pending',
+  'portal.home.approved':     'approved',
+  'portal.home.tools':        'Quick Tools',
+  'portal.home.actions':      'Quick Actions',
+
+  // Attendance section
+  'portal.attendance_title':  'Attendance',
+  'portal.attendance.tab_request': 'Request',
+  'portal.attendance.tab_history': 'History',
 
   // Notes section
   'portal.notes_title':           'My Notes',
