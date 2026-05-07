@@ -76,7 +76,8 @@ export function render(selector) {
   _filterType = 'all';
   _sortKey    = 'firstName';
   _sortDir    = 'asc';
-  _daysWorked = {};
+  // Don't reset _daysWorked — manual overrides should persist across navigation.
+  // They're only cleared when the user picks a different month, or clicks "Reset Days".
   _selectedMonth = _selectedMonth || defaultMonth();
 
   container.innerHTML = `
@@ -164,10 +165,26 @@ export function render(selector) {
   document.getElementById('payroll-table').addEventListener('change', e => {
     const input = e.target.closest('.days-input');
     if (!input) return;
-    let val = parseInt(input.value, 10);
-    if (isNaN(val) || val < 0) val = 0;
-    if (val > 31) val = 31;
-    _daysWorked[input.dataset.empId] = val;
+    const empId = input.dataset.empId;
+    const raw   = input.value.trim();
+    if (raw === '') {
+      // Empty value → remove the manual override and revert to auto-computed days
+      delete _daysWorked[empId];
+    } else {
+      let val = parseInt(raw, 10);
+      if (isNaN(val) || val < 0) val = 0;
+      if (val > 31) val = 31;
+      _daysWorked[empId] = val;
+    }
+    renderRows(container);
+  });
+
+  // Per-employee reset button (↺ next to days input)
+  document.getElementById('payroll-table').addEventListener('click', e => {
+    const btn = e.target.closest('.reset-one-day-btn');
+    if (!btn) return;
+    const empId = btn.dataset.empId;
+    delete _daysWorked[empId];
     renderRows(container);
   });
 
@@ -426,7 +443,10 @@ function renderRows(container) {
       <td><strong>${esc(r.firstName)} ${esc(r.lastName)}</strong></td>
       <td><span class="badge badge-${r.employeeType === 'Teacher' ? 'teacher' : 'admin'}">${r.employeeType === 'Admin' ? 'Admin' : 'Teacher'}</span></td>
       <td>
-        <input type="number" class="days-input" min="0" max="31" data-emp-id="${esc(r.id)}" value="${r.daysWorked}" style="width:52px;text-align:center;" oninput="if(this.value.length>2)this.value=this.value.slice(0,2)">
+        <div style="display:inline-flex;align-items:center;gap:4px;">
+          <input type="number" class="days-input" min="0" max="31" data-emp-id="${esc(r.id)}" value="${r.daysWorked}" style="width:52px;text-align:center;" oninput="if(this.value.length>2)this.value=this.value.slice(0,2)">
+          ${bd.isManualOverride ? `<button class="reset-one-day-btn" data-emp-id="${esc(r.id)}" title="Reset to auto-computed days" style="border:none;background:transparent;cursor:pointer;font-size:0.85rem;color:#ea580c;padding:2px 4px;line-height:1;">↺</button>` : ''}
+        </div>
         ${breakdownHint}
       </td>
       <td class="num-lbp">${fmt(r.baseSalaryLBP)} ل.ل</td>
