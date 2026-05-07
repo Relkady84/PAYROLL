@@ -493,6 +493,45 @@ export async function createUserRecord(uid, data) {
   await setDoc(doc(db, 'users', uid), data);
 }
 
+// ── Personal Notes (private to each user) ─────────────────
+// Stored at /users/{uid}/notes/{noteId}. Firestore rules ensure ONLY the user
+// can read/write their own notes — not even company admin or super admin.
+export async function getMyNotes(uid) {
+  if (!uid) return [];
+  try {
+    const snap = await getDocs(collection(db, 'users', uid, 'notes'));
+    return snap.docs.map(d => ({ ...d.data(), id: d.id }));
+  } catch (e) {
+    console.warn('Could not load notes:', e);
+    return [];
+  }
+}
+
+export async function addMyNote(uid, note) {
+  if (!uid) throw new Error('addMyNote: uid required');
+  const ref = await addDoc(collection(db, 'users', uid, 'notes'), {
+    title:     String(note.title || '').trim(),
+    body:      String(note.body  || ''),
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  });
+  return { id: ref.id, ...note };
+}
+
+export async function updateMyNote(uid, noteId, changes) {
+  if (!uid || !noteId) throw new Error('updateMyNote: uid + noteId required');
+  await updateDoc(doc(db, 'users', uid, 'notes', noteId), {
+    ...(changes.title !== undefined && { title: String(changes.title).trim() }),
+    ...(changes.body  !== undefined && { body:  String(changes.body) }),
+    updatedAt: Date.now()
+  });
+}
+
+export async function deleteMyNote(uid, noteId) {
+  if (!uid || !noteId) throw new Error('deleteMyNote: uid + noteId required');
+  await deleteDoc(doc(db, 'users', uid, 'notes', noteId));
+}
+
 // ── Company metadata helpers ───────────────────────────────
 export async function createCompany(companyId, metadata) {
   // Write to both the root company document (for super-admin listing) and the metadata subcollection

@@ -19,7 +19,11 @@ import {
   getSettingsFor,
   getCalendarFor,
   getAcademicYearFor,
-  getRoleRegistryFor
+  getRoleRegistryFor,
+  getMyNotes,
+  addMyNote,
+  updateMyNote,
+  deleteMyNote
 } from '../data/store.js';
 import {
   ABSENCE_CATEGORIES,
@@ -56,6 +60,10 @@ let _paySlipMonth = null;
 // history filter state
 let _histStatus     = 'all';          // 'all' | 'pending' | 'approved' | 'rejected'
 let _histCategory   = 'all';          // 'all' | 'sick' | ...
+
+// Notes state
+let _notes          = [];             // array of { id, title, body, updatedAt }
+let _editingNoteId  = null;           // null = list view; 'new' = new note; otherwise editing this id
 let _histDate       = 'all';          // 'all' | 'YYYY' | 'YYYY-MM'
 let _histExpandedY  = null;           // for the date picker: which year is currently expanded
 let _histDateOpen   = false;          // is the date picker menu open?
@@ -116,6 +124,13 @@ export async function renderEmployeePortal({ user, companyId, employeeId }) {
   await loadOwnAbsenceRequests(companyId, employeeId);
   // Pre-fetch the academic year covering the current pay-slip month so the breakdown is correct on first render
   await findAcademicYearForMonth();
+  // Load private notes (only this user can read them)
+  try {
+    _notes = await getMyNotes(user.uid);
+  } catch (e) {
+    console.warn('Could not load notes:', e);
+    _notes = [];
+  }
   draw();
 }
 
@@ -139,6 +154,7 @@ function draw() {
 function renderSection() {
   if (_section === 'payslip') return paySlipSectionHTML();
   if (_section === 'history') return historySectionHTML();
+  if (_section === 'notes')   return notesSectionHTML();
   return homeSectionHTML();
 }
 
@@ -163,9 +179,10 @@ function headerHTML() {
 }
 
 function sectionTitle(section) {
-  if (section === 'payslip') return 'My Pay Slip';
-  if (section === 'history') return 'Attendance History';
-  return 'Employee Portal';
+  if (section === 'payslip') return t('portal.payslip_title');
+  if (section === 'history') return t('portal.history_title');
+  if (section === 'notes')   return t('portal.notes_title');
+  return t('portal.title');
 }
 
 // ── Drawer (slide-out menu) ──────────────────────────────
@@ -200,6 +217,7 @@ function drawerHTML() {
         ${item('home',    '🏠', t('portal.drawer.home'))}
         ${item('payslip', '💰', t('portal.drawer.payslip'))}
         ${item('history', '📋', t('portal.drawer.history'))}
+        ${item('notes',   '🔐', t('portal.drawer.notes'))}
       </nav>
 
       <div class="ep-drawer-footer">
@@ -609,6 +627,172 @@ function historySectionHTML() {
   `;
 }
 
+// ── Section: NOTES (private personal notes) ──────────────
+function notesSectionHTML() {
+  // Edit mode
+  if (_editingNoteId !== null) {
+    const isNew    = _editingNoteId === 'new';
+    const note     = isNew ? { title: '', body: '' } : (_notes.find(n => n.id === _editingNoteId) || { title: '', body: '' });
+    return `
+      <section class="ep-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div class="ep-card-title" style="margin:0;">${isNew ? '➕ ' + esc(t('portal.notes.new')) : '✏️ ' + esc(t('portal.notes.edit'))}</div>
+          <button id="ep-note-back" class="ep-link-btn" style="padding:4px 10px;">← ${esc(t('common.cancel'))}</button>
+        </div>
+
+        <form id="ep-note-form" novalidate>
+          <label class="ep-label" for="ep-note-title">${esc(t('portal.notes.title_field'))}</label>
+          <input class="ep-input" type="text" id="ep-note-title"
+            maxlength="100" placeholder="${esc(t('portal.notes.title_placeholder'))}"
+            value="${esc(note.title || '')}" required>
+
+          <label class="ep-label" for="ep-note-body" style="margin-top:10px;">${esc(t('portal.notes.body_field'))}</label>
+          <textarea class="ep-input" id="ep-note-body" rows="10"
+            maxlength="5000"
+            placeholder="${esc(t('portal.notes.body_placeholder'))}">${esc(note.body || '')}</textarea>
+
+          <div id="ep-note-errors" class="ep-errors"></div>
+
+          <div style="display:flex;gap:8px;margin-top:14px;">
+            <button type="submit" class="ep-btn ep-btn-primary" style="flex:1;">
+              💾 ${esc(t('common.save'))}
+            </button>
+            ${!isNew ? `
+              <button type="button" id="ep-note-delete" class="ep-btn ep-btn-ghost">
+                🗑 ${esc(t('common.delete'))}
+              </button>
+            ` : ''}
+          </div>
+        </form>
+      </section>
+    `;
+  }
+
+  // List mode
+  const sorted = [..._notes].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  return `
+    <section class="ep-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+        <div class="ep-card-title" style="margin:0;">🔐 ${esc(t('portal.notes_title'))}</div>
+        <button id="ep-note-new" class="ep-btn ep-btn-primary" style="padding:6px 12px;font-size:0.82rem;">
+          ➕ ${esc(t('portal.notes.new'))}
+        </button>
+      </div>
+      <p class="ep-card-sub">${esc(t('portal.notes.intro'))}</p>
+      <div style="font-size:0.72rem;color:#94a3b8;background:#fef9c3;border:1px solid #fef08a;border-radius:8px;padding:8px 10px;margin-bottom:14px;">
+        ⚠️ ${esc(t('portal.notes.warning'))}
+      </div>
+
+      ${sorted.length ? `
+        <div class="ep-list">
+          ${sorted.map(n => noteCardHTML(n)).join('')}
+        </div>
+      ` : `
+        <div class="ep-empty" style="padding:18px;">
+          <div class="ep-empty-icon">📝</div>
+          <div class="ep-empty-text">${esc(t('portal.notes.empty'))}</div>
+          <div class="ep-empty-sub">${esc(t('portal.notes.empty_sub'))}</div>
+        </div>
+      `}
+    </section>
+  `;
+}
+
+function noteCardHTML(n) {
+  const preview = (n.body || '').slice(0, 80).replace(/\s+/g, ' ');
+  const updated = n.updatedAt ? new Date(n.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+  return `
+    <div class="ep-note-card" data-note-id="${esc(n.id)}"
+      style="padding:12px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;cursor:pointer;">
+      <div style="font-weight:700;color:#1e293b;font-size:0.95rem;">${esc(n.title || t('portal.notes.untitled'))}</div>
+      ${preview ? `<div style="font-size:0.78rem;color:#64748b;margin-top:4px;line-height:1.4;">${esc(preview)}${(n.body || '').length > 80 ? '…' : ''}</div>` : ''}
+      ${updated ? `<div style="font-size:0.68rem;color:#94a3b8;margin-top:6px;">${updated}</div>` : ''}
+    </div>
+  `;
+}
+
+function bindNotesEvents() {
+  // List actions
+  const newBtn = document.getElementById('ep-note-new');
+  if (newBtn) {
+    newBtn.addEventListener('click', () => {
+      _editingNoteId = 'new';
+      draw();
+    });
+  }
+  document.querySelectorAll('.ep-note-card[data-note-id]').forEach(card => {
+    card.addEventListener('click', () => {
+      _editingNoteId = card.dataset.noteId;
+      draw();
+    });
+  });
+
+  // Edit-mode actions
+  const backBtn = document.getElementById('ep-note-back');
+  if (backBtn) {
+    backBtn.addEventListener('click', () => {
+      _editingNoteId = null;
+      draw();
+    });
+  }
+  const form = document.getElementById('ep-note-form');
+  if (form) {
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const title = document.getElementById('ep-note-title').value.trim();
+      const body  = document.getElementById('ep-note-body').value;
+      const errEl = document.getElementById('ep-note-errors');
+
+      if (!title) {
+        errEl.innerHTML = `<div>⚠ ${esc(t('portal.notes.title_required'))}</div>`;
+        return;
+      }
+      errEl.innerHTML = '';
+
+      const submitBtn = form.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = t('common.loading');
+
+      try {
+        const uid = _user?.uid;
+        if (!uid) throw new Error('No user uid');
+        if (_editingNoteId === 'new') {
+          const created = await addMyNote(uid, { title, body });
+          _notes.push({ ...created, title, body, createdAt: Date.now(), updatedAt: Date.now() });
+        } else {
+          await updateMyNote(uid, _editingNoteId, { title, body });
+          const idx = _notes.findIndex(n => n.id === _editingNoteId);
+          if (idx !== -1) _notes[idx] = { ..._notes[idx], title, body, updatedAt: Date.now() };
+        }
+        _editingNoteId = null;
+        draw();
+      } catch (err) {
+        console.error(err);
+        errEl.innerHTML = `<div>⚠ ${esc(t('portal.error.submit_failed'))}</div>`;
+        submitBtn.disabled = false;
+        submitBtn.textContent = '💾 ' + t('common.save');
+      }
+    });
+  }
+  const deleteBtn = document.getElementById('ep-note-delete');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', async () => {
+      if (!confirm(t('portal.notes.delete_confirm'))) return;
+      deleteBtn.disabled = true;
+      try {
+        await deleteMyNote(_user.uid, _editingNoteId);
+        _notes = _notes.filter(n => n.id !== _editingNoteId);
+        _editingNoteId = null;
+        draw();
+      } catch (err) {
+        console.error(err);
+        alert(t('portal.notes.delete_failed'));
+        deleteBtn.disabled = false;
+      }
+    });
+  }
+}
+
 // ── Events ──────────────────────────────────────────────
 function bindGlobalEvents() {
   // Burger
@@ -663,6 +847,8 @@ function bindSectionEvents() {
   } else if (_section === 'history') {
     bindHistoryEvents();
     bindListEvents();
+  } else if (_section === 'notes') {
+    bindNotesEvents();
   }
 }
 

@@ -37,6 +37,14 @@ service cloud.firestore {
       return userData().employeeId;
     }
 
+    // ── /users/{uid}/notes/{noteId} — private personal notes ────
+    // Only the authenticated user can read/write their own notes.
+    // NOT visible to super admin or company owner via these rules
+    // (the project owner can still read via Firebase admin console for support).
+    match /users/{uid}/notes/{noteId} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
     // ── /users/{uid} — self-managed records ──────────────────
     // Users can create/update their own record. The 'role' field is
     // restricted to 'owner' or 'employee' (self-service signup).

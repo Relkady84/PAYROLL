@@ -217,6 +217,24 @@ export const fr = {
   'portal.drawer.home':    'Accueil',
   'portal.drawer.payslip': 'Mon bulletin',
   'portal.drawer.history': 'Historique',
+  'portal.drawer.notes':   'Mes notes',
+
+  // Notes section
+  'portal.notes_title':           'Mes notes',
+  'portal.notes.new':             'Nouvelle note',
+  'portal.notes.edit':            'Modifier la note',
+  'portal.notes.title_field':     'Titre',
+  'portal.notes.title_placeholder': 'ex : Connexion classe 5A, Code imprimante',
+  'portal.notes.body_field':      'Contenu',
+  'portal.notes.body_placeholder': 'Écrivez ce que vous voulez — identifiants, codes, rappels…',
+  'portal.notes.title_required':  'Veuillez ajouter un titre.',
+  'portal.notes.empty':           'Aucune note pour le moment.',
+  'portal.notes.empty_sub':       'Appuyez sur « Nouvelle note » pour ajouter la première.',
+  'portal.notes.untitled':        'Sans titre',
+  'portal.notes.intro':           'Votre espace privé — seul vous pouvez lire ces notes.',
+  'portal.notes.warning':         'Évitez de stocker des mots de passe sensibles ici. Utilisez un gestionnaire de mots de passe dédié.',
+  'portal.notes.delete_confirm':  'Supprimer cette note ? Cette action est irréversible.',
+  'portal.notes.delete_failed':   'Suppression impossible. Réessayez.',
 
   // Absence form
   'portal.absence.title':       '🚫 Demande d\'absence',

@@ -217,6 +217,24 @@ export const en = {
   'portal.drawer.home':    'Home',
   'portal.drawer.payslip': 'My Pay Slip',
   'portal.drawer.history': 'Attendance History',
+  'portal.drawer.notes':   'My Notes',
+
+  // Notes section
+  'portal.notes_title':           'My Notes',
+  'portal.notes.new':             'New note',
+  'portal.notes.edit':            'Edit note',
+  'portal.notes.title_field':     'Title',
+  'portal.notes.title_placeholder': 'e.g., Class 5A login, Printer code',
+  'portal.notes.body_field':      'Content',
+  'portal.notes.body_placeholder': 'Write anything — usernames, codes, reminders…',
+  'portal.notes.title_required':  'Please add a title.',
+  'portal.notes.empty':           'No notes yet.',
+  'portal.notes.empty_sub':       'Tap "New note" to add your first one.',
+  'portal.notes.untitled':        'Untitled',
+  'portal.notes.intro':           'Your private space — only you can read these notes.',
+  'portal.notes.warning':         'Avoid storing high-security passwords here. Use a dedicated password manager for those.',
+  'portal.notes.delete_confirm':  'Delete this note? This cannot be undone.',
+  'portal.notes.delete_failed':   'Could not delete. Try again.',
 
   // Absence form
   'portal.absence.title':       '🚫 Request an Absence',
