@@ -899,21 +899,31 @@ export function _applySidebarLogo(logoUrl) {
   const el = document.getElementById('sidebar-logo-icon');
   if (!el) return;
   if (logoUrl) {
+    // Wrap in a div with a stable white background + forced-color-adjust:none
+    // so Windows High Contrast / browser auto-dark-mode CAN'T touch the image.
+    // The wrapper guarantees the logo sits on a fixed white background regardless
+    // of the dark sidebar behind it.
+    el.innerHTML = '';
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = `
+      width:40px;height:40px;background:#fff;border-radius:8px;
+      display:flex;align-items:center;justify-content:center;padding:3px;
+      box-sizing:border-box;
+      forced-color-adjust:none;-webkit-forced-color-adjust:none;
+      filter:none !important;-webkit-filter:none !important;
+      isolation:isolate;color-scheme:light;
+    `;
     const img = document.createElement('img');
     img.src = logoUrl;
     img.alt = 'Logo';
-    // Stable white background + explicit color-scheme so browser auto-dark mode
-    // can't tint/invert the logo. Slight padding keeps the image off the edges.
+    img.referrerPolicy = 'no-referrer';
     img.style.cssText = `
-      width:36px;height:36px;object-fit:contain;border-radius:6px;
-      background:#fff;padding:2px;
-      color-scheme:light;
-      filter:none !important;
-      -webkit-filter:none !important;
-      isolation:isolate;
+      max-width:100%;max-height:100%;object-fit:contain;
+      forced-color-adjust:none;-webkit-forced-color-adjust:none;
+      filter:none !important;-webkit-filter:none !important;
     `;
-    el.textContent = '';
-    el.appendChild(img);
+    wrapper.appendChild(img);
+    el.appendChild(wrapper);
   } else {
     el.textContent = '💼';
   }

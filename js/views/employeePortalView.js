@@ -55,18 +55,36 @@ let _academicYearsCache = {};   // yearId -> year doc, lazy-loaded
 
 // Default quick-launch tools shown on Home if the company hasn't configured custom ones.
 // Each entry has a `tKey` so the label translates dynamically based on the current language.
+// Icons are URLs (when available, official brand SVGs from Wikimedia) or emoji fallbacks.
 const DEFAULT_QUICK_LINKS = [
-  { id: 'pronote',    tKey: 'quicklinks.pronote',    url: 'https://2050048n.index-education.net/pronote/', icon: '📚' },
-  { id: 'website',    tKey: 'quicklinks.website',    url: 'https://www.lycee-montaigne.edu.lb/',          icon: '🌐' },
-  { id: 'outlook',    tKey: 'quicklinks.outlook',    url: 'https://outlook.office365.com/',               icon: '📧' },
-  { id: 'sharepoint', tKey: 'quicklinks.sharepoint', url: 'https://sharepoint-explorer.web.app/',         icon: '📁' },
-  { id: 'padlet',     tKey: 'quicklinks.padlet',     url: 'https://padlet.com/michelinechaaban/bonne-rentree-2025-ipmmo5sypaxr4pl7', icon: '🎓' }
+  { id: 'pronote',    tKey: 'quicklinks.pronote',    url: 'https://2050048n.index-education.net/pronote/',
+    icon: 'https://www.index-education.com/contenu/img/favicon-pronote.png' },
+  { id: 'website',    tKey: 'quicklinks.website',    url: 'https://www.lycee-montaigne.edu.lb/',
+    icon: '🌐' },
+  { id: 'outlook',    tKey: 'quicklinks.outlook',    url: 'https://outlook.office365.com/',
+    icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Microsoft_Office_Outlook_%282018%E2%80%93present%29.svg/240px-Microsoft_Office_Outlook_%282018%E2%80%93present%29.svg.png' },
+  { id: 'sharepoint', tKey: 'quicklinks.sharepoint', url: 'https://sharepoint-explorer.web.app/',
+    icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Microsoft_Office_SharePoint_%282019%E2%80%93present%29.svg/240px-Microsoft_Office_SharePoint_%282019%E2%80%93present%29.svg.png' },
+  { id: 'padlet',     tKey: 'quicklinks.padlet',     url: 'https://padlet.com/michelinechaaban/bonne-rentree-2025-ipmmo5sypaxr4pl7',
+    icon: '🎓' }
 ];
 
 // Resolve a link's display label — uses tKey for translation if present, else literal label
 function linkLabel(link) {
   if (link.tKey) return t(link.tKey);
   return link.label || '';
+}
+
+// Render the icon for a link — supports image URLs OR emoji
+function renderLinkIcon(icon) {
+  if (!icon) return '<div style="font-size:1.6rem;">🔗</div>';
+  if (/^https?:\/\//.test(icon)) {
+    return `<img src="${esc(icon)}" alt="" referrerpolicy="no-referrer"
+              style="width:36px;height:36px;object-fit:contain;
+                     forced-color-adjust:none;filter:none;"
+              onerror="this.outerHTML='<div style=\\'font-size:1.6rem;\\'>🔗</div>'">`;
+  }
+  return `<div style="font-size:1.6rem;">${esc(icon)}</div>`;
 }
 
 // Sub-tab state inside the Attendance section
@@ -334,10 +352,13 @@ function homeSectionHTML() {
              style="display:flex;flex-direction:column;align-items:center;justify-content:center;
                     padding:14px 8px;border:1.5px solid #e2e8f0;border-radius:12px;
                     background:#f8fafc;text-decoration:none;color:#1e293b;
-                    transition:transform 0.1s, box-shadow 0.1s;cursor:pointer;text-align:center;"
+                    transition:transform 0.1s, box-shadow 0.1s;cursor:pointer;text-align:center;
+                    forced-color-adjust:none;"
              onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.08)';"
              onmouseout="this.style.transform='';this.style.boxShadow='';">
-            <div style="font-size:1.6rem;margin-bottom:6px;">${esc(link.icon || '🔗')}</div>
+            <div style="margin-bottom:6px;height:36px;display:flex;align-items:center;justify-content:center;">
+              ${renderLinkIcon(link.icon)}
+            </div>
             <div style="font-size:0.72rem;font-weight:600;line-height:1.2;">${esc(linkLabel(link))}</div>
           </a>
         `).join('')}
