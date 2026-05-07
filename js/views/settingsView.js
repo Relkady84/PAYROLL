@@ -932,30 +932,45 @@ export function _applySidebarLogo(logoUrl) {
   const el = document.getElementById('sidebar-logo-icon');
   if (!el) return;
   if (logoUrl) {
-    // Apply white-bg + color-protection styles DIRECTLY to the existing
-    // sidebar-logo-icon element (parent), so any external CSS sizing it
-    // also gets the white background. Belt-and-suspenders approach with
-    // every known dark-mode-suppression CSS property.
+    // Bulletproof color-fidelity: white card + a no-op CSS filter on the <img>.
+    // The filter (brightness(1) contrast(1)) is a no-op visually but it makes
+    // Chrome's "Auto Dark Mode" feature SKIP the element — Chrome refuses to
+    // re-tint any image that already has a CSS filter applied. This is the
+    // canonical fix for "my logo's colors keep changing on dark phones".
     el.style.cssText = `
       background:#fff !important;
       border-radius:8px;
-      padding:3px;
+      padding:4px;
       box-sizing:border-box;
       display:flex;align-items:center;justify-content:center;
       forced-color-adjust:none !important;
       -webkit-forced-color-adjust:none !important;
-      filter:none !important;
-      -webkit-filter:none !important;
       isolation:isolate;
-      color-scheme:light only;
+      color-scheme:only light;
       mix-blend-mode:normal;
+      box-shadow:0 0 0 1px rgba(255,255,255,0.4);
     `;
-    el.innerHTML = `
-      <img src="${logoUrl.replace(/"/g, '%22')}" alt="Logo"
-           referrerpolicy="no-referrer"
-           style="max-width:100%;max-height:100%;object-fit:contain;
-                  forced-color-adjust:none !important;filter:none !important;">
+    // Build the <img> programmatically so quotes in the URL can't break out
+    el.textContent = '';
+    const img = document.createElement('img');
+    img.src = logoUrl;
+    img.alt = 'Logo';
+    img.referrerPolicy = 'no-referrer';
+    img.draggable = false;
+    img.style.cssText = `
+      max-width:100%;
+      max-height:100%;
+      object-fit:contain;
+      forced-color-adjust:none !important;
+      -webkit-forced-color-adjust:none !important;
+      filter:brightness(1) contrast(1);
+      -webkit-filter:brightness(1) contrast(1);
+      mix-blend-mode:normal;
+      isolation:isolate;
     `;
+    // Tell Chrome's auto-dark explicitly to leave this image alone
+    img.setAttribute('data-darkreader-ignore', 'true');
+    el.appendChild(img);
   } else {
     // Reset any logo-image styles when reverting to the default emoji
     el.style.cssText = '';
