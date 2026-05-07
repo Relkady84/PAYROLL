@@ -87,7 +87,8 @@ export const en = {
   'settings.backup.freq_saved':    'Reminder frequency saved.',
   'settings.backup.save_failed':   'Failed to save.',
   'settings.backup.tip_title':     'Tip',
-  'settings.backup.tip_body':      'Save the downloaded JSON file to a safe location (cloud drive, USB, email). Restoring from this file requires technical support — keep it as a last-resort safety net.',
+  'settings.backup.tip_body':      'Save the downloaded JSON file to a safe location (cloud drive, USB, email). Use Restore to recover lost or modified data from a backup file.',
+  'settings.backup.restore':       'Restore from file',
 
   // Settings section headers
   'settings.section.company':       'Company Profile',

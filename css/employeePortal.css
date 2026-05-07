@@ -356,6 +356,14 @@ textarea.ep-input {
 }
 .btn.btn-success:hover { background: #15803d; }
 
+/* btn-warning for restore-style operations */
+.btn.btn-warning {
+  background: #f59e0b;
+  color: #fff;
+  border: none;
+}
+.btn.btn-warning:hover { background: #d97706; }
+
 /* ─── Drawer (slide-out menu) ─────────────────────────── */
 .ep-drawer-overlay {
   position: fixed;

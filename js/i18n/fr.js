@@ -87,7 +87,8 @@ export const fr = {
   'settings.backup.freq_saved':    'Fréquence enregistrée.',
   'settings.backup.save_failed':   'Échec de l\'enregistrement.',
   'settings.backup.tip_title':     'Astuce',
-  'settings.backup.tip_body':      'Enregistrez le fichier JSON téléchargé dans un endroit sûr (cloud, clé USB, e-mail). La restauration depuis ce fichier nécessite une assistance technique — gardez-le comme filet de sécurité ultime.',
+  'settings.backup.tip_body':      'Enregistrez le fichier JSON téléchargé dans un endroit sûr (cloud, clé USB, e-mail). Utilisez « Restaurer » pour récupérer des données perdues ou modifiées.',
+  'settings.backup.restore':       'Restaurer depuis un fichier',
 
   // Settings section headers
   'settings.section.company':       'Profil de l\'établissement',

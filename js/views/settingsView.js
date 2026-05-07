@@ -7,6 +7,7 @@ import {
   getRoleRegistry, saveRoleRegistry,
   setCompanyBackupSchedule, recordBackupTaken, buildCompanyBackup
 } from '../data/store.js';
+import { openRestoreOverlay } from './backupRestoreView.js';
 import { validateSettings, normalizeSettings, denormalizeSettings } from '../models/settings.js';
 import {
   DOW_LABELS, DOW_LABELS_FULL,
@@ -373,6 +374,10 @@ export async function render(selector) {
             <button type="button" class="btn btn-primary" id="backup-download-btn">
               📥 ${esc(t('settings.backup.download'))}
             </button>
+            <label class="btn btn-warning" style="cursor:pointer;background:#f59e0b;color:#fff;border:none;">
+              📂 ${esc(t('settings.backup.restore'))}
+              <input type="file" id="backup-restore-input" accept=".json" class="file-input-hidden">
+            </label>
             <button type="button" class="btn btn-secondary" id="backup-save-freq-btn">
               💾 ${esc(t('settings.backup.save_freq'))}
             </button>
@@ -1024,6 +1029,39 @@ function initBackupSection(meta) {
       dlBtn.textContent = originalText;
     }
   });
+
+  // Restore from backup file
+  const restoreInput = document.getElementById('backup-restore-input');
+  if (restoreInput) {
+    restoreInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (!data || typeof data !== 'object') {
+            showToast('Invalid backup file.', 'error');
+            return;
+          }
+          // Sanity check — at least one of these should exist
+          const hasData = data.employees || data.settings || data.calendar
+            || data.academicYears || data.absenceRequests || data.roleRegistry;
+          if (!hasData) {
+            showToast('Not a valid payroll backup file.', 'error');
+            return;
+          }
+          openRestoreOverlay(data);
+        } catch (err) {
+          console.error(err);
+          showToast('Could not parse backup file. Make sure it is a valid JSON.', 'error');
+        }
+      };
+      reader.onerror = () => showToast('Could not read file.', 'error');
+      reader.readAsText(file);
+      restoreInput.value = ''; // reset so picking the same file again works
+    });
+  }
 
   // Initial render
   refreshStatus();
