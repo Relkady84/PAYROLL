@@ -39,6 +39,7 @@ import {
 import { calculateNetSalary, computeEffectiveDays } from '../services/payroll.js';
 import { signOutUser } from '../auth.js';
 import { t, getLanguage, setLanguage, SUPPORTED_LANGUAGES } from '../i18n.js';
+import { showToast } from './components/toast.js';
 
 // ── State ─────────────────────────────────────────────
 let _user        = null;
@@ -52,14 +53,21 @@ let _calendar    = null;
 let _roleRegistry = null;
 let _academicYearsCache = {};   // yearId -> year doc, lazy-loaded
 
-// Default quick-launch tools shown on Home if the company hasn't configured custom ones
+// Default quick-launch tools shown on Home if the company hasn't configured custom ones.
+// Each entry has a `tKey` so the label translates dynamically based on the current language.
 const DEFAULT_QUICK_LINKS = [
-  { id: 'pronote',    label: 'Pronote',           url: 'https://2050048n.index-education.net/pronote/', icon: '📚' },
-  { id: 'website',    label: 'School Website',    url: 'https://www.lycee-montaigne.edu.lb/',          icon: '🌐' },
-  { id: 'outlook',    label: 'Outlook',           url: 'https://outlook.office365.com/',               icon: '📧' },
-  { id: 'sharepoint', label: 'SharePoint',        url: 'https://sharepoint-explorer.web.app/',         icon: '📁' },
-  { id: 'padlet',     label: 'Padlet',            url: 'https://padlet.com/michelinechaaban/bonne-rentree-2025-ipmmo5sypaxr4pl7', icon: '🎓' }
+  { id: 'pronote',    tKey: 'quicklinks.pronote',    url: 'https://2050048n.index-education.net/pronote/', icon: '📚' },
+  { id: 'website',    tKey: 'quicklinks.website',    url: 'https://www.lycee-montaigne.edu.lb/',          icon: '🌐' },
+  { id: 'outlook',    tKey: 'quicklinks.outlook',    url: 'https://outlook.office365.com/',               icon: '📧' },
+  { id: 'sharepoint', tKey: 'quicklinks.sharepoint', url: 'https://sharepoint-explorer.web.app/',         icon: '📁' },
+  { id: 'padlet',     tKey: 'quicklinks.padlet',     url: 'https://padlet.com/michelinechaaban/bonne-rentree-2025-ipmmo5sypaxr4pl7', icon: '🎓' }
 ];
+
+// Resolve a link's display label — uses tKey for translation if present, else literal label
+function linkLabel(link) {
+  if (link.tKey) return t(link.tKey);
+  return link.label || '';
+}
 
 // Sub-tab state inside the Attendance section
 let _attendanceTab = 'request';   // 'request' | 'history'
@@ -180,6 +188,13 @@ function headerHTML() {
     ? `<img src="${esc(_companyLogo)}" alt="" class="ep-logo-img">`
     : `<span class="ep-logo">🏫</span>`;
 
+  // Show a home button on the right when user is not already on home
+  const homeBtn = _section !== 'home' ? `
+    <button id="ep-home-btn" class="ep-burger" aria-label="${esc(t('portal.home.go_home'))}"
+      title="${esc(t('portal.home.go_home'))}"
+      style="margin-left:auto;">🏠</button>
+  ` : '';
+
   return `
     <header class="ep-header">
       <button id="ep-burger" class="ep-burger" aria-label="Open menu">☰</button>
@@ -190,6 +205,7 @@ function headerHTML() {
           <div class="ep-header-sub">${esc(sectionTitle(_section))}</div>
         </div>
       </div>
+      ${homeBtn}
     </header>
   `;
 }
@@ -322,7 +338,7 @@ function homeSectionHTML() {
              onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.08)';"
              onmouseout="this.style.transform='';this.style.boxShadow='';">
             <div style="font-size:1.6rem;margin-bottom:6px;">${esc(link.icon || '🔗')}</div>
-            <div style="font-size:0.72rem;font-weight:600;line-height:1.2;">${esc(link.label)}</div>
+            <div style="font-size:0.72rem;font-weight:600;line-height:1.2;">${esc(linkLabel(link))}</div>
           </a>
         `).join('')}
       </div>
@@ -333,10 +349,15 @@ function homeSectionHTML() {
       <div class="ep-card-title">⚡ ${esc(t('portal.home.actions'))}</div>
       <div style="display:flex;flex-direction:column;gap:8px;">
         <button class="ep-btn ep-btn-primary" data-go-section="attendance" data-attendance-tab="request">
-          📝 ${esc(t('portal.absence.title'))}
+          ${esc(t('portal.home.attendance_btn'))}
         </button>
-        <button class="ep-btn ep-btn-ghost" data-go-section="payslip" style="background:#dbeafe;color:#1e40af;border:1.5px solid #bfdbfe;">
-          💰 ${esc(t('portal.drawer.payslip'))}
+        <button class="ep-btn" data-go-section="payslip"
+          style="background:#dbeafe;color:#1e40af;border:1.5px solid #bfdbfe;">
+          ${esc(t('portal.home.payslip_btn'))}
+        </button>
+        <button class="ep-btn" data-go-section="notes"
+          style="background:#fef3c7;color:#92400e;border:1.5px solid #fde68a;">
+          ${esc(t('portal.home.notes_btn'))}
         </button>
       </div>
     </section>
@@ -930,6 +951,16 @@ function bindGlobalEvents() {
   // Drawer overlay close
   document.getElementById('ep-drawer-overlay').addEventListener('click', closeDrawer);
 
+  // Home button (top-right of header — visible when not on home)
+  const homeBtn = document.getElementById('ep-home-btn');
+  if (homeBtn) {
+    homeBtn.addEventListener('click', () => {
+      _section = 'home';
+      _editingNoteId = null;
+      draw();
+    });
+  }
+
   // Close X inside drawer
   const closeBtn = document.getElementById('ep-drawer-close');
   if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
@@ -1020,12 +1051,13 @@ function bindFormEvents() {
     try {
       const req = createAbsenceRequest(data, _employee);
       await addOwnAbsenceRequest(_companyId, req);
+      showToast(t('portal.absence.submitted'), 'success');
       draw();
     } catch (err) {
       console.error(err);
-      errEl.innerHTML = `<div>⚠ Failed to submit. Try again.</div>`;
+      errEl.innerHTML = `<div>⚠ ${esc(t('portal.error.submit_failed'))}</div>`;
       submitBtn.disabled = false;
-      submitBtn.textContent = '✓ Submit Request';
+      submitBtn.textContent = '✓ ' + t('portal.absence.submit');
     }
   });
 }
@@ -1090,12 +1122,13 @@ function bindPermanenceEvents() {
     try {
       const req = createAbsenceRequest(data, _employee);
       await addOwnAbsenceRequest(_companyId, req);
+      showToast(t('portal.permanence.submitted'), 'success');
       draw();
     } catch (err) {
       console.error(err);
-      errEl.innerHTML = `<div>⚠ Failed to submit. Try again.</div>`;
+      errEl.innerHTML = `<div>⚠ ${esc(t('portal.error.submit_failed'))}</div>`;
       submitBtn.disabled = false;
-      submitBtn.textContent = '✓ Submit Request';
+      submitBtn.textContent = '✓ ' + t('portal.permanence.submit');
     }
   });
 }

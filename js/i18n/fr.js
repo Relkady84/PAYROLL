@@ -230,7 +230,7 @@ export const fr = {
 
   // ── Employee Portal ──
   'portal.title':              'Portail Employé',
-  'portal.payslip_title':      'Mon bulletin de paie',
+  'portal.payslip_title':      'Fiche de paie',
   'portal.history_title':      'Historique des présences',
   'portal.greeting':           'Bonjour, {name} 👋',
   'portal.role.teacher':       'Enseignant',
@@ -239,16 +239,32 @@ export const fr = {
   // Drawer
   'portal.drawer.home':       'Accueil',
   'portal.drawer.attendance': 'Présence',
-  'portal.drawer.payslip':    'Mon bulletin',
+  'portal.drawer.payslip':    'Fiche de paie',
   'portal.drawer.history':    'Historique',
   'portal.drawer.notes':      'Mes notes',
 
   // Home dashboard
-  'portal.home.days_month':   'jours ce mois',
-  'portal.home.pending':      'en attente',
-  'portal.home.approved':     'approuvées',
-  'portal.home.tools':        'Outils rapides',
-  'portal.home.actions':      'Actions rapides',
+  'portal.home.days_month':       'jours ce mois',
+  'portal.home.pending':          'en attente',
+  'portal.home.approved':         'approuvées',
+  'portal.home.tools':            'Outils rapides',
+  'portal.home.actions':          'Actions rapides',
+  'portal.home.attendance_btn':   '📝 Demande de présence',
+  'portal.home.notes_btn':        '🔐 Mes notes',
+  'portal.home.payslip_btn':      '💰 Fiche de paie',
+  'portal.home.go_home':          'Accueil',
+
+  // Submit confirmations
+  'portal.absence.submitted':     '✓ Demande d\'absence envoyée avec succès.',
+  'portal.permanence.submitted':  '✓ Demande de permanence envoyée avec succès.',
+
+  // Default Quick Link labels
+  'quicklinks.pronote':    'Pronote',
+  'quicklinks.website':    'Site de l\'école',
+  'quicklinks.outlook':    'Outlook',
+  'quicklinks.sharepoint': 'Explorateur SharePoint',
+  'quicklinks.padlet':     'Padlet',
+  'quicklinks.notes':      'Mes notes',
 
   // Attendance section
   'portal.attendance_title':  'Présence',

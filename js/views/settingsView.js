@@ -902,7 +902,16 @@ export function _applySidebarLogo(logoUrl) {
     const img = document.createElement('img');
     img.src = logoUrl;
     img.alt = 'Logo';
-    img.style.cssText = 'width:36px;height:36px;object-fit:contain;border-radius:6px;';
+    // Stable white background + explicit color-scheme so browser auto-dark mode
+    // can't tint/invert the logo. Slight padding keeps the image off the edges.
+    img.style.cssText = `
+      width:36px;height:36px;object-fit:contain;border-radius:6px;
+      background:#fff;padding:2px;
+      color-scheme:light;
+      filter:none !important;
+      -webkit-filter:none !important;
+      isolation:isolate;
+    `;
     el.textContent = '';
     el.appendChild(img);
   } else {

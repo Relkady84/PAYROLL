@@ -244,11 +244,27 @@ export const en = {
   'portal.drawer.notes':      'My Notes',
 
   // Home dashboard
-  'portal.home.days_month':   'days this month',
-  'portal.home.pending':      'pending',
-  'portal.home.approved':     'approved',
-  'portal.home.tools':        'Quick Tools',
-  'portal.home.actions':      'Quick Actions',
+  'portal.home.days_month':       'days this month',
+  'portal.home.pending':          'pending',
+  'portal.home.approved':         'approved',
+  'portal.home.tools':            'Quick Tools',
+  'portal.home.actions':          'Quick Actions',
+  'portal.home.attendance_btn':   '📝 Attendance Request',
+  'portal.home.notes_btn':        '🔐 My Notes',
+  'portal.home.payslip_btn':      '💰 My Pay Slip',
+  'portal.home.go_home':          'Home',
+
+  // Submit confirmations
+  'portal.absence.submitted':     '✓ Absence request sent successfully.',
+  'portal.permanence.submitted':  '✓ Permanence request sent successfully.',
+
+  // Default Quick Link labels (used when admin hasn't customized)
+  'quicklinks.pronote':    'Pronote',
+  'quicklinks.website':    'School Website',
+  'quicklinks.outlook':    'Outlook',
+  'quicklinks.sharepoint': 'SharePoint Explorer',
+  'quicklinks.padlet':     'Padlet',
+  'quicklinks.notes':      'My Notes',
 
   // Attendance section
   'portal.attendance_title':  'Attendance',
