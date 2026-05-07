@@ -615,10 +615,37 @@ textarea.ep-input {
   color: #f1f5f9;
 }
 
-/* Drawer stays dark already, but ensure footer buttons read correctly */
+/* Drawer body — flip from white to dark */
+:root[data-theme="dark"] .ep-drawer {
+  background: #1e293b;
+  box-shadow: 4px 0 20px rgba(0,0,0,0.45);
+}
+:root[data-theme="dark"] .ep-drawer-nav { background: #1e293b; }
+:root[data-theme="dark"] .ep-drawer-item {
+  color: #e2e8f0;
+  background: transparent;
+}
+:root[data-theme="dark"] .ep-drawer-item:hover { background: #334155; }
+:root[data-theme="dark"] .ep-drawer-item.active {
+  background: #1e3a8a;
+  color: #ffffff;
+}
+:root[data-theme="dark"] .ep-drawer-footer {
+  background: #1e293b;
+  border-top-color: #334155;
+}
+/* Footer language + theme buttons */
 :root[data-theme="dark"] .ep-drawer-footer button[data-lang],
 :root[data-theme="dark"] .ep-drawer-footer button[data-theme-opt] {
-  background: #1e293b;
+  background: #0f172a;
   color: #cbd5e1;
   border-color: #334155;
 }
+/* Active (selected) language / theme button */
+:root[data-theme="dark"] .ep-drawer-footer button[data-lang][style*="2563eb"],
+:root[data-theme="dark"] .ep-drawer-footer button[data-theme-opt][style*="2563eb"] {
+  background: #1e3a8a !important;
+  color: #ffffff !important;
+  border-color: #3b82f6 !important;
+}
+:root[data-theme="dark"] .ep-link-btn { color: #f87171; }

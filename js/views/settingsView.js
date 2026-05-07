@@ -179,22 +179,6 @@ export async function render(selector) {
         </div>
         <div class="section-card-body">
 
-          <!-- Light / Dark / Auto mode toggle -->
-          <div style="margin-bottom:22px;padding:14px;background:var(--color-surface);
-                      border:1.5px solid var(--color-border);border-radius:10px;">
-            <div class="form-label" style="margin-bottom:10px;display:flex;align-items:center;gap:8px;">
-              <span>🌗 Appearance</span>
-              <span style="font-weight:400;font-size:0.78rem;color:var(--color-text-secondary);">
-                — applies to this device only
-              </span>
-            </div>
-            <div id="app-theme-picker" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
-            <div style="font-size:0.75rem;color:var(--color-text-secondary);margin-top:8px;">
-              Tip: if your phone's browser darkens images strangely, picking <b>Dark</b> here
-              keeps colors consistent.
-            </div>
-          </div>
-
           <!-- Preset themes -->
           <div style="margin-bottom:20px;">
             <div class="form-label" style="margin-bottom:10px;">Quick Themes (sidebar / header colors)</div>
@@ -848,9 +832,6 @@ export async function render(selector) {
 
   // ── Quick Links manager ────────────────────────────────
   initQuickLinksSection(meta);
-
-  // ── Light / Dark / Auto theme picker ──────────────────
-  initAppThemePicker();
 
   // Convert fuel price value when switching currency (USD ↔ LBP)
   container.querySelectorAll('[name="fuelPriceCurrency"]').forEach(radio => {
