@@ -154,9 +154,12 @@ export async function render(selector) {
                 </div>
               </div>
 
-              <div style="display:flex;gap:8px;margin-top:10px;">
-                <button type="button" class="btn btn-secondary" id="ql-add-btn">+ Add tile</button>
+              <div style="display:flex;gap:8px;margin-top:10px;align-items:center;">
+                <button type="button" class="btn btn-primary" id="ql-add-btn">+ Add new tile</button>
                 <button type="button" class="btn btn-secondary" id="ql-cancel-btn" style="display:none;">Cancel</button>
+                <span id="ql-add-hint" style="font-size:0.75rem;color:#64748b;">
+                  Fill the fields above, then click here to add it to the list.
+                </span>
               </div>
               <div id="ql-add-error" style="font-size:0.78rem;color:var(--color-danger);margin-top:6px;min-height:18px;"></div>
             </div>
@@ -1199,6 +1202,7 @@ function initQuickLinksSection(meta) {
   const addBtn      = document.getElementById('ql-add-btn');
   const cancelBtn   = document.getElementById('ql-cancel-btn');
   const formTitle   = document.getElementById('ql-form-title');
+  const hintEl      = document.getElementById('ql-add-hint');
   const saveBtn     = document.getElementById('ql-save-btn');
   const defaultsBtn = document.getElementById('ql-defaults-btn');
 
@@ -1225,8 +1229,11 @@ function initQuickLinksSection(meta) {
     errEl.textContent = '';
     editingIdx = null;
     formTitle.textContent = '+ Add a new tile';
-    addBtn.textContent    = '+ Add tile';
+    addBtn.textContent    = '+ Add new tile';
+    addBtn.classList.remove('btn-secondary');
+    addBtn.classList.add('btn-primary');
     cancelBtn.style.display = 'none';
+    if (hintEl) hintEl.textContent = 'Fill the fields above, then click here to add it to the list.';
     updatePreview();
   }
 
@@ -1240,7 +1247,10 @@ function initQuickLinksSection(meta) {
     editingIdx = idx;
     formTitle.textContent = `Editing: ${link.label || ''}`;
     addBtn.textContent    = '💾 Save changes';
+    addBtn.classList.remove('btn-primary');
+    addBtn.classList.add('btn-secondary');
     cancelBtn.style.display = '';
+    if (hintEl) hintEl.textContent = 'Update the fields, then save — or Cancel to add a new tile instead.';
     updatePreview();
     document.getElementById('quicklinks-list')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }

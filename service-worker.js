@@ -10,7 +10,7 @@
  * Version bump = bump CACHE_VERSION below.
  */
 
-const CACHE_VERSION = 'v33-2026-05-07-quicklinks-upload';
+const CACHE_VERSION = 'v34-2026-05-07-quicklinks-add-emphasis';
 const CACHE_SHELL   = `payroll-shell-${CACHE_VERSION}`;
 const CACHE_RUNTIME = `payroll-runtime-${CACHE_VERSION}`;
 
