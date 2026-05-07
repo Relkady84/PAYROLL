@@ -30,11 +30,21 @@ function registerSW() {
           if (!newWorker) return;
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // A new version is waiting — prompt the user
               showUpdateToast(newWorker);
             }
           });
         });
+
+        // Check for updates AGGRESSIVELY:
+        //  - Every time the page becomes visible (user reopens app)
+        //  - Every 60 seconds while the app is open
+        //  - Right after registration
+        const checkForUpdates = () => reg.update().catch(() => {});
+        checkForUpdates();
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') checkForUpdates();
+        });
+        setInterval(checkForUpdates, 60_000);
       })
       .catch(err => console.warn('[PWA] SW registration failed:', err));
 
