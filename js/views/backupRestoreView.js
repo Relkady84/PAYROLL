@@ -46,69 +46,133 @@ function ensureOverlay() {
   return el;
 }
 
+// Display count of "items" for a section header (slightly different from
+// what the diff function counts — e.g., calendar = 1 doc but we want to
+// show holiday count to the user).
+function sectionRawCount(b, id) {
+  if (id === 'settings')        return b.settings ? Object.keys(b.settings).length : 0;
+  if (id === 'calendar')        return (b.calendar?.holidays || []).length;
+  if (id === 'roleRegistry')    return (b.roleRegistry?.roles || []).length;
+  if (id === 'academicYears')   return (b.academicYears || []).length;
+  if (id === 'employees')       return (b.employees || []).length;
+  if (id === 'absenceRequests') return (b.absenceRequests || []).length;
+  return 0;
+}
+
+// ── Diff computation per section ─────────────────────────
+// Returns { totalInBackup, missingFromCurrent, changed, identical }
+// "missing" → in backup but not in current  → can be re-added
+// "changed" → exists in both but different values → can be replaced
+// "identical" → exists in both, same values
+function diffSection(sectionId) {
+  const b = _backup;
+  if (!b) return { totalInBackup: 0, missingFromCurrent: 0, changed: 0, identical: 0 };
+
+  if (sectionId === 'settings') {
+    const backup = b.settings || {};
+    const current = getSettings();
+    const keys = Object.keys(backup);
+    let changed = 0;
+    for (const k of keys) {
+      if (JSON.stringify(backup[k]) !== JSON.stringify(current[k])) changed++;
+    }
+    return { totalInBackup: keys.length, missingFromCurrent: 0, changed, identical: keys.length - changed };
+  }
+
+  if (sectionId === 'calendar') {
+    const backup = b.calendar || {};
+    const current = getCalendar();
+    const same = JSON.stringify(backup) === JSON.stringify(current);
+    return { totalInBackup: 1, missingFromCurrent: 0, changed: same ? 0 : 1, identical: same ? 1 : 0 };
+  }
+
+  if (sectionId === 'roleRegistry') {
+    const backup = b.roleRegistry || { roles: [] };
+    const current = getRoleRegistry();
+    const same = JSON.stringify(backup) === JSON.stringify(current);
+    return { totalInBackup: 1, missingFromCurrent: 0, changed: same ? 0 : 1, identical: same ? 1 : 0 };
+  }
+
+  if (sectionId === 'academicYears') {
+    const backup = b.academicYears || [];
+    const currentMap = new Map(getAcademicYears().map(y => [y.yearId, y]));
+    let missing = 0, changed = 0, identical = 0;
+    for (const y of backup) {
+      const cur = currentMap.get(y.yearId);
+      if (!cur) missing++;
+      else if (JSON.stringify(y) !== JSON.stringify(cur)) changed++;
+      else identical++;
+    }
+    return { totalInBackup: backup.length, missingFromCurrent: missing, changed, identical };
+  }
+
+  if (sectionId === 'employees') {
+    const backup = b.employees || [];
+    const currentMap = new Map(getEmployees().map(e => [e.id, e]));
+    let missing = 0, changed = 0, identical = 0;
+    const fields = ['firstName','lastName','employeeType','role','baseSalaryLBP','kmDistance','homeLocation','email','age','defaultDaysPerMonth','workSchedule'];
+    for (const e of backup) {
+      const cur = currentMap.get(e.id);
+      if (!cur) { missing++; continue; }
+      const differs = fields.some(f => JSON.stringify(e[f]) !== JSON.stringify(cur[f]));
+      if (differs) changed++;
+      else identical++;
+    }
+    return { totalInBackup: backup.length, missingFromCurrent: missing, changed, identical };
+  }
+
+  if (sectionId === 'absenceRequests') {
+    const backup = b.absenceRequests || [];
+    const currentMap = new Map(getAbsenceRequests().map(r => [r.id, r]));
+    let missing = 0, changed = 0, identical = 0;
+    for (const r of backup) {
+      const cur = currentMap.get(r.id);
+      if (!cur) missing++;
+      else if (JSON.stringify(r) !== JSON.stringify(cur)) changed++;
+      else identical++;
+    }
+    return { totalInBackup: backup.length, missingFromCurrent: missing, changed, identical };
+  }
+
+  return { totalInBackup: 0, missingFromCurrent: 0, changed: 0, identical: 0 };
+}
+
+function diffBadge(d) {
+  // No differences → green "in sync"
+  if (d.missingFromCurrent === 0 && d.changed === 0) {
+    return `<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#dcfce7;color:#166534;font-size:0.7rem;font-weight:600;">✓ in sync</span>`;
+  }
+  const parts = [];
+  if (d.missingFromCurrent > 0) parts.push(`<span style="color:#1d4ed8;">+${d.missingFromCurrent} missing</span>`);
+  if (d.changed > 0)            parts.push(`<span style="color:#b45309;">${d.changed} changed</span>`);
+  return `<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#fef3c7;color:#713f12;font-size:0.7rem;font-weight:600;">${parts.join(' · ')}</span>`;
+}
+
 // ── Summary view (entry point) ───────────────────────────
 function drawSummary() {
   const b = _backup;
   if (!b) return;
 
-  const sections = [
-    {
-      id: 'settings',
-      icon: '⚙️',
-      label: 'Settings',
-      count: b.settings ? Object.keys(b.settings).length : 0,
-      countLabel: 'fields',
-      canAddNew: false,
-      canReplaceAll: true
-    },
-    {
-      id: 'calendar',
-      icon: '📅',
-      label: 'Calendar',
-      count: (b.calendar?.holidays || []).length,
-      countLabel: 'holidays',
-      canAddNew: false,
-      canReplaceAll: true
-    },
-    {
-      id: 'academicYears',
-      icon: '🎓',
-      label: 'Academic Years',
-      count: (b.academicYears || []).length,
-      countLabel: 'years',
-      canAddNew: true,
-      canReplaceAll: true
-    },
-    {
-      id: 'roleRegistry',
-      icon: '👔',
-      label: 'Roles',
-      count: (b.roleRegistry?.roles || []).length,
-      countLabel: 'roles',
-      canAddNew: false,
-      canReplaceAll: true
-    },
-    {
-      id: 'employees',
-      icon: '👥',
-      label: 'Employees',
-      count: (b.employees || []).length,
-      countLabel: 'employees',
-      canAddNew: true,
-      canReplaceAll: true,
-      perRecord: true
-    },
-    {
-      id: 'absenceRequests',
-      icon: '📋',
-      label: 'Absence / Permanence Requests',
-      count: (b.absenceRequests || []).length,
-      countLabel: 'requests',
-      canAddNew: true,
-      canReplaceAll: false,
-      perRecord: true
-    }
+  const baseSections = [
+    { id: 'settings',         icon: '⚙️',  label: 'Settings',                       countLabel: 'fields',     canAddNew: false, canReplaceAll: true  },
+    { id: 'calendar',         icon: '📅',  label: 'Calendar',                       countLabel: 'holidays',   canAddNew: false, canReplaceAll: true  },
+    { id: 'academicYears',    icon: '🎓',  label: 'Academic Years',                 countLabel: 'years',      canAddNew: true,  canReplaceAll: true  },
+    { id: 'roleRegistry',     icon: '👔',  label: 'Roles',                          countLabel: 'roles',      canAddNew: false, canReplaceAll: true  },
+    { id: 'employees',        icon: '👥',  label: 'Employees',                      countLabel: 'employees',  canAddNew: true,  canReplaceAll: true  },
+    { id: 'absenceRequests',  icon: '📋',  label: 'Absence / Permanence Requests',  countLabel: 'requests',   canAddNew: true,  canReplaceAll: false }
   ];
+
+  // Decorate each section with diff info
+  const sections = baseSections.map(s => {
+    const d = diffSection(s.id);
+    return {
+      ...s,
+      count:         (s.id === 'calendar' || s.id === 'roleRegistry') ? sectionRawCount(b, s.id) : d.totalInBackup,
+      hasMissing:    d.missingFromCurrent > 0,
+      hasChanges:    d.changed > 0,
+      diff:          d
+    };
+  });
 
   const exportedAt = b.exportedAt
     ? new Date(b.exportedAt).toLocaleString()
@@ -147,24 +211,35 @@ function drawSummary() {
           <thead>
             <tr>
               <th>Section</th>
-              <th style="width:90px;">Items</th>
+              <th style="width:120px;">Status</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            ${sections.map(s => `
-              <tr>
-                <td><strong>${s.icon} ${s.label}</strong></td>
-                <td>${s.count} ${s.countLabel}</td>
-                <td>
-                  <div style="display:flex;gap:5px;flex-wrap:wrap;">
-                    ${s.count > 0 ? `<button class="btn btn-secondary btn-sm" data-act="view"        data-section="${s.id}">👁 View</button>` : ''}
-                    ${s.canAddNew     ? `<button class="btn btn-success   btn-sm" data-act="add-new"     data-section="${s.id}">+ Add new</button>` : ''}
-                    ${s.canReplaceAll ? `<button class="btn btn-danger    btn-sm" data-act="replace-all" data-section="${s.id}">⚠️ Replace</button>` : ''}
-                  </div>
-                </td>
-              </tr>
-            `).join('')}
+            ${sections.map(s => {
+              // Show buttons only if there's something to act on
+              const showAddNew     = s.canAddNew && s.hasMissing;
+              const showReplaceAll = s.canReplaceAll && (s.hasChanges || s.hasMissing);
+              const noActions      = !showAddNew && !showReplaceAll;
+              const inSync         = !s.hasMissing && !s.hasChanges;
+              return `
+                <tr style="${inSync ? 'opacity:0.8;' : ''}">
+                  <td>
+                    <strong>${s.icon} ${s.label}</strong>
+                    <div style="font-size:0.72rem;color:#94a3b8;margin-top:2px;">${s.count} ${s.countLabel} in backup</div>
+                  </td>
+                  <td>${diffBadge(s.diff)}</td>
+                  <td>
+                    <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                      ${s.count > 0 ? `<button class="btn btn-secondary btn-sm" data-act="view" data-section="${s.id}">👁 View</button>` : ''}
+                      ${showAddNew     ? `<button class="btn btn-success btn-sm" data-act="add-new"     data-section="${s.id}">+ Add ${s.diff.missingFromCurrent}</button>` : ''}
+                      ${showReplaceAll ? `<button class="btn btn-danger  btn-sm" data-act="replace-all" data-section="${s.id}">⚠️ Replace</button>` : ''}
+                      ${noActions      ? `<span style="font-size:0.72rem;color:#94a3b8;font-style:italic;">no action needed</span>` : ''}
+                    </div>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
           </tbody>
         </table>
       </div>
