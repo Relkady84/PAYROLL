@@ -46,37 +46,41 @@ function ensureOverlay() {
   return el;
 }
 
-// Deep equality that ignores object key order and treats null/undefined/empty
-// strings as equivalent. Required because Firestore re-orders keys when
-// reading data back, which made simple JSON.stringify comparisons unreliable.
+// "Normalize" a value before comparing: drops empty fields recursively,
+// sorts object keys, drops empty objects/arrays, and converts numeric strings
+// to numbers. Then comparison is just JSON.stringify of the normalized values.
+//
+// This is the most robust way to compare Firestore data because Firestore can:
+//  - Reorder object keys
+//  - Convert null↔undefined↔missing
+//  - Strip empty strings sometimes
+function normalize(v) {
+  if (v === null || v === undefined || v === '') return undefined;
+  if (Array.isArray(v)) {
+    const arr = v.map(normalize).filter(x => x !== undefined);
+    return arr.length ? arr : undefined;
+  }
+  if (typeof v === 'object') {
+    const out = {};
+    Object.keys(v).sort().forEach(k => {
+      const nv = normalize(v[k]);
+      if (nv !== undefined) out[k] = nv;
+    });
+    return Object.keys(out).length ? out : undefined;
+  }
+  // Treat numeric strings like "5" the same as 5 (Firestore quirk)
+  if (typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v)) && /^-?\d*\.?\d+$/.test(v.trim())) {
+    return Number(v);
+  }
+  return v;
+}
+
+function deepEqual(a, b) {
+  return JSON.stringify(normalize(a)) === JSON.stringify(normalize(b));
+}
+
 function isEmpty(v) {
   return v === null || v === undefined || v === '';
-}
-function deepEqual(a, b) {
-  if (isEmpty(a) && isEmpty(b)) return true;
-  if (a === b) return true;
-  if (typeof a !== typeof b) {
-    // Number 5 == string "5" → treat as equal (Firestore sometimes returns numbers)
-    if ((typeof a === 'number' || typeof a === 'string') &&
-        (typeof b === 'number' || typeof b === 'string')) {
-      return String(a) === String(b);
-    }
-    return false;
-  }
-  if (typeof a !== 'object' || a === null || b === null) return a === b;
-  if (Array.isArray(a) !== Array.isArray(b)) return false;
-  if (Array.isArray(a)) {
-    if (a.length !== b.length) return false;
-    return a.every((item, i) => deepEqual(item, b[i]));
-  }
-  // Object: compare keys, IGNORING entries whose value is null/undefined/empty
-  const meaningfulKeys = obj =>
-    Object.keys(obj).filter(k => !isEmpty(obj[k]));
-  const aKeys = meaningfulKeys(a);
-  const bKeys = meaningfulKeys(b);
-  if (aKeys.length !== bKeys.length) return false;
-  if (!aKeys.every(k => bKeys.includes(k))) return false;
-  return aKeys.every(k => deepEqual(a[k], b[k]));
 }
 
 // Display count of "items" for a section header (slightly different from
@@ -90,6 +94,25 @@ function sectionRawCount(b, id) {
   if (id === 'employees')       return (b.employees || []).length;
   if (id === 'absenceRequests') return (b.absenceRequests || []).length;
   return 0;
+}
+
+// Generic array diff — compares all fields (except the matching key) so any
+// new field added in the future is automatically included in the comparison.
+// Uses normalize+JSON for the comparison so it's order-insensitive and
+// tolerant of null/undefined/empty quirks.
+function diffArrayByKey(backup, current, keyField) {
+  const currentMap = new Map(current.map(x => [x[keyField], x]));
+  let missing = 0, changed = 0, identical = 0;
+  for (const item of backup) {
+    const cur = currentMap.get(item[keyField]);
+    if (!cur) { missing++; continue; }
+    // Compare full normalized objects — any future field is auto-included
+    const a = normalize(item);
+    const b = normalize(cur);
+    if (JSON.stringify(a) === JSON.stringify(b)) identical++;
+    else changed++;
+  }
+  return { totalInBackup: backup.length, missingFromCurrent: missing, changed, identical };
 }
 
 // ── Diff computation per section ─────────────────────────
@@ -136,34 +159,11 @@ function diffSection(sectionId) {
   }
 
   if (sectionId === 'employees') {
-    const backup = b.employees || [];
-    const currentMap = new Map(getEmployees().map(e => [e.id, e]));
-    let missing = 0, changed = 0, identical = 0;
-    const fields = ['firstName','lastName','employeeType','role','baseSalaryLBP','kmDistance','homeLocation','email','age','defaultDaysPerMonth','workSchedule'];
-    for (const e of backup) {
-      const cur = currentMap.get(e.id);
-      if (!cur) { missing++; continue; }
-      const differs = fields.some(f => !deepEqual(e[f], cur[f]));
-      if (differs) changed++;
-      else identical++;
-    }
-    return { totalInBackup: backup.length, missingFromCurrent: missing, changed, identical };
+    return diffArrayByKey(b.employees || [], getEmployees(), 'id');
   }
 
   if (sectionId === 'absenceRequests') {
-    const backup = b.absenceRequests || [];
-    const currentMap = new Map(getAbsenceRequests().map(r => [r.id, r]));
-    let missing = 0, changed = 0, identical = 0;
-    // Compare meaningful fields, not the full record (Firestore can add timestamps etc.)
-    const fields = ['employeeId','employeeName','employeeEmail','date','type','category','reason','status','reviewedBy','reviewNotes'];
-    for (const r of backup) {
-      const cur = currentMap.get(r.id);
-      if (!cur) { missing++; continue; }
-      const differs = fields.some(f => !deepEqual(r[f], cur[f]));
-      if (differs) changed++;
-      else identical++;
-    }
-    return { totalInBackup: backup.length, missingFromCurrent: missing, changed, identical };
+    return diffArrayByKey(b.absenceRequests || [], getAbsenceRequests(), 'id');
   }
 
   return { totalInBackup: 0, missingFromCurrent: 0, changed: 0, identical: 0 };
@@ -412,8 +412,8 @@ function drawViewer(section) {
 
   let title = '', body = '';
   if (section === 'settings') {
-    title = '⚙️ Settings (backup)';
-    body = renderObjectTable(b.settings || {});
+    title = '⚙️ Settings — backup vs current';
+    body = renderSettingsDiff(b.settings || {}, getSettings());
   } else if (section === 'calendar') {
     title = '📅 Calendar (backup)';
     const cal = b.calendar || {};
@@ -447,6 +447,45 @@ function drawViewer(section) {
   }
 
   drawDetailModal(title, body);
+
+  // For settings: wire up per-field restore buttons
+  if (section === 'settings') {
+    document.querySelectorAll('[data-restore-setting-path]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const path = btn.dataset.restoreSettingPath;
+        if (!confirm(`Restore "${path}" to the backup value? This overwrites the current value.`)) return;
+
+        // Build a settings object that has this one field updated
+        const current = getSettings();
+        const bv = getByPath(_backup.settings || {}, path);
+        const updated = setByPath(current, path, bv);
+        try {
+          saveSettings(updated);
+          showToast(`Field "${path}" restored.`, 'success');
+          // Refresh the view to show new state
+          drawViewer('settings');
+        } catch (e) {
+          console.error(e);
+          showToast('Failed to restore.', 'error');
+        }
+      });
+    });
+  }
+}
+
+// Set a value at a dotted path on a deep-cloned object
+function setByPath(obj, path, value) {
+  const clone = JSON.parse(JSON.stringify(obj || {}));
+  const parts = path.split('.');
+  let target = clone;
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (!target[parts[i]] || typeof target[parts[i]] !== 'object') {
+      target[parts[i]] = {};
+    }
+    target = target[parts[i]];
+  }
+  target[parts[parts.length - 1]] = value;
+  return clone;
 }
 
 function drawEmployeesViewer() {
@@ -510,19 +549,25 @@ function renderEmployeeRow(emp, current) {
       <details style="margin-top:8px;font-size:0.78rem;">
         <summary style="cursor:pointer;color:#475569;">Show details</summary>
         <table style="width:100%;margin-top:6px;font-size:0.78rem;border-collapse:collapse;">
-          ${['firstName','lastName','employeeType','role','baseSalaryLBP','kmDistance','homeLocation','email','age','defaultDaysPerMonth']
-            .map(k => {
-              const bv = emp[k] ?? '—';
-              const cv = current ? (current[k] ?? '—') : null;
-              const changed = current && bv !== cv;
+          ${(() => {
+            // Show ALL fields (future-proof) — combine keys from backup and current
+            const allKeys = [...new Set([
+              ...Object.keys(emp || {}),
+              ...Object.keys(current || {})
+            ])].filter(k => k !== 'id').sort();
+            return allKeys.map(k => {
+              const bv = emp[k];
+              const cv = current ? current[k] : undefined;
+              const changed = current && !deepEqual(bv, cv);
               return `
                 <tr style="${changed ? 'background:#fef3c7;' : ''}">
-                  <td style="padding:3px 6px;color:#64748b;">${k}</td>
-                  <td style="padding:3px 6px;font-family:monospace;">${esc(String(bv))}</td>
-                  ${current ? `<td style="padding:3px 6px;font-family:monospace;color:#94a3b8;">(now: ${esc(String(cv))})</td>` : ''}
+                  <td style="padding:3px 6px;color:#64748b;">${esc(k)}</td>
+                  <td style="padding:3px 6px;font-family:monospace;">${esc(formatValue(bv))}</td>
+                  ${current ? `<td style="padding:3px 6px;font-family:monospace;color:${changed ? '#b91c1c' : '#94a3b8'};">${esc(formatValue(cv))}</td>` : ''}
                 </tr>
               `;
-            }).join('')}
+            }).join('');
+          })()}
         </table>
       </details>
     </div>
@@ -530,8 +575,13 @@ function renderEmployeeRow(emp, current) {
 }
 
 function buildEmployeeDiff(backup, current) {
-  const fields = ['firstName','lastName','employeeType','role','baseSalaryLBP','kmDistance','homeLocation','email','age','defaultDaysPerMonth','workSchedule'];
-  return fields.filter(f => !deepEqual(backup[f], current[f]));
+  // Combine all keys from both backup and current — future fields auto-included
+  const allKeys = new Set([
+    ...Object.keys(backup || {}),
+    ...Object.keys(current || {})
+  ]);
+  allKeys.delete('id'); // never compare ID — it's the matching key
+  return [...allKeys].filter(f => !deepEqual(backup[f], current[f]));
 }
 
 function drawRequestsViewer() {
@@ -547,6 +597,74 @@ function drawRequestsViewer() {
     ])
   );
   drawDetailModal(`📋 Requests in backup (${list.length})`, body);
+}
+
+// ── Settings diff view: flatten nested objects + show backup vs current ──
+function flattenObject(obj, prefix = '') {
+  const out = [];
+  for (const [k, v] of Object.entries(obj || {})) {
+    const path = prefix ? `${prefix}.${k}` : k;
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      out.push(...flattenObject(v, path));
+    } else {
+      out.push({ path, value: v });
+    }
+  }
+  return out;
+}
+
+function getByPath(obj, path) {
+  return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
+}
+
+function renderSettingsDiff(backup, current) {
+  // Combine paths from both backup and current so we don't miss any
+  const backupPaths = new Set(flattenObject(backup).map(x => x.path));
+  const currentPaths = new Set(flattenObject(current).map(x => x.path));
+  const allPaths = [...new Set([...backupPaths, ...currentPaths])].sort();
+
+  if (!allPaths.length) return '<p style="color:#94a3b8;">No settings to display.</p>';
+
+  const rows = allPaths.map(path => {
+    const bv = getByPath(backup, path);
+    const cv = getByPath(current, path);
+    const differs = !deepEqual(bv, cv);
+    return { path, bv, cv, differs };
+  });
+
+  const changedCount = rows.filter(r => r.differs).length;
+
+  return `
+    <div style="font-size:0.78rem;color:#64748b;margin-bottom:10px;">
+      ${changedCount === 0
+        ? '✅ All settings match the backup.'
+        : `<strong style="color:#b45309;">${changedCount} field(s) differ from the backup.</strong> Click <strong>↺ Restore</strong> on any row to bring back its backup value.`}
+    </div>
+    <table class="data-table" style="width:100%;font-size:0.85rem;">
+      <thead>
+        <tr>
+          <th style="text-align:left;">Field</th>
+          <th style="text-align:left;">Backup value</th>
+          <th style="text-align:left;">Current value</th>
+          <th style="width:90px;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(r => `
+          <tr style="${r.differs ? 'background:#fef3c7;' : ''}">
+            <td style="font-family:monospace;font-size:0.78rem;color:#475569;">${esc(r.path)}</td>
+            <td style="font-family:monospace;">${esc(formatValue(r.bv))}</td>
+            <td style="font-family:monospace;color:${r.differs ? '#b91c1c' : '#94a3b8'};">${esc(formatValue(r.cv))}</td>
+            <td>
+              ${r.differs && r.bv !== undefined
+                ? `<button class="btn btn-warning btn-sm" data-restore-setting-path="${esc(r.path)}" style="background:#f59e0b;color:#fff;border:none;padding:4px 10px;font-size:0.75rem;">↺ Restore</button>`
+                : ''}
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
 }
 
 // ── Generic UI helpers ───────────────────────────────────

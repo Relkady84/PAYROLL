@@ -957,21 +957,41 @@ function initBackupSection(meta) {
       return;
     }
 
-    const days = Math.floor((Date.now() - lastBackup) / (1000 * 60 * 60 * 24));
+    const ageMs   = Date.now() - lastBackup;
+    const days    = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+    const hours   = Math.floor(ageMs / (1000 * 60 * 60));
+    const minutes = Math.floor(ageMs / (1000 * 60));
     const dueDays = FREQUENCY_DAYS[currentSchedule];
     const isOverdue = dueDays !== null && days >= dueDays;
 
-    const lastDate = new Date(lastBackup).toLocaleDateString();
+    // Exact timestamp with date + time + seconds (locale-aware)
+    const exactDate = new Date(lastBackup).toLocaleString(undefined, {
+      year:   'numeric',
+      month:  'short',
+      day:    'numeric',
+      hour:   '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+
+    // Friendly relative ago text
+    const ago = days > 0    ? `${days} day${days !== 1 ? 's' : ''} ago`
+              : hours > 0   ? `${hours} hour${hours !== 1 ? 's' : ''} ago`
+              : minutes > 0 ? `${minutes} minute${minutes !== 1 ? 's' : ''} ago`
+              : 'just now';
+
     if (isOverdue) {
       wrap.innerHTML = `
         <div style="padding:10px 12px;background:#fee2e2;border:1px solid #fecaca;border-radius:8px;font-size:0.85rem;color:#991b1b;">
-          🔴 ${esc(t('settings.backup.overdue', { days, last: lastDate }))}
+          🔴 <strong>Last backup OVERDUE</strong><br>
+          🕐 ${esc(exactDate)} <span style="opacity:0.7;">(${esc(ago)})</span>
         </div>
       `;
     } else {
       wrap.innerHTML = `
         <div style="padding:10px 12px;background:#dcfce7;border:1px solid #bbf7d0;border-radius:8px;font-size:0.85rem;color:#166534;">
-          ✅ ${esc(t('settings.backup.ok', { days, last: lastDate }))}
+          ✅ <strong>Last backup up to date</strong><br>
+          🕐 ${esc(exactDate)} <span style="opacity:0.7;">(${esc(ago)})</span>
         </div>
       `;
     }
