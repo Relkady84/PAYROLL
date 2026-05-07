@@ -10,6 +10,24 @@
   <meta name="theme-color" content="#0f172a">
   <!-- Prevent the browser from auto-dark-mode-ing the page (which can invert/recolor images) -->
   <meta name="color-scheme" content="light">
+
+  <!-- Apply user's saved theme BEFORE CSS paints, to avoid a flash -->
+  <script>
+    (function () {
+      try {
+        var pref = localStorage.getItem('app-theme') || 'light';
+        var resolved = pref;
+        if (pref === 'auto') {
+          resolved = window.matchMedia &&
+                     window.matchMedia('(prefers-color-scheme: dark)').matches
+                     ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', resolved);
+        var meta = document.querySelector('meta[name="color-scheme"]');
+        if (meta) meta.setAttribute('content', resolved === 'dark' ? 'dark light' : 'light');
+      } catch (e) { /* ignore */ }
+    })();
+  </script>
   <link rel="icon" type="image/svg+xml" href="/icons/icon-192.svg">
   <!-- iOS / mobile web-app support -->
   <meta name="mobile-web-app-capable" content="yes">

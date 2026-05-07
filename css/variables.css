@@ -49,3 +49,71 @@
   --font-size-2xl: 1.5rem;
   --font-size-3xl: 1.875rem;
 }
+
+/* ── Dark theme overrides ──
+   Activated by setting <html data-theme="dark">.
+   Sidebar already dark by default — we only swap the page surfaces & text. */
+:root[data-theme="dark"] {
+  --color-bg:              #0f172a;
+  --color-surface:         #1e293b;
+  --color-border:          #334155;
+  --color-border-hover:    #475569;
+
+  --color-text:            #f1f5f9;
+  --color-text-secondary:  #cbd5e1;
+  --color-text-muted:      #94a3b8;
+
+  --color-header-bg:       #1e293b;
+
+  --color-primary-light:   #1e3a8a;
+  --color-danger-light:    #7f1d1d;
+  --color-success-light:   #14532d;
+  --color-warning-light:   #78350f;
+  --color-info-light:      #155e75;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5), 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Common hard-coded surfaces in components — flip them via the same attribute */
+:root[data-theme="dark"] body { background: var(--color-bg); color: var(--color-text); }
+:root[data-theme="dark"] .form-control,
+:root[data-theme="dark"] input[type="text"],
+:root[data-theme="dark"] input[type="email"],
+:root[data-theme="dark"] input[type="number"],
+:root[data-theme="dark"] input[type="url"],
+:root[data-theme="dark"] input[type="date"],
+:root[data-theme="dark"] input[type="search"],
+:root[data-theme="dark"] input[type="password"],
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] textarea {
+  background: #0f172a;
+  color: #f1f5f9;
+  border-color: var(--color-border);
+}
+:root[data-theme="dark"] .form-control::placeholder,
+:root[data-theme="dark"] input::placeholder,
+:root[data-theme="dark"] textarea::placeholder { color: #64748b; }
+
+:root[data-theme="dark"] .section-card,
+:root[data-theme="dark"] .stat-card,
+:root[data-theme="dark"] .alert-info,
+:root[data-theme="dark"] .alert-success,
+:root[data-theme="dark"] .alert-warning,
+:root[data-theme="dark"] .alert-danger {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+:root[data-theme="dark"] table { color: var(--color-text); }
+:root[data-theme="dark"] th { background: #0f172a; color: var(--color-text); }
+:root[data-theme="dark"] tr:hover td { background: rgba(255,255,255,0.04); }
+
+:root[data-theme="dark"] .btn-secondary {
+  background: #334155;
+  color: #f1f5f9;
+  border-color: #475569;
+}
+:root[data-theme="dark"] .btn-secondary:hover { background: #475569; }

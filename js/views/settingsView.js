@@ -179,9 +179,25 @@ export async function render(selector) {
         </div>
         <div class="section-card-body">
 
+          <!-- Light / Dark / Auto mode toggle -->
+          <div style="margin-bottom:22px;padding:14px;background:var(--color-surface);
+                      border:1.5px solid var(--color-border);border-radius:10px;">
+            <div class="form-label" style="margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+              <span>🌗 Appearance</span>
+              <span style="font-weight:400;font-size:0.78rem;color:var(--color-text-secondary);">
+                — applies to this device only
+              </span>
+            </div>
+            <div id="app-theme-picker" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+            <div style="font-size:0.75rem;color:var(--color-text-secondary);margin-top:8px;">
+              Tip: if your phone's browser darkens images strangely, picking <b>Dark</b> here
+              keeps colors consistent.
+            </div>
+          </div>
+
           <!-- Preset themes -->
           <div style="margin-bottom:20px;">
-            <div class="form-label" style="margin-bottom:10px;">Quick Themes</div>
+            <div class="form-label" style="margin-bottom:10px;">Quick Themes (sidebar / header colors)</div>
             <div id="theme-presets" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
           </div>
 
@@ -833,6 +849,9 @@ export async function render(selector) {
   // ── Quick Links manager ────────────────────────────────
   initQuickLinksSection(meta);
 
+  // ── Light / Dark / Auto theme picker ──────────────────
+  initAppThemePicker();
+
   // Convert fuel price value when switching currency (USD ↔ LBP)
   container.querySelectorAll('[name="fuelPriceCurrency"]').forEach(radio => {
     radio.addEventListener('change', () => {
@@ -926,6 +945,68 @@ export function applyDisplayColors(colors) {
   if (colors.sidebarActive) r.setProperty('--color-sidebar-active-bg', colors.sidebarActive);
   if (colors.headerBg)      r.setProperty('--color-header-bg',         colors.headerBg);
   if (colors.pageBg)        r.setProperty('--color-bg',                colors.pageBg);
+}
+
+// ── Appearance (Light / Dark / Auto) ─────────────────────
+const THEME_OPTIONS = [
+  { id: 'light', label: '☀️ Light',  desc: 'Always light' },
+  { id: 'dark',  label: '🌙 Dark',   desc: 'Always dark' },
+  { id: 'auto',  label: '🖥 Auto',   desc: 'Follow system' },
+];
+
+export function applyAppTheme(pref) {
+  const safe = ['light', 'dark', 'auto'].includes(pref) ? pref : 'light';
+  let resolved = safe;
+  if (safe === 'auto') {
+    resolved = window.matchMedia &&
+               window.matchMedia('(prefers-color-scheme: dark)').matches
+               ? 'dark' : 'light';
+  }
+  document.documentElement.setAttribute('data-theme', resolved);
+  const meta = document.querySelector('meta[name="color-scheme"]');
+  if (meta) meta.setAttribute('content', resolved === 'dark' ? 'dark light' : 'light');
+  // Update theme-color so phone status bars match
+  const tc = document.querySelector('meta[name="theme-color"]');
+  if (tc) tc.setAttribute('content', resolved === 'dark' ? '#0f172a' : '#0f172a');
+  try { localStorage.setItem('app-theme', safe); } catch (e) {}
+}
+
+function initAppThemePicker() {
+  const wrap = document.getElementById('app-theme-picker');
+  if (!wrap) return;
+  let current = 'light';
+  try { current = localStorage.getItem('app-theme') || 'light'; } catch (e) {}
+
+  function render() {
+    wrap.innerHTML = THEME_OPTIONS.map(opt => `
+      <button type="button" data-theme-opt="${opt.id}"
+        style="flex:1 1 130px;min-width:120px;padding:10px 12px;border-radius:8px;
+               border:2px solid ${opt.id === current ? 'var(--color-primary)' : 'var(--color-border)'};
+               background:${opt.id === current ? 'var(--color-primary-light)' : 'transparent'};
+               color:var(--color-text);
+               cursor:pointer;font-family:inherit;text-align:left;
+               display:flex;flex-direction:column;gap:2px;">
+        <span style="font-weight:600;font-size:0.9rem;">${opt.label}</span>
+        <span style="font-size:0.72rem;color:var(--color-text-secondary);">${opt.desc}</span>
+      </button>
+    `).join('');
+    wrap.querySelectorAll('[data-theme-opt]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        current = btn.dataset.themeOpt;
+        applyAppTheme(current);
+        render();
+      });
+    });
+  }
+  render();
+
+  // If "auto", react to live system changes
+  if (window.matchMedia) {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => { if (current === 'auto') applyAppTheme('auto'); };
+    if (mq.addEventListener) mq.addEventListener('change', onChange);
+    else if (mq.addListener) mq.addListener(onChange);
+  }
 }
 
 export function _applySidebarLogo(logoUrl) {
