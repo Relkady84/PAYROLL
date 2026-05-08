@@ -601,6 +601,10 @@ textarea.ep-input {
   background: #0f172a !important;
   color: #f1f5f9 !important;
   border-color: #334155 !important;
+  /* Tells the browser to use its dark-mode native widgets, which renders the
+     calendar / month / time picker icons in white instead of black. Works in
+     Chrome, Edge, Safari, Firefox — both desktop and mobile. */
+  color-scheme: dark;
 }
 :root[data-theme="dark"] .ep-input::placeholder,
 :root[data-theme="dark"] #employee-portal-screen input::placeholder,
@@ -612,9 +616,14 @@ textarea.ep-input {
   background: #1e293b;
   color: #f1f5f9;
 }
-/* Date-input native picker icon — invert so it's visible on dark */
-:root[data-theme="dark"] #employee-portal-screen input[type="date"]::-webkit-calendar-picker-indicator {
+/* Belt-and-suspenders: also invert the calendar icon for browsers that
+   don't fully respect color-scheme on the input element. */
+:root[data-theme="dark"] #employee-portal-screen input[type="date"]::-webkit-calendar-picker-indicator,
+:root[data-theme="dark"] #employee-portal-screen input[type="month"]::-webkit-calendar-picker-indicator,
+:root[data-theme="dark"] #employee-portal-screen input[type="time"]::-webkit-calendar-picker-indicator {
   filter: invert(1);
+  opacity: 0.8;
+  cursor: pointer;
 }
 
 /* Quick-tools tiles & action buttons */
@@ -654,6 +663,78 @@ textarea.ep-input {
   background: transparent;
   color: #f1f5f9;
   border-color: #334155;
+}
+
+/* Pay slip — text color + section borders inside the card */
+:root[data-theme="dark"] .ep-payslip-name,
+:root[data-theme="dark"] .ep-payslip-row { color: #f1f5f9; }
+:root[data-theme="dark"] .ep-payslip-period,
+:root[data-theme="dark"] .ep-payslip-type,
+:root[data-theme="dark"] .ep-payslip-sub  { color: #94a3b8; }
+:root[data-theme="dark"] .ep-payslip-section { border-top-color: #334155; }
+/* Keep the deduction text red on dark too */
+:root[data-theme="dark"] .ep-payslip-row.ep-deduction,
+:root[data-theme="dark"] .ep-payslip-row.ep-deduction strong { color: #f87171; }
+/* Net-salary green gradient → dark green so white text reads on it */
+:root[data-theme="dark"] .ep-payslip-net {
+  background: linear-gradient(135deg, #14532d 0%, #166534 100%);
+}
+:root[data-theme="dark"] .ep-payslip-net-label  { color: #bbf7d0; }
+:root[data-theme="dark"] .ep-payslip-net-lbp    { color: #ffffff; }
+:root[data-theme="dark"] .ep-payslip-net-usd    { color: #bbf7d0; }
+
+/* Greeting card — light-blue gradient → dark blue */
+:root[data-theme="dark"] .ep-greeting {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%) !important;
+  color: #f1f5f9 !important;
+}
+
+/* Note cards — inline gradient white→#f8fafc, override with !important */
+:root[data-theme="dark"] .ep-note-card {
+  background: linear-gradient(180deg, #1e293b, #0f172a) !important;
+  border-color: #334155 !important;
+  border-left-color: #3b82f6 !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3) !important;
+}
+:root[data-theme="dark"] .ep-note-card:hover {
+  border-left-color: #60a5fa !important;
+}
+
+/* History request items (absence + permanence rows) */
+:root[data-theme="dark"] .ep-request {
+  background: #0f172a;
+  border-color: #334155;
+}
+:root[data-theme="dark"] .ep-request-date    { color: #f1f5f9; }
+:root[data-theme="dark"] .ep-request-cat     { color: #94a3b8; }
+:root[data-theme="dark"] .ep-request-reason  { color: #cbd5e1; }
+:root[data-theme="dark"] .ep-request-review  {
+  background: #1e3a8a;
+  color: #dbeafe;
+}
+
+/* Status pills — keep accent colors, lighten the surface for contrast */
+:root[data-theme="dark"] .ep-status-pending  { background: #422006; color: #fef3c7; }
+:root[data-theme="dark"] .ep-status-approved { background: #052e16; color: #bbf7d0; }
+:root[data-theme="dark"] .ep-status-rejected { background: #450a0a; color: #fee2e2; }
+
+/* Custom date filter button + dropdown menu in history */
+:root[data-theme="dark"] #ep-hist-date-btn {
+  background: #0f172a !important;
+  color: #f1f5f9 !important;
+  border-color: #334155 !important;
+}
+:root[data-theme="dark"] #ep-hist-date-menu {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.5) !important;
+}
+:root[data-theme="dark"] #ep-hist-date-menu * { color: #f1f5f9; }
+:root[data-theme="dark"] #ep-hist-date-menu small { color: #94a3b8 !important; }
+:root[data-theme="dark"] #ep-hist-date-menu button:hover,
+:root[data-theme="dark"] #ep-hist-date-menu [role="button"]:hover {
+  background: #334155 !important;
 }
 
 /* Drawer body — flip from white to dark */
