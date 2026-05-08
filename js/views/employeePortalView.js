@@ -992,22 +992,15 @@ function announcementsSectionHTML() {
           const isUnread = !_readAnnouncementIds.includes(a.id);
           const stamp = a.createdAt ? new Date(a.createdAt).toLocaleString() : '';
           return `
-            <article style="padding:14px 16px;background:${isUnread ? 'linear-gradient(180deg,#eff6ff,#dbeafe)' : 'linear-gradient(180deg,#fff,#f8fafc)'};
-                            border:1px solid ${isUnread ? '#bfdbfe' : '#e2e8f0'};
-                            border-left:4px solid ${isUnread ? '#2563eb' : '#94a3b8'};
-                            border-radius:10px;">
-              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-                <div style="font-weight:700;color:#1e293b;font-size:0.98rem;flex:1;min-width:0;">
-                  ${esc(a.title)}
-                </div>
-                ${isUnread ? `<span style="font-size:0.6rem;background:#2563eb;color:#fff;
-                              padding:2px 7px;border-radius:999px;font-weight:700;flex-shrink:0;">NEW</span>` : ''}
+            <article class="ep-announcement ${isUnread ? 'ep-announcement-unread' : 'ep-announcement-read'}">
+              <div class="ep-announcement-row">
+                <div class="ep-announcement-title">${esc(a.title)}</div>
+                ${isUnread ? `<span class="ep-announcement-new">NEW</span>` : ''}
               </div>
-              ${stamp ? `<div style="font-size:0.7rem;color:#64748b;margin-top:3px;">
+              ${stamp ? `<div class="ep-announcement-meta">
                 ${esc(stamp)}${a.createdBy ? ' · ' + esc(a.createdBy) : ''}
               </div>` : ''}
-              <div style="margin-top:10px;font-size:0.88rem;color:#1e293b;
-                          white-space:pre-wrap;line-height:1.5;">${esc(a.body)}</div>
+              <div class="ep-announcement-body">${esc(a.body)}</div>
             </article>
           `;
         }).join('')}

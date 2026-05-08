@@ -734,6 +734,78 @@ textarea.ep-input {
   cursor: not-allowed !important;
 }
 
+/* ── Announcement cards (employee portal) ─────────────── */
+.ep-announcement {
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #94a3b8;
+  background: linear-gradient(180deg, #fff, #f8fafc);
+}
+.ep-announcement-unread {
+  background: linear-gradient(180deg, #eff6ff, #dbeafe);
+  border-color: #bfdbfe;
+  border-left-color: #2563eb;
+}
+.ep-announcement-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+.ep-announcement-title {
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 0.98rem;
+  flex: 1;
+  min-width: 0;
+}
+.ep-announcement-new {
+  font-size: 0.6rem;
+  background: #2563eb;
+  color: #fff;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-weight: 700;
+  flex-shrink: 0;
+  letter-spacing: 0.04em;
+}
+.ep-announcement-meta {
+  font-size: 0.7rem;
+  color: #64748b;
+  margin-top: 3px;
+}
+.ep-announcement-body {
+  margin-top: 10px;
+  font-size: 0.88rem;
+  color: #1e293b;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+/* Dark theme for announcement cards */
+:root[data-theme="dark"] .ep-announcement {
+  background: linear-gradient(180deg, #1e293b, #0f172a) !important;
+  border-color: #334155 !important;
+  border-left-color: #475569 !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+:root[data-theme="dark"] .ep-announcement-unread {
+  background: linear-gradient(180deg, #1e3a8a, #1e40af) !important;
+  border-color: #3b82f6 !important;
+  border-left-color: #60a5fa !important;
+}
+:root[data-theme="dark"] .ep-announcement-title { color: #f1f5f9; }
+:root[data-theme="dark"] .ep-announcement-meta  { color: #94a3b8; }
+:root[data-theme="dark"] .ep-announcement-body  { color: #e2e8f0; }
+:root[data-theme="dark"] .ep-announcement-unread .ep-announcement-title,
+:root[data-theme="dark"] .ep-announcement-unread .ep-announcement-body { color: #ffffff; }
+:root[data-theme="dark"] .ep-announcement-unread .ep-announcement-meta { color: #bfdbfe; }
+:root[data-theme="dark"] .ep-announcement-new {
+  background: #60a5fa;
+  color: #0f172a;
+}
+
 /* Year header rows in pay-slip picker — light slate so they're visible on
    the dark dropdown background */
 .ep-payslip-year-btn:hover { background: #eff6ff !important; }
