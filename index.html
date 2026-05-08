@@ -90,6 +90,32 @@
       margin-bottom: 32px;
     }
 
+    /* Dark theme overrides for login / super-admin / onboarding cards */
+    :root[data-theme="dark"] .login-card {
+      background: #1e293b;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.6);
+    }
+    :root[data-theme="dark"] .login-title { color: #f1f5f9; }
+    :root[data-theme="dark"] .login-sub   { color: #cbd5e1; }
+    :root[data-theme="dark"] #google-signin-btn,
+    :root[data-theme="dark"] #microsoft-signin-btn {
+      background: #0f172a;
+      color: #f1f5f9;
+      border-color: #334155;
+    }
+    :root[data-theme="dark"] #google-signin-btn:hover,
+    :root[data-theme="dark"] #microsoft-signin-btn:hover {
+      border-color: #3b82f6;
+    }
+    /* Inputs inside the login/super-admin card */
+    :root[data-theme="dark"] .login-card input[type="text"],
+    :root[data-theme="dark"] .login-card input[type="search"],
+    :root[data-theme="dark"] .login-card input[type="email"] {
+      background: #0f172a;
+      color: #f1f5f9;
+    }
+    :root[data-theme="dark"] .login-card input::placeholder { color: #64748b; }
+
     #google-signin-btn {
       display: flex;
       align-items: center;
