@@ -154,3 +154,8 @@
   background: #334155 !important;
   color: #cbd5e1 !important;
 }
+
+/* Role badges — text was same hue as light bg; in dark theme the bg flips to
+   dark blue/cyan, so the dark-tinted text becomes invisible. Force white. */
+:root[data-theme="dark"] .badge-teacher { color: #ffffff; }
+:root[data-theme="dark"] .badge-admin   { color: #ffffff; }
