@@ -14,7 +14,9 @@ import {
   initStore, setCompanyId,
   getUserRecord, createUserRecord,
   getCompanyMetadata, lookupEmployeeByEmail,
-  SUPER_ADMIN_EMAIL
+  SUPER_ADMIN_EMAIL,
+  startAbsenceRequestsLiveSync, stopAbsenceRequestsLiveSync, onAbsenceRequestsChange,
+  getAbsenceRequests
 } from './data/store.js';
 import { onAuthChanged, signInWithGoogle, signInWithMicrosoft, signOutUser } from './auth.js';
 import { t, getLanguage, setLanguage, SUPPORTED_LANGUAGES, applyTranslationsToDOM } from './i18n.js';
@@ -158,6 +160,47 @@ async function showApp(user, { isSuperAdmin = false, companyName = null } = {}) 
   } catch (e) {
     console.error('Could not show app shell:', e);
   }
+
+  // 6. Live sync — stream new absence requests from Firestore so the dashboard
+  //    + Attendance Requests views update in real time and the sidebar badge
+  //    flashes when something pending arrives.
+  try {
+    startAbsenceRequestsLiveSync();
+    onAbsenceRequestsChange(() => {
+      refreshPendingBadge();
+      // Re-render the currently-active route if it cares about absence data
+      const hash = location.hash || '#dashboard';
+      if (hash === '#dashboard' || hash === '#absence-requests') {
+        // route() is wired in router.js — easiest path is to re-trigger it
+        try {
+          const ev = new HashChangeEvent('hashchange', { newURL: location.href, oldURL: location.href });
+          window.dispatchEvent(ev);
+        } catch {}
+      }
+    });
+    refreshPendingBadge();
+  } catch (e) { console.warn('Absence live-sync setup:', e); }
+}
+
+/** Refresh the red pending badge on the sidebar's Attendance Requests link. */
+function refreshPendingBadge() {
+  try {
+    const link = document.querySelector('a.nav-link[href="#absence-requests"]');
+    if (!link) return;
+    const count = getAbsenceRequests().filter(r => (r.status || 'pending') === 'pending').length;
+    let badge = link.querySelector('.nav-pending-badge');
+    if (count > 0) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'nav-pending-badge';
+        link.appendChild(badge);
+      }
+      badge.textContent = count > 99 ? '99+' : String(count);
+      badge.title = `${count} pending request${count === 1 ? '' : 's'}`;
+    } else if (badge) {
+      badge.remove();
+    }
+  } catch (e) { console.warn('Refresh pending badge:', e); }
 }
 
 function showLogin() {
@@ -271,6 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   onAuthChanged(async user => {
     if (!user) {
+      stopAbsenceRequestsLiveSync();   // don't leak listeners across sessions
       showLogin();
       return;
     }

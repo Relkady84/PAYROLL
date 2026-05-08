@@ -125,6 +125,26 @@
   border-radius: 0 2px 2px 0;
 }
 
+/* Red pulsing badge for pending requests on the sidebar nav link */
+.nav-link .nav-pending-badge {
+  margin-left: auto;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  min-width: 20px;
+  text-align: center;
+  line-height: 1.4;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.25);
+  animation: nav-pending-pulse 1.6s ease-in-out infinite;
+}
+@keyframes nav-pending-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.25); }
+  50%      { box-shadow: 0 0 0 5px rgba(220, 38, 38, 0.0);  }
+}
+
 .nav-link-icon {
   font-size: 16px;
   width: 20px;

@@ -7,7 +7,7 @@ import {
   getDoc, getDocs,
   setDoc, deleteDoc, updateDoc, addDoc,
   query, where, orderBy,
-  writeBatch
+  writeBatch, onSnapshot
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
 // ── Super Admin ───────────────────────────────────────────
@@ -124,6 +124,35 @@ async function _loadAbsenceRequests() {
   } catch (e) {
     console.warn('Could not load absence requests:', e);
   }
+}
+
+// ── Real-time absence-requests listener ────────────────────
+// When an admin/owner is signed in, we keep a live Firestore listener so new
+// requests submitted from the employee portal appear instantly in the dashboard
+// + Attendance Requests views — no manual refresh needed.
+let _absenceUnsub = null;
+const _absenceListeners = new Set();   // callbacks to fire on each snapshot
+
+export function onAbsenceRequestsChange(cb) {
+  _absenceListeners.add(cb);
+  return () => _absenceListeners.delete(cb);
+}
+
+export function startAbsenceRequestsLiveSync() {
+  if (!_companyId) return;
+  if (_absenceUnsub) return;   // already running
+  _absenceUnsub = onSnapshot(
+    companyCol('absenceRequests'),
+    snap => {
+      _absenceRequests = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+      _absenceListeners.forEach(cb => { try { cb(_absenceRequests); } catch (e) { console.error(e); } });
+    },
+    err => console.warn('Absence requests live sync error:', err)
+  );
+}
+
+export function stopAbsenceRequestsLiveSync() {
+  if (_absenceUnsub) { _absenceUnsub(); _absenceUnsub = null; }
 }
 
 async function _loadSettings() {
