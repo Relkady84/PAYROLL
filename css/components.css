@@ -323,6 +323,33 @@
   color: #0e7490;
 }
 
+/* ── Announcement audience radio chips ── */
+.ann-aud-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1.5px solid var(--color-border);
+  border-radius: 999px;
+  cursor: pointer;
+  user-select: none;
+  background: var(--color-surface);
+  font-size: 0.85rem;
+  color: var(--color-text);
+  transition: border-color 0.15s, background 0.15s;
+}
+.ann-aud-opt input[type="radio"] {
+  margin: 0;
+  accent-color: var(--color-primary);
+}
+.ann-aud-opt:has(input[type="radio"]:checked) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+.ann-aud-opt:hover { border-color: var(--color-border-hover); }
+
 /* ── Stat Cards ── */
 .stat-cards {
   display: grid;

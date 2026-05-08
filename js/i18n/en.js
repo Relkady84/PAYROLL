@@ -255,6 +255,7 @@ export const en = {
   'portal.home.attendance_btn':   '📝 Attendance Request',
   'portal.home.notes_btn':        '🔐 My Notes',
   'portal.home.payslip_btn':      '💰 My Pay Slip',
+  'portal.home.announcements_btn':'Announcements',
   'portal.home.go_home':          'Home',
 
   // Submit confirmations

@@ -270,8 +270,18 @@ function renderSection() {
   return homeSectionHTML();
 }
 
+/** Returns only announcements whose audience matches THIS employee's type
+ *  (or 'all' / undefined for legacy posts). */
+function visibleAnnouncements() {
+  const myType = _employee?.employeeType || '';
+  return _announcements.filter(a => {
+    const aud = a.audience || 'all';
+    return aud === 'all' || aud === myType;
+  });
+}
+
 function unreadAnnouncementCount() {
-  return _announcements.filter(a => !_readAnnouncementIds.includes(a.id)).length;
+  return visibleAnnouncements().filter(a => !_readAnnouncementIds.includes(a.id)).length;
 }
 
 function announcementsDrawerItemHTML() {
@@ -298,12 +308,24 @@ function headerHTML() {
     ? `<img src="${esc(_companyLogo)}" alt="" class="ep-logo-img">`
     : `<span class="ep-logo">🏫</span>`;
 
-  // Show a home button on the right when user is not already on home
+  // Show a home button when user is not already on home
   const homeBtn = _section !== 'home' ? `
     <button id="ep-home-btn" class="ep-burger" aria-label="${esc(t('portal.home.go_home'))}"
-      title="${esc(t('portal.home.go_home'))}"
-      style="margin-left:auto;">🏠</button>
+      title="${esc(t('portal.home.go_home'))}">🏠</button>
   ` : '';
+
+  // Always-visible notification bell (top-right)
+  const totalNotifs = totalNotificationCount();
+  const bellBadge = totalNotifs > 0 ? `
+    <span class="ep-bell-badge">${totalNotifs > 99 ? '99+' : totalNotifs}</span>
+  ` : '';
+  const bell = `
+    <button id="ep-bell-btn" class="ep-burger ep-bell"
+      aria-label="Notifications" title="Notifications"
+      style="position:relative;">
+      🔔${bellBadge}
+    </button>
+  `;
 
   return `
     <header class="ep-header">
@@ -315,8 +337,88 @@ function headerHTML() {
           <div class="ep-header-sub">${esc(sectionTitle(_section))}</div>
         </div>
       </div>
-      ${homeBtn}
+      <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+        ${homeBtn}
+        ${bell}
+      </div>
+      ${notificationPanelHTML()}
     </header>
+  `;
+}
+
+// ── Notification system (bell + dropdown panel) ──────────
+let _bellOpen = false;
+
+function getSeenPaySlipMonths() {
+  try {
+    const raw = localStorage.getItem('seen-payslip-months');
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+function markPaySlipMonthsSeen(months) {
+  try {
+    const existing = getSeenPaySlipMonths();
+    const merged   = Array.from(new Set([...existing, ...months]));
+    localStorage.setItem('seen-payslip-months', JSON.stringify(merged));
+  } catch {}
+}
+function unseenPaySlipMonths() {
+  const seen = getSeenPaySlipMonths();
+  return _issuedMonths.filter(m => !seen.includes(m));
+}
+function totalNotificationCount() {
+  return unreadAnnouncementCount() + unseenPaySlipMonths().length;
+}
+
+function notificationPanelHTML() {
+  if (!_bellOpen) return '';
+  const unread = visibleAnnouncements().filter(a => !_readAnnouncementIds.includes(a.id));
+  const unseenMonths = unseenPaySlipMonths();
+  const empty = !unread.length && !unseenMonths.length;
+
+  return `
+    <div id="ep-bell-panel" class="ep-bell-panel">
+      <div class="ep-bell-panel-header">
+        <span style="font-weight:700;">🔔 Notifications</span>
+        ${!empty ? `<button type="button" id="ep-bell-mark-all" style="background:none;border:none;
+                       color:#2563eb;font-size:0.78rem;cursor:pointer;font-family:inherit;
+                       font-weight:600;">Mark all as read</button>` : ''}
+      </div>
+      <div class="ep-bell-panel-body">
+        ${empty ? `
+          <div style="padding:28px 16px;text-align:center;color:#94a3b8;font-size:0.88rem;">
+            <div style="font-size:2rem;margin-bottom:6px;">✨</div>
+            <div style="font-weight:600;color:#64748b;">All caught up!</div>
+            <div style="font-size:0.78rem;margin-top:2px;">No new updates right now.</div>
+          </div>
+        ` : `
+          ${unseenMonths.length ? `
+            <div class="ep-bell-section-label">💰 Pay Slip</div>
+            ${unseenMonths.map(ym => `
+              <button type="button" class="ep-bell-item" data-bell-go="payslip" data-bell-month="${esc(ym)}">
+                <span class="ep-bell-item-icon" style="background:#dbeafe;">💰</span>
+                <span class="ep-bell-item-text">
+                  <span class="ep-bell-item-title">${esc(payslipMonthLabel(ym))} pay slip is now available</span>
+                  <span class="ep-bell-item-sub">Tap to view your pay slip</span>
+                </span>
+              </button>
+            `).join('')}
+          ` : ''}
+          ${unread.length ? `
+            <div class="ep-bell-section-label">📢 Announcements</div>
+            ${unread.map(a => `
+              <button type="button" class="ep-bell-item" data-bell-go="announcements" data-bell-id="${esc(a.id)}">
+                <span class="ep-bell-item-icon" style="background:#fee2e2;">📢</span>
+                <span class="ep-bell-item-text">
+                  <span class="ep-bell-item-title">${esc(a.title)}</span>
+                  <span class="ep-bell-item-sub">${a.createdAt ? esc(new Date(a.createdAt).toLocaleString()) : ''}</span>
+                </span>
+              </button>
+            `).join('')}
+          ` : ''}
+        `}
+      </div>
+    </div>
   `;
 }
 
@@ -502,9 +604,16 @@ function homeSectionHTML() {
           style="background:#dbeafe;color:#1e40af;border:1.5px solid #bfdbfe;">
           ${esc(t('portal.home.payslip_btn'))}
         </button>
-        <button class="ep-btn" data-go-section="notes"
-          style="background:#fef3c7;color:#92400e;border:1.5px solid #fde68a;">
-          ${esc(t('portal.home.notes_btn'))}
+        <button class="ep-btn" data-go-section="announcements"
+          style="background:#fee2e2;color:#991b1b;border:1.5px solid #fecaca;
+                 display:flex;align-items:center;justify-content:center;gap:8px;">
+          📢 ${esc(t('portal.home.announcements_btn') || 'Announcements')}
+          ${unreadAnnouncementCount() > 0
+            ? `<span style="background:#dc2626;color:#fff;font-size:0.66rem;font-weight:700;
+                            padding:2px 7px;border-radius:999px;min-width:20px;text-align:center;">
+                ${unreadAnnouncementCount() > 99 ? '99+' : unreadAnnouncementCount()}
+              </span>`
+            : ''}
         </button>
       </div>
     </section>
@@ -693,6 +802,11 @@ async function findAcademicYearForMonth(yearId) {
 
 // ── Section: PAY SLIP ────────────────────────────────────
 function paySlipSectionHTML() {
+  // Viewing the section = those months are no longer "new" to this user
+  setTimeout(() => {
+    if (_issuedMonths.length) markPaySlipMonthsSeen(_issuedMonths);
+  }, 0);
+
   // No issued pay slips yet → show a friendly empty state, no picker
   if (!_issuedMonths.length) {
     return `
@@ -953,9 +1067,11 @@ function historySectionHTML() {
 // ── Section: NOTES (private personal notes) ──────────────
 // ── Section: ANNOUNCEMENTS ────────────────────────────────
 function announcementsSectionHTML() {
-  // Mark all current announcements as read shortly after render — fire-and-forget
+  const list = visibleAnnouncements();
+
+  // Mark visible announcements as read shortly after render — fire-and-forget
   setTimeout(() => {
-    const unreadIds = _announcements
+    const unreadIds = list
       .filter(a => !_readAnnouncementIds.includes(a.id))
       .map(a => a.id);
     if (unreadIds.length && _user?.uid) {
@@ -971,7 +1087,7 @@ function announcementsSectionHTML() {
     }
   }, 600);
 
-  if (!_announcements.length) {
+  if (!list.length) {
     return `
       <section class="ep-card">
         <div class="ep-card-title">📢 Announcements</div>
@@ -988,7 +1104,7 @@ function announcementsSectionHTML() {
     <section class="ep-card">
       <div class="ep-card-title">📢 Announcements</div>
       <div style="display:flex;flex-direction:column;gap:10px;margin-top:6px;">
-        ${_announcements.map(a => {
+        ${list.map(a => {
           const isUnread = !_readAnnouncementIds.includes(a.id);
           const stamp = a.createdAt ? new Date(a.createdAt).toLocaleString() : '';
           return `
@@ -1301,6 +1417,56 @@ function bindGlobalEvents() {
       _section = 'home';
       _editingNoteId = null;
       draw();
+    });
+  }
+
+  // Notification bell
+  const bellBtn = document.getElementById('ep-bell-btn');
+  if (bellBtn) {
+    bellBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      _bellOpen = !_bellOpen;
+      draw();
+    });
+  }
+  // Click outside the panel closes it
+  if (_bellOpen) {
+    document.addEventListener('click', closeBellPanelOnce, { once: true });
+    const panel = document.getElementById('ep-bell-panel');
+    if (panel) panel.addEventListener('click', e => e.stopPropagation());
+
+    // Mark all as read
+    const markAll = document.getElementById('ep-bell-mark-all');
+    if (markAll) {
+      markAll.addEventListener('click', async () => {
+        const visibleUnread = visibleAnnouncements()
+          .filter(a => !_readAnnouncementIds.includes(a.id))
+          .map(a => a.id);
+        if (visibleUnread.length && _user?.uid) {
+          try {
+            await markAnnouncementsRead(_user.uid, visibleUnread);
+            _readAnnouncementIds = Array.from(new Set([..._readAnnouncementIds, ...visibleUnread]));
+          } catch (e) { console.warn('mark-all read failed:', e); }
+        }
+        markPaySlipMonthsSeen(_issuedMonths);
+        _bellOpen = false;
+        draw();
+      });
+    }
+
+    // Item clicks → navigate
+    document.querySelectorAll('[data-bell-go]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = btn.dataset.bellGo;
+        const month  = btn.dataset.bellMonth;
+        if (target === 'payslip' && month) {
+          _paySlipMonth = month;
+          markPaySlipMonthsSeen([month]);
+        }
+        _section = target;
+        _bellOpen = false;
+        draw();
+      });
     });
   }
 
@@ -1742,6 +1908,10 @@ function closeDrawer() {
   document.getElementById('ep-drawer')?.classList.remove('open');
   document.getElementById('ep-drawer-overlay')?.classList.remove('open');
   document.body.classList.remove('ep-drawer-open');
+}
+
+function closeBellPanelOnce() {
+  if (_bellOpen) { _bellOpen = false; draw(); }
 }
 
 function bindSignOut() {

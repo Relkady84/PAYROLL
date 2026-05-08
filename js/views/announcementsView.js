@@ -41,6 +41,24 @@ export function render(selector) {
               <textarea class="form-control" id="ann-body" rows="4"
                         placeholder="Share the details with your team…"></textarea>
             </div>
+            <div class="form-group" style="grid-column:1/-1;">
+              <label class="form-label">Audience</label>
+              <div id="ann-audience" style="display:flex;gap:8px;flex-wrap:wrap;">
+                <label class="ann-aud-opt" data-aud="all">
+                  <input type="radio" name="ann-aud" value="all" checked>
+                  <span>👥 Everyone</span>
+                </label>
+                <label class="ann-aud-opt" data-aud="Teacher">
+                  <input type="radio" name="ann-aud" value="Teacher">
+                  <span>📘 Teachers only</span>
+                </label>
+                <label class="ann-aud-opt" data-aud="Admin">
+                  <input type="radio" name="ann-aud" value="Admin">
+                  <span>💼 Administration only</span>
+                </label>
+              </div>
+              <span class="form-hint">Pick who should see this announcement in their portal.</span>
+            </div>
           </div>
           <div style="display:flex;gap:10px;margin-top:4px;">
             <button type="button" class="btn btn-primary" id="ann-post-btn">📢 Post announcement</button>
@@ -98,10 +116,15 @@ async function handlePost() {
   try {
     const { auth } = await import('../firebase.js');
     const createdBy = auth?.currentUser?.email || '';
-    await addAnnouncement({ title, body, createdBy });
+    const audEl    = document.querySelector('input[name="ann-aud"]:checked');
+    const audience = audEl ? audEl.value : 'all';
+    await addAnnouncement({ title, body, createdBy, audience });
     titleEl.value = '';
     bodyEl.value  = '';
-    showToast('Announcement posted — staff will see it instantly.', 'success');
+    // Reset audience to "Everyone" for the next post
+    const allRadio = document.querySelector('input[name="ann-aud"][value="all"]');
+    if (allRadio) allRadio.checked = true;
+    showToast('Announcement posted — targeted staff will see it instantly.', 'success');
   } catch (e) {
     console.error(e);
     errEl.textContent = 'Failed to post. Try again.';
@@ -133,13 +156,23 @@ function renderList(list) {
 
   listEl.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:10px;">
-      ${list.map(a => `
+      ${list.map(a => {
+        const aud = a.audience || 'all';
+        const audBadge = aud === 'Teacher'
+          ? `<span style="background:#dbeafe;color:#1e40af;font-size:0.68rem;font-weight:700;padding:2px 8px;border-radius:999px;">📘 Teachers</span>`
+          : aud === 'Admin'
+          ? `<span style="background:#fef3c7;color:#92400e;font-size:0.68rem;font-weight:700;padding:2px 8px;border-radius:999px;">💼 Administration</span>`
+          : `<span style="background:#dcfce7;color:#166534;font-size:0.68rem;font-weight:700;padding:2px 8px;border-radius:999px;">👥 Everyone</span>`;
+        return `
         <div style="padding:14px 16px;border:1px solid var(--color-border);border-radius:10px;
                     background:var(--color-surface);">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
             <div style="flex:1;min-width:0;">
-              <div style="font-weight:700;font-size:1rem;color:var(--color-text);">
-                ${esc(a.title)}
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <span style="font-weight:700;font-size:1rem;color:var(--color-text);">
+                  ${esc(a.title)}
+                </span>
+                ${audBadge}
               </div>
               <div style="font-size:0.72rem;color:var(--color-text-muted);margin-top:3px;">
                 ${a.createdAt ? new Date(a.createdAt).toLocaleString() : ''}${a.createdBy ? ' · by ' + esc(a.createdBy) : ''}
@@ -150,7 +183,8 @@ function renderList(list) {
           <div style="margin-top:10px;font-size:0.9rem;color:var(--color-text);
                       white-space:pre-wrap;line-height:1.45;">${esc(a.body)}</div>
         </div>
-      `).join('')}
+      `;
+      }).join('')}
     </div>
   `;
 
