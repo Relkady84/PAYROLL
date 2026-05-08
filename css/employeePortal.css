@@ -665,23 +665,9 @@ textarea.ep-input {
   border-color: #334155;
 }
 
-/* Pay slip — text color + section borders inside the card */
-:root[data-theme="dark"] .ep-payslip-name,
-:root[data-theme="dark"] .ep-payslip-row { color: #f1f5f9; }
-:root[data-theme="dark"] .ep-payslip-period,
-:root[data-theme="dark"] .ep-payslip-type,
-:root[data-theme="dark"] .ep-payslip-sub  { color: #94a3b8; }
+/* Pay slip — keep light-mode text styling, just make container dark.
+   The .ep-card dark background already applies; section dividers softened. */
 :root[data-theme="dark"] .ep-payslip-section { border-top-color: #334155; }
-/* Keep the deduction text red on dark too */
-:root[data-theme="dark"] .ep-payslip-row.ep-deduction,
-:root[data-theme="dark"] .ep-payslip-row.ep-deduction strong { color: #f87171; }
-/* Net-salary green gradient → dark green so white text reads on it */
-:root[data-theme="dark"] .ep-payslip-net {
-  background: linear-gradient(135deg, #14532d 0%, #166534 100%);
-}
-:root[data-theme="dark"] .ep-payslip-net-label  { color: #bbf7d0; }
-:root[data-theme="dark"] .ep-payslip-net-lbp    { color: #ffffff; }
-:root[data-theme="dark"] .ep-payslip-net-usd    { color: #bbf7d0; }
 
 /* Greeting card — light-blue gradient → dark blue */
 :root[data-theme="dark"] .ep-greeting {
@@ -718,23 +704,34 @@ textarea.ep-input {
 :root[data-theme="dark"] .ep-status-approved { background: #052e16; color: #bbf7d0; }
 :root[data-theme="dark"] .ep-status-rejected { background: #450a0a; color: #fee2e2; }
 
-/* Custom date filter button + dropdown menu in history */
-:root[data-theme="dark"] #ep-hist-date-btn {
+/* Custom date filter button + dropdown menu in history AND pay slip */
+:root[data-theme="dark"] #ep-hist-date-btn,
+:root[data-theme="dark"] #ep-payslip-date-btn {
   background: #0f172a !important;
   color: #f1f5f9 !important;
   border-color: #334155 !important;
 }
-:root[data-theme="dark"] #ep-hist-date-menu {
+:root[data-theme="dark"] #ep-hist-date-menu,
+:root[data-theme="dark"] #ep-payslip-date-menu {
   background: #1e293b !important;
   border-color: #334155 !important;
   color: #f1f5f9 !important;
   box-shadow: 0 6px 18px rgba(0,0,0,0.5) !important;
 }
-:root[data-theme="dark"] #ep-hist-date-menu * { color: #f1f5f9; }
-:root[data-theme="dark"] #ep-hist-date-menu small { color: #94a3b8 !important; }
+:root[data-theme="dark"] #ep-hist-date-menu *,
+:root[data-theme="dark"] #ep-payslip-date-menu * { color: #f1f5f9; }
+:root[data-theme="dark"] #ep-hist-date-menu small,
+:root[data-theme="dark"] #ep-payslip-date-menu small { color: #94a3b8 !important; }
 :root[data-theme="dark"] #ep-hist-date-menu button:hover,
-:root[data-theme="dark"] #ep-hist-date-menu [role="button"]:hover {
+:root[data-theme="dark"] #ep-payslip-date-menu button:hover {
   background: #334155 !important;
+}
+/* Disabled (future) month buttons in pay-slip picker stay subdued */
+:root[data-theme="dark"] #ep-payslip-date-menu button[disabled] {
+  background: #0f172a !important;
+  color: #475569 !important;
+  border-color: #334155 !important;
+  cursor: not-allowed !important;
 }
 
 /* Drawer body — flip from white to dark */

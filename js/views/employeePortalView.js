@@ -123,6 +123,10 @@ let _histDate       = 'all';          // 'all' | 'YYYY' | 'YYYY-MM'
 let _histExpandedY  = null;           // for the date picker: which year is currently expanded
 let _histDateOpen   = false;          // is the date picker menu open?
 
+// Pay-slip month picker — hierarchical custom dropdown (same model as history)
+let _paySlipPickerOpen = false;
+let _paySlipExpandedY  = null;
+
 const HIST_MONTH_OPTIONS = [
   { v: '01', l: 'Jan' }, { v: '02', l: 'Feb' }, { v: '03', l: 'Mar' },
   { v: '04', l: 'Apr' }, { v: '05', l: 'May' }, { v: '06', l: 'Jun' },
@@ -642,8 +646,22 @@ function paySlipSectionHTML() {
     <section class="ep-card">
       <div class="ep-card-title">💰 Pay Slip</div>
 
-      <label class="ep-label" for="ep-payslip-month">Month</label>
-      <input class="ep-input" type="month" id="ep-payslip-month" value="${_paySlipMonth}" max="${defaultMonth()}">
+      <label class="ep-label">Month</label>
+      <div style="position:relative;">
+        <button type="button" id="ep-payslip-date-btn"
+          style="width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:9px;
+                 font-size:0.95rem;font-family:inherit;background:#fff;color:#1e293b;
+                 text-align:left;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+          <span>📅 ${esc(payslipMonthLabel(_paySlipMonth))}</span>
+          <span style="font-size:0.75rem;color:#94a3b8;">▼</span>
+        </button>
+        <div id="ep-payslip-date-menu"
+          style="display:${_paySlipPickerOpen ? 'block' : 'none'};position:absolute;top:100%;left:0;right:0;margin-top:4px;
+                 background:#fff;border:1.5px solid #e2e8f0;border-radius:8px;
+                 box-shadow:0 6px 18px rgba(0,0,0,0.12);z-index:50;
+                 padding:6px;max-height:340px;overflow-y:auto;font-size:0.85rem;">
+        </div>
+      </div>
     </section>
 
     <section class="ep-card ep-payslip">
@@ -1185,15 +1203,117 @@ function bindListEvents() {
 }
 
 function bindPaySlipEvents() {
-  document.getElementById('ep-payslip-month').addEventListener('change', async e => {
-    _paySlipMonth = e.target.value || defaultMonth();
-    // Pre-fetch the academic year for this month, then redraw
-    await findAcademicYearForMonth();
-    draw();
-  });
+  // Hierarchical month picker (year → month) — same UX as history attendance
+  const dateBtn  = document.getElementById('ep-payslip-date-btn');
+  const dateMenu = document.getElementById('ep-payslip-date-menu');
+  if (dateBtn && dateMenu) {
+    dateBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      _paySlipPickerOpen = !_paySlipPickerOpen;
+      dateMenu.style.display = _paySlipPickerOpen ? 'block' : 'none';
+      if (_paySlipPickerOpen) renderPaySlipDatePickerMenu();
+    });
+    dateMenu.addEventListener('click', e => e.stopPropagation());
+    document.addEventListener('click', e => {
+      if (!dateBtn.contains(e.target) && !dateMenu.contains(e.target)) {
+        if (_paySlipPickerOpen) {
+          _paySlipPickerOpen = false;
+          dateMenu.style.display = 'none';
+        }
+      }
+    });
+    if (_paySlipPickerOpen) renderPaySlipDatePickerMenu();
+  }
 
   document.getElementById('ep-payslip-pdf').addEventListener('click', () => {
     generatePaySlipPDF();
+  });
+}
+
+// Pretty label for selected pay-slip month (e.g. "May 2026")
+function payslipMonthLabel(ym) {
+  if (!ym || !/^\d{4}-\d{2}$/.test(ym)) return 'Pick a month';
+  const m = HIST_MONTH_OPTIONS.find(x => x.v === ym.slice(5, 7));
+  return `${m ? m.l : ''} ${ym.slice(0, 4)}`.trim();
+}
+
+function renderPaySlipDatePickerMenu() {
+  const menu = document.getElementById('ep-payslip-date-menu');
+  if (!menu) return;
+
+  // Show the last 5 years (current + 4 prior). Months newer than the current
+  // month are disabled because there's no pay slip for the future.
+  const today    = new Date();
+  const curY     = today.getFullYear();
+  const curM     = today.getMonth() + 1;
+  const years    = [];
+  for (let y = curY; y >= curY - 4; y--) years.push(String(y));
+
+  const selectedY = _paySlipMonth.slice(0, 4);
+  if (_paySlipExpandedY == null) _paySlipExpandedY = selectedY;
+
+  let html = '';
+  for (const year of years) {
+    const isExpanded = _paySlipExpandedY === year;
+    const isMonthSel = _paySlipMonth.startsWith(year + '-');
+
+    html += `
+      <div style="margin-bottom:2px;">
+        <button type="button" data-pstoggle="${year}"
+          style="display:flex;width:100%;align-items:center;justify-content:space-between;
+                 padding:7px 10px;border:none;background:transparent;cursor:pointer;
+                 font-family:inherit;font-size:0.9rem;border-radius:6px;
+                 color:${isMonthSel ? '#1e40af' : '#1e293b'};
+                 font-weight:${isMonthSel ? '600' : '500'};">
+          <span>${year}${isMonthSel ? ` <small style="color:#64748b;">(${payslipMonthLabel(_paySlipMonth)})</small>` : ''}</span>
+          <span style="font-size:0.7rem;color:#94a3b8;">${isExpanded ? '▼' : '▶'}</span>
+        </button>
+        ${isExpanded ? `
+          <div style="padding:4px 10px 6px 14px;">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:3px;">
+              ${HIST_MONTH_OPTIONS.map(m => {
+                const code     = `${year}-${m.v}`;
+                const isFuture = (parseInt(year, 10) > curY) ||
+                                 (parseInt(year, 10) === curY && parseInt(m.v, 10) > curM);
+                const sel      = _paySlipMonth === code;
+                return `
+                  <button type="button" data-pspick="${code}" ${isFuture ? 'disabled' : ''}
+                    style="padding:6px 4px;border:1.5px solid ${sel ? '#2563eb' : '#e2e8f0'};
+                           background:${sel ? '#dbeafe' : (isFuture ? '#f8fafc' : '#fff')};
+                           color:${sel ? '#1e40af' : (isFuture ? '#cbd5e1' : '#1e293b')};
+                           font-family:inherit;font-size:0.78rem;
+                           border-radius:5px;cursor:${isFuture ? 'not-allowed' : 'pointer'};
+                           font-weight:${sel ? '600' : '500'};">
+                    ${m.l}
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+  menu.innerHTML = html;
+
+  // Toggle year expand/collapse
+  menu.querySelectorAll('[data-pstoggle]').forEach(b => {
+    b.addEventListener('click', () => {
+      const y = b.dataset.pstoggle;
+      _paySlipExpandedY = (_paySlipExpandedY === y) ? null : y;
+      renderPaySlipDatePickerMenu();
+    });
+  });
+
+  // Pick a month
+  menu.querySelectorAll('[data-pspick]').forEach(b => {
+    if (b.disabled) return;
+    b.addEventListener('click', async () => {
+      _paySlipMonth = b.dataset.pspick;
+      _paySlipPickerOpen = false;
+      await findAcademicYearForMonth();
+      draw();
+    });
   });
 }
 

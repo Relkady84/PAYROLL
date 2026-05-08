@@ -10,7 +10,7 @@
  * Version bump = bump CACHE_VERSION below.
  */
 
-const CACHE_VERSION = 'v47-2026-05-08-history-items-and-date-dropdown-dark';
+const CACHE_VERSION = 'v48-2026-05-08-payslip-custom-month-picker';
 const CACHE_SHELL   = `payroll-shell-${CACHE_VERSION}`;
 const CACHE_RUNTIME = `payroll-runtime-${CACHE_VERSION}`;
 
