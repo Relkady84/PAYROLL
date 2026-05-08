@@ -1,7 +1,8 @@
 import {
   getEmployees, getSettings, getAbsenceRequests,
   getCalendar, getCurrentAcademicYear, findAcademicYearForMonth, getRoleRegistry,
-  getAcademicYears
+  getAcademicYears,
+  getIssuedPaySlipMonths, publishPaySlipMonth, unpublishPaySlipMonth
 } from '../data/store.js';
 import { calculatePayroll, calculateTotals, computeEffectiveDays } from '../services/payroll.js';
 import { exportCSV, exportExcel, exportPDF } from '../services/exportService.js';
@@ -32,6 +33,29 @@ function payrollMonthLabel(ym) {
   if (!ym || !/^\d{4}-\d{2}$/.test(ym)) return 'Pick month';
   const m = PAYROLL_MONTH_OPTIONS.find(x => x.v === ym.slice(5, 7));
   return `${m ? m.l : ''} ${ym.slice(0, 4)}`.trim();
+}
+
+/** Refresh the Publish button label + style based on whether the
+ *  currently-selected month is already published. */
+async function refreshPublishButton() {
+  const btn   = document.getElementById('payroll-publish-btn');
+  const lblEl = document.getElementById('payroll-publish-month-label');
+  if (!btn || !lblEl) return;
+  let issued = [];
+  try { issued = await getIssuedPaySlipMonths(); } catch {}
+  const isPublished = issued.includes(_selectedMonth);
+  lblEl.textContent = payrollMonthLabel(_selectedMonth);
+  if (isPublished) {
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-secondary');
+    btn.innerHTML = `✓ Published — Unpublish <span id="payroll-publish-month-label">${payrollMonthLabel(_selectedMonth)}</span>`;
+    btn.title = 'This month is visible to employees. Click to hide it again.';
+  } else {
+    btn.classList.remove('btn-secondary');
+    btn.classList.add('btn-primary');
+    btn.innerHTML = `📢 Publish for <span id="payroll-publish-month-label">${payrollMonthLabel(_selectedMonth)}</span>`;
+    btn.title = "Publish this month's pay slip — employees can then see it in their portal";
+  }
 }
 
 /** Years for the payroll picker — pulled from academic years + absence dates,
@@ -115,6 +139,13 @@ export function render(selector) {
               </div>
             </div>
             <button class="btn btn-secondary btn-sm" id="payroll-reset-days" style="margin-left:8px;" title="Reset manual day overrides — recompute from approved absences">↺ Reset Days</button>
+
+            <!-- Publish pay slip for selected month → makes it visible to employees -->
+            <button class="btn btn-primary btn-sm" id="payroll-publish-btn"
+              style="margin-left:12px;"
+              title="Publish this month's pay slip — employees can then see it in their portal">
+              📢 Publish for <span id="payroll-publish-month-label">${payrollMonthLabel(_selectedMonth)}</span>
+            </button>
           </div>
           <div class="toolbar-right">
             <span style="font-size:var(--font-size-xs);color:var(--color-text-muted);font-weight:500;">IMPORT:</span>
@@ -222,6 +253,37 @@ export function render(selector) {
     _daysWorked = {};
     renderRows(container);
     showToast('Days reset — recomputed from approved absences.', 'info');
+  });
+
+  // Publish / Unpublish pay slip for the selected month
+  refreshPublishButton();
+  document.getElementById('payroll-publish-btn').addEventListener('click', async () => {
+    const btn   = document.getElementById('payroll-publish-btn');
+    const month = _selectedMonth;
+    const issued = await getIssuedPaySlipMonths();
+    const isPublished = issued.includes(month);
+    const verb = isPublished ? 'unpublish' : 'publish';
+    if (!confirm(`Are you sure you want to ${verb} the pay slip for ${payrollMonthLabel(month)}?\n\n${
+      isPublished
+        ? 'Employees will no longer see this month in their portal.'
+        : 'Employees will be able to view their pay slip for this month.'
+    }`)) return;
+    btn.disabled = true;
+    try {
+      if (isPublished) {
+        await unpublishPaySlipMonth(month);
+        showToast(`Unpublished ${payrollMonthLabel(month)} — hidden from employees.`, 'info');
+      } else {
+        await publishPaySlipMonth(month);
+        showToast(`Published ${payrollMonthLabel(month)} — employees can now view it.`, 'success');
+      }
+      refreshPublishButton();
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to update pay-slip status. Try again.', 'error');
+    } finally {
+      btn.disabled = false;
+    }
   });
 
   // Sort headers
@@ -344,6 +406,7 @@ function renderPayrollDateMenu(container) {
       if (lbl) lbl.textContent = payrollMonthLabel(_selectedMonth);
       menu.style.display = 'none';
       renderRows(container);
+      refreshPublishButton();
     });
   });
 }

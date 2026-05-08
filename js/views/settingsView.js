@@ -5,7 +5,8 @@ import {
   getAcademicYears, getCurrentAcademicYear, getCurrentAcademicYearId,
   saveAcademicYear, setCurrentAcademicYear, deleteAcademicYear,
   getRoleRegistry, saveRoleRegistry,
-  setCompanyBackupSchedule, recordBackupTaken, buildCompanyBackup
+  setCompanyBackupSchedule, recordBackupTaken, buildCompanyBackup,
+  setPaySlipPublishers
 } from '../data/store.js';
 import { openRestoreOverlay } from './backupRestoreView.js';
 import { validateSettings, normalizeSettings, denormalizeSettings } from '../models/settings.js';
@@ -103,6 +104,29 @@ export async function render(selector) {
           <button type="button" id="save-profile-btn" class="btn btn-primary">
             💾 Save Company Profile
           </button>
+
+          <!-- Pay Slip Publishers — designated people allowed to publish monthly pay slips -->
+          <div class="settings-section" style="margin-top:24px;border-top:1px solid var(--color-border);padding-top:18px;">
+            <div class="settings-section-title">📢 Pay Slip Publishers</div>
+            <div class="alert alert-info" style="margin-bottom:12px;">
+              <span>ℹ</span>
+              <span>List employees (by sign-in email) who are allowed to publish monthly pay slips
+                to the rest of the staff. Typically your <strong>Service Financier</strong> manager.
+                Once added, they'll see a <em>📢 Pay Slips</em> section in their portal drawer.</span>
+            </div>
+
+            <div id="payslip-publishers-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;"></div>
+
+            <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+              <div style="flex:1 1 260px;">
+                <label class="form-label" style="font-size:0.78rem;">Publisher email</label>
+                <input type="email" class="form-control" id="psp-add-email"
+                       placeholder="finance@school.lb">
+              </div>
+              <button type="button" class="btn btn-secondary" id="psp-add-btn">+ Add publisher</button>
+            </div>
+            <div id="psp-add-error" style="font-size:0.78rem;color:var(--color-danger);margin-top:6px;min-height:18px;"></div>
+          </div>
 
           <!-- Quick Links — shown on Employee Portal Home page -->
           <div class="settings-section" style="margin-top:24px;border-top:1px solid var(--color-border);padding-top:18px;">
@@ -852,6 +876,9 @@ export async function render(selector) {
   // ── Quick Links manager ────────────────────────────────
   initQuickLinksSection(meta);
 
+  // ── Pay Slip Publishers manager ────────────────────────
+  initPaySlipPublishersSection(meta);
+
   // ── Light / Dark / Auto theme picker ──────────────────
   initAppThemePicker();
 
@@ -1294,6 +1321,76 @@ function initBackupSection(meta) {
 }
 
 // ── Quick Links manager (Company Profile section) ─────────
+function initPaySlipPublishersSection(meta) {
+  let publishers = Array.isArray(meta?.paySlipPublishers) ? [...meta.paySlipPublishers] : [];
+
+  const listEl    = document.getElementById('payslip-publishers-list');
+  const emailIn   = document.getElementById('psp-add-email');
+  const addBtn    = document.getElementById('psp-add-btn');
+  const errEl     = document.getElementById('psp-add-error');
+  if (!listEl || !addBtn) return;
+
+  function renderList() {
+    if (!publishers.length) {
+      listEl.innerHTML = `<div style="padding:12px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;text-align:center;color:#94a3b8;font-size:0.85rem;">
+        No designated publishers yet. Only you (the company owner) can publish pay slips.
+      </div>`;
+      return;
+    }
+    listEl.innerHTML = publishers.map((email, i) => `
+      <div style="display:flex;gap:10px;align-items:center;padding:9px 12px;background:#f8fafc;border:1px solid var(--color-border);border-radius:8px;">
+        <span style="font-size:1.1rem;flex-shrink:0;">📧</span>
+        <span style="flex:1;min-width:0;font-size:0.88rem;font-weight:600;
+                     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(email)}</span>
+        <button type="button" class="btn btn-danger btn-sm" data-psp-del="${i}" title="Remove">🗑</button>
+      </div>
+    `).join('');
+    listEl.querySelectorAll('[data-psp-del]').forEach(b => {
+      b.addEventListener('click', async () => {
+        const i = parseInt(b.dataset.pspDel, 10);
+        const email = publishers[i];
+        if (!confirm(`Remove ${email} from pay-slip publishers?`)) return;
+        publishers.splice(i, 1);
+        try {
+          await setPaySlipPublishers(publishers);
+          showToast('Publisher removed.', 'success');
+          renderList();
+        } catch (e) {
+          console.error(e);
+          showToast('Failed to remove publisher.', 'error');
+        }
+      });
+    });
+  }
+
+  addBtn.addEventListener('click', async () => {
+    errEl.textContent = '';
+    const email = emailIn.value.trim().toLowerCase();
+    if (!email) { errEl.textContent = 'Email is required.'; return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errEl.textContent = 'Enter a valid email address.';
+      return;
+    }
+    if (publishers.includes(email)) {
+      errEl.textContent = 'This email is already a publisher.';
+      return;
+    }
+    publishers.push(email);
+    try {
+      await setPaySlipPublishers(publishers);
+      emailIn.value = '';
+      showToast(`${email} can now publish pay slips.`, 'success');
+      renderList();
+    } catch (e) {
+      console.error(e);
+      publishers.pop();
+      errEl.textContent = 'Failed to save. Try again.';
+    }
+  });
+
+  renderList();
+}
+
 function initQuickLinksSection(meta) {
   const DEFAULT_LINKS = [
     { id: 'pronote',    label: 'Pronote',         url: 'https://2050048n.index-education.net/pronote/', icon: '📚' },

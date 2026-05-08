@@ -505,6 +505,83 @@ export async function recordBackupTaken() {
   await updateCompanyMetadata({ lastBackupAt: Date.now() });
 }
 
+// ── Pay-slip issuing (financial-manager workflow) ─────────
+// Stored at /companies/{X}/metadata/info under field:
+//   issuedPaySlipMonths: ['2026-04', '2026-05', ...]  (sorted ascending)
+// Employees only see months listed here in their pay-slip picker.
+
+export async function getIssuedPaySlipMonths() {
+  const meta = await getCompanyMetadata();
+  return Array.isArray(meta?.issuedPaySlipMonths)
+    ? [...meta.issuedPaySlipMonths].sort()
+    : [];
+}
+
+export async function publishPaySlipMonth(month) {
+  if (!/^\d{4}-\d{2}$/.test(month)) throw new Error('Invalid month: ' + month);
+  const list = await getIssuedPaySlipMonths();
+  if (!list.includes(month)) list.push(month);
+  list.sort();
+  await updateCompanyMetadata({ issuedPaySlipMonths: list });
+  return list;
+}
+
+export async function unpublishPaySlipMonth(month) {
+  const list = (await getIssuedPaySlipMonths()).filter(m => m !== month);
+  await updateCompanyMetadata({ issuedPaySlipMonths: list });
+  return list;
+}
+
+// Read-only helper for the employee portal.
+export async function getIssuedPaySlipMonthsFor(companyId) {
+  const snap = await getDoc(doc(db, 'companies', companyId, 'metadata', 'info'));
+  const data = snap.exists() ? snap.data() : null;
+  return Array.isArray(data?.issuedPaySlipMonths)
+    ? [...data.issuedPaySlipMonths].sort()
+    : [];
+}
+
+// Designated-publisher list management ─────────────────────
+// Owner-only — managed in Settings → Company.
+export async function getPaySlipPublishers() {
+  const meta = await getCompanyMetadata();
+  return Array.isArray(meta?.paySlipPublishers) ? [...meta.paySlipPublishers] : [];
+}
+export async function setPaySlipPublishers(emails) {
+  const clean = (emails || []).map(e => String(e).trim().toLowerCase()).filter(Boolean);
+  await updateCompanyMetadata({ paySlipPublishers: Array.from(new Set(clean)) });
+  return clean;
+}
+
+// Read for the employee portal — to know if THIS user is a publisher.
+export async function getPaySlipPublishersFor(companyId) {
+  const snap = await getDoc(doc(db, 'companies', companyId, 'metadata', 'info'));
+  const data = snap.exists() ? snap.data() : null;
+  return Array.isArray(data?.paySlipPublishers) ? [...data.paySlipPublishers] : [];
+}
+
+// Publish / unpublish from the publisher's portal session (uses companyId
+// directly, not the cached _companyId, since publishers run inside the portal).
+export async function publishPaySlipMonthFor(companyId, month) {
+  if (!/^\d{4}-\d{2}$/.test(month)) throw new Error('Invalid month: ' + month);
+  const list = await getIssuedPaySlipMonthsFor(companyId);
+  if (!list.includes(month)) list.push(month);
+  list.sort();
+  await Promise.all([
+    setDoc(doc(db, 'companies', companyId), { issuedPaySlipMonths: list }, { merge: true }),
+    setDoc(doc(db, 'companies', companyId, 'metadata', 'info'), { issuedPaySlipMonths: list }, { merge: true })
+  ]);
+  return list;
+}
+export async function unpublishPaySlipMonthFor(companyId, month) {
+  const list = (await getIssuedPaySlipMonthsFor(companyId)).filter(m => m !== month);
+  await Promise.all([
+    setDoc(doc(db, 'companies', companyId), { issuedPaySlipMonths: list }, { merge: true }),
+    setDoc(doc(db, 'companies', companyId, 'metadata', 'info'), { issuedPaySlipMonths: list }, { merge: true })
+  ]);
+  return list;
+}
+
 /**
  * Bundle the company's data into a single object for export.
  * Reads from in-memory caches — call after initStore() so data is loaded.

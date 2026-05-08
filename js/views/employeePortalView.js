@@ -23,7 +23,11 @@ import {
   getMyNotes,
   addMyNote,
   updateMyNote,
-  deleteMyNote
+  deleteMyNote,
+  getIssuedPaySlipMonthsFor,
+  getPaySlipPublishersFor,
+  publishPaySlipMonthFor,
+  unpublishPaySlipMonthFor
 } from '../data/store.js';
 import {
   ABSENCE_CATEGORIES,
@@ -49,6 +53,8 @@ let _companyId   = null;
 let _companyName = '';
 let _companyLogo = '';
 let _quickLinks  = null;        // [{ label, url, icon }, ...] from company metadata, or defaults
+let _issuedMonths = [];          // pay-slip months published by the financial manager (sorted asc)
+let _isPublisher  = false;        // true if THIS user can publish pay slips
 let _settings    = null;
 let _calendar    = null;
 let _roleRegistry = null;
@@ -127,6 +133,11 @@ let _histDateOpen   = false;          // is the date picker menu open?
 let _paySlipPickerOpen = false;
 let _paySlipExpandedY  = null;
 
+// Pay-slip launch anchor — the earliest month for which we have live data.
+// Bump this once you officially launch with real payroll data so old months
+// don't appear in the picker. Format: 'YYYY-MM'.
+const PAYSLIP_LAUNCH_MONTH = '2026-05';
+
 const HIST_MONTH_OPTIONS = [
   { v: '01', l: 'Jan' }, { v: '02', l: 'Feb' }, { v: '03', l: 'Mar' },
   { v: '04', l: 'Apr' }, { v: '05', l: 'May' }, { v: '06', l: 'Jun' },
@@ -157,13 +168,15 @@ export async function renderEmployeePortal({ user, companyId, employeeId }) {
   const screen = document.getElementById('employee-portal-screen');
   screen.style.display = 'flex';
 
-  // Load employee + metadata + settings + calendar + role registry + own requests in parallel
-  const [emp, meta, settings, calendar, roleRegistry] = await Promise.all([
+  // Load employee + metadata + settings + calendar + role registry + issued pay-slip months + publishers list in parallel
+  const [emp, meta, settings, calendar, roleRegistry, issuedMonths, publishers] = await Promise.all([
     getEmployeeRecord(companyId, employeeId),
     getCompanyMetadataFor(companyId),
     getSettingsFor(companyId),
     getCalendarFor(companyId),
-    getRoleRegistryFor(companyId)
+    getRoleRegistryFor(companyId),
+    getIssuedPaySlipMonthsFor(companyId).catch(() => []),
+    getPaySlipPublishersFor(companyId).catch(() => [])
   ]);
 
   if (!emp) {
@@ -181,7 +194,20 @@ export async function renderEmployeePortal({ user, companyId, employeeId }) {
   _settings     = settings;
   _calendar     = calendar;
   _roleRegistry = roleRegistry;
-  _paySlipMonth = _paySlipMonth || defaultMonth();
+  _issuedMonths = Array.isArray(issuedMonths) ? issuedMonths : [];
+  _isPublisher  = Array.isArray(publishers) &&
+                  user?.email &&
+                  publishers.map(e => String(e).toLowerCase()).includes(user.email.toLowerCase());
+  // Default to the LATEST issued month so employees land on something they can read.
+  // If nothing is issued yet, leave _paySlipMonth as-is — the UI shows an empty state.
+  if (_issuedMonths.length) {
+    const latest = _issuedMonths[_issuedMonths.length - 1];
+    if (!_paySlipMonth || !_issuedMonths.includes(_paySlipMonth)) {
+      _paySlipMonth = latest;
+    }
+  } else {
+    _paySlipMonth = _paySlipMonth || defaultMonth();
+  }
 
   await loadOwnAbsenceRequests(companyId, employeeId);
   // Pre-fetch the academic year covering the current pay-slip month so the breakdown is correct on first render
@@ -217,6 +243,7 @@ function renderSection() {
   if (_section === 'payslip')    return paySlipSectionHTML();
   if (_section === 'attendance') return attendanceSectionHTML();
   if (_section === 'notes')      return notesSectionHTML();
+  if (_section === 'publish' && _isPublisher) return publishSectionHTML();
   return homeSectionHTML();
 }
 
@@ -252,6 +279,7 @@ function sectionTitle(section) {
   if (section === 'payslip')    return t('portal.payslip_title');
   if (section === 'attendance') return t('portal.attendance_title');
   if (section === 'notes')      return t('portal.notes_title');
+  if (section === 'publish')    return 'Publish Pay Slips';
   return t('portal.title');
 }
 
@@ -317,6 +345,7 @@ function drawerHTML() {
         ${item('attendance', '📅', t('portal.drawer.attendance'))}
         ${item('payslip',    '💰', t('portal.drawer.payslip'))}
         ${item('notes',      '🔐', t('portal.drawer.notes'))}
+        ${_isPublisher ? item('publish', '📢', 'Publish Pay Slips') : ''}
       </nav>
 
       <div class="ep-drawer-footer">
@@ -617,6 +646,23 @@ async function findAcademicYearForMonth(yearId) {
 
 // ── Section: PAY SLIP ────────────────────────────────────
 function paySlipSectionHTML() {
+  // No issued pay slips yet → show a friendly empty state, no picker
+  if (!_issuedMonths.length) {
+    return `
+      <section class="ep-card">
+        <div class="ep-card-title">💰 Pay Slip</div>
+        <div class="ep-empty" style="padding:24px 12px;">
+          <div class="ep-empty-icon">📅</div>
+          <div class="ep-empty-text">No pay slips published yet</div>
+          <div class="ep-empty-sub">
+            Your school's financial manager will publish each month's pay slip
+            once payroll is finalized. You'll see it here as soon as it's available.
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
   const [y, m] = _paySlipMonth.split('-').map(Number);
   // Use synchronously-loaded year if cached; otherwise compute without active periods.
   const probe = `${_paySlipMonth}-15`;
@@ -858,6 +904,86 @@ function historySectionHTML() {
 }
 
 // ── Section: NOTES (private personal notes) ──────────────
+// ── Section: PUBLISH (only visible to designated publishers) ─────
+function publishSectionHTML() {
+  // Show last 12 months back from today, plus current — newest first.
+  const today = new Date();
+  const months = [];
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    months.push(ym);
+  }
+
+  return `
+    <section class="ep-card">
+      <div class="ep-card-title">📢 Publish Pay Slips</div>
+      <div class="ep-card-sub">
+        Publish a month to make it visible to all staff in their portal.
+        Unpublish to hide it again.
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px;">
+        ${months.map(ym => {
+          const isPublished = _issuedMonths.includes(ym);
+          return `
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;
+                        background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;">
+              <div style="flex:1;min-width:0;">
+                <div style="font-weight:700;color:#1e293b;font-size:0.95rem;">
+                  ${esc(payslipMonthLabel(ym))}
+                </div>
+                <div style="font-size:0.78rem;color:${isPublished ? '#166534' : '#92400e'};
+                            margin-top:2px;font-weight:600;">
+                  ${isPublished ? '✓ Visible to staff' : '⏳ Not published yet'}
+                </div>
+              </div>
+              <button type="button"
+                class="ep-btn ${isPublished ? '' : 'ep-btn-primary'}"
+                data-publish-month="${esc(ym)}"
+                data-publish-action="${isPublished ? 'unpublish' : 'publish'}"
+                style="${isPublished
+                  ? 'background:#fee2e2;color:#991b1b;border:1.5px solid #fecaca;'
+                  : ''}min-width:120px;">
+                ${isPublished ? 'Unpublish' : '📢 Publish'}
+              </button>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </section>
+  `;
+}
+
+function bindPublishSectionEvents() {
+  document.querySelectorAll('[data-publish-month]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const month  = btn.dataset.publishMonth;
+      const action = btn.dataset.publishAction;
+      const verb   = action === 'publish' ? 'publish' : 'unpublish';
+      if (!confirm(`Are you sure you want to ${verb} the pay slip for ${payslipMonthLabel(month)}?\n\n${
+        action === 'publish'
+          ? 'Employees will be able to view their pay slip for this month.'
+          : 'Employees will no longer see this month in their portal.'
+      }`)) return;
+      btn.disabled = true;
+      try {
+        if (action === 'publish') {
+          _issuedMonths = await publishPaySlipMonthFor(_companyId, month);
+          showToast(`Published ${payslipMonthLabel(month)}.`, 'success');
+        } else {
+          _issuedMonths = await unpublishPaySlipMonthFor(_companyId, month);
+          showToast(`Unpublished ${payslipMonthLabel(month)}.`, 'info');
+        }
+        draw();
+      } catch (e) {
+        console.error(e);
+        showToast('Failed to update. Make sure you still have publish permission.', 'error');
+        btn.disabled = false;
+      }
+    });
+  });
+}
+
 function notesSectionHTML() {
   // Edit mode
   if (_editingNoteId !== null) {
@@ -1133,6 +1259,8 @@ function bindSectionEvents() {
     bindPaySlipEvents();
   } else if (_section === 'notes') {
     bindNotesEvents();
+  } else if (_section === 'publish' && _isPublisher) {
+    bindPublishSectionEvents();
   }
 }
 
@@ -1241,13 +1369,22 @@ function renderPaySlipDatePickerMenu() {
   const menu = document.getElementById('ep-payslip-date-menu');
   if (!menu) return;
 
-  // Show the last 5 years (current + 4 prior). Months newer than the current
-  // month are disabled because there's no pay slip for the future.
-  const today    = new Date();
-  const curY     = today.getFullYear();
-  const curM     = today.getMonth() + 1;
-  const years    = [];
-  for (let y = curY; y >= curY - 4; y--) years.push(String(y));
+  // Source of truth: only months the financial manager has officially issued.
+  // Group them by year so the dropdown stays tidy as months accumulate.
+  const issuedByYear = {};
+  for (const ym of _issuedMonths) {
+    const y = ym.slice(0, 4);
+    if (!issuedByYear[y]) issuedByYear[y] = new Set();
+    issuedByYear[y].add(ym.slice(5, 7));
+  }
+  const years = Object.keys(issuedByYear).sort().reverse();   // newest first
+
+  if (!years.length) {
+    menu.innerHTML = `<div style="padding:14px;color:#94a3b8;font-size:0.82rem;text-align:center;">
+      No pay slips published yet.
+    </div>`;
+    return;
+  }
 
   const selectedY = _paySlipMonth.slice(0, 4);
   if (_paySlipExpandedY == null) _paySlipExpandedY = selectedY;
@@ -1273,17 +1410,16 @@ function renderPaySlipDatePickerMenu() {
           <div style="padding:4px 10px 6px 14px;">
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:3px;">
               ${HIST_MONTH_OPTIONS.map(m => {
-                const code     = `${year}-${m.v}`;
-                const isFuture = (parseInt(year, 10) > curY) ||
-                                 (parseInt(year, 10) === curY && parseInt(m.v, 10) > curM);
-                const sel      = _paySlipMonth === code;
+                const code      = `${year}-${m.v}`;
+                const isIssued  = issuedByYear[year]?.has(m.v);
+                const sel       = _paySlipMonth === code;
                 return `
-                  <button type="button" data-pspick="${code}" ${isFuture ? 'disabled' : ''}
+                  <button type="button" data-pspick="${code}" ${isIssued ? '' : 'disabled'}
                     style="padding:6px 4px;border:1.5px solid ${sel ? '#2563eb' : '#e2e8f0'};
-                           background:${sel ? '#dbeafe' : (isFuture ? '#f8fafc' : '#fff')};
-                           color:${sel ? '#1e40af' : (isFuture ? '#cbd5e1' : '#1e293b')};
+                           background:${sel ? '#dbeafe' : (isIssued ? '#fff' : '#f8fafc')};
+                           color:${sel ? '#1e40af' : (isIssued ? '#1e293b' : '#cbd5e1')};
                            font-family:inherit;font-size:0.78rem;
-                           border-radius:5px;cursor:${isFuture ? 'not-allowed' : 'pointer'};
+                           border-radius:5px;cursor:${isIssued ? 'pointer' : 'not-allowed'};
                            font-weight:${sel ? '600' : '500'};">
                     ${m.l}
                   </button>

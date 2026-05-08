@@ -109,8 +109,22 @@ service cloud.firestore {
     }
 
     // Employees can read company metadata (for company name / logo display).
+    // Designated pay-slip publishers (listed by email in metadata.paySlipPublishers)
+    // can also update ONLY the issuedPaySlipMonths field — nothing else.
     match /companies/{companyId}/metadata/info {
       allow read: if isEmployeeOf(companyId);
+      allow update: if
+        isEmployeeOf(companyId)
+        && request.auth.token.email in resource.data.paySlipPublishers
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['issuedPaySlipMonths']);
+    }
+    // Same delegated update for the parent /companies/{companyId} doc, since the
+    // store writes the field to both paths via updateCompanyMetadata.
+    match /companies/{companyId} {
+      allow update: if
+        isEmployeeOf(companyId)
+        && request.auth.token.email in get(/databases/$(database)/documents/companies/$(companyId)/metadata/info).data.paySlipPublishers
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['issuedPaySlipMonths']);
     }
 
     // Employees can read settings (needed for pay slip calculation: tax rates,
