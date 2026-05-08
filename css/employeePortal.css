@@ -576,7 +576,7 @@ textarea.ep-input {
 }
 
 /* ── Employee portal dark theme overrides ───────────────── */
-:root[data-theme="dark"] .ep-portal {
+:root[data-theme="dark"] #employee-portal-screen {
   background: #0f172a;
   color: #f1f5f9;
 }
@@ -593,26 +593,67 @@ textarea.ep-input {
 :root[data-theme="dark"] .ep-empty-text { color: #f1f5f9; }
 :root[data-theme="dark"] .ep-empty-sub  { color: #94a3b8; }
 
-/* Form controls inside the portal */
-:root[data-theme="dark"] .ep-portal input,
-:root[data-theme="dark"] .ep-portal select,
-:root[data-theme="dark"] .ep-portal textarea {
-  background: #0f172a;
-  color: #f1f5f9;
-  border-color: #334155;
+/* Form controls — both class-based (.ep-input) and any input/select/textarea */
+:root[data-theme="dark"] .ep-input,
+:root[data-theme="dark"] #employee-portal-screen input,
+:root[data-theme="dark"] #employee-portal-screen select,
+:root[data-theme="dark"] #employee-portal-screen textarea {
+  background: #0f172a !important;
+  color: #f1f5f9 !important;
+  border-color: #334155 !important;
 }
-:root[data-theme="dark"] .ep-portal input::placeholder,
-:root[data-theme="dark"] .ep-portal textarea::placeholder { color: #64748b; }
+:root[data-theme="dark"] .ep-input::placeholder,
+:root[data-theme="dark"] #employee-portal-screen input::placeholder,
+:root[data-theme="dark"] #employee-portal-screen textarea::placeholder {
+  color: #64748b !important;
+}
+/* Native dropdown options (where supported) */
+:root[data-theme="dark"] #employee-portal-screen select option {
+  background: #1e293b;
+  color: #f1f5f9;
+}
+/* Date-input native picker icon — invert so it's visible on dark */
+:root[data-theme="dark"] #employee-portal-screen input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
 
 /* Quick-tools tiles & action buttons */
-:root[data-theme="dark"] .ep-portal a[href][target="_blank"] {
+:root[data-theme="dark"] #employee-portal-screen a[href][target="_blank"] {
   background: #0f172a !important;
   border-color: #334155 !important;
   color: #f1f5f9 !important;
 }
-:root[data-theme="dark"] .ep-portal .ep-btn:not(.ep-btn-primary) {
+:root[data-theme="dark"] #employee-portal-screen .ep-btn:not(.ep-btn-primary) {
   background: #334155;
   color: #f1f5f9;
+}
+
+/* History list — items, notes, status pills */
+:root[data-theme="dark"] #employee-portal-screen .ep-history-item,
+:root[data-theme="dark"] #employee-portal-screen [style*="background:#f8fafc"],
+:root[data-theme="dark"] #employee-portal-screen [style*="background: #f8fafc"],
+:root[data-theme="dark"] #employee-portal-screen [style*="background:#f1f5f9"],
+:root[data-theme="dark"] #employee-portal-screen [style*="background: #f1f5f9"] {
+  background: #0f172a !important;
+  color: #f1f5f9 !important;
+  border-color: #334155 !important;
+}
+/* History note bubble (often background:#fff inline) */
+:root[data-theme="dark"] #employee-portal-screen [style*="background:#fff"],
+:root[data-theme="dark"] #employee-portal-screen [style*="background: #fff"],
+:root[data-theme="dark"] #employee-portal-screen [style*="background:#ffffff"] {
+  background: #1e293b !important;
+  color: #f1f5f9 !important;
+}
+
+/* Pay-slip rendered HTML rows + headings + amounts */
+:root[data-theme="dark"] #employee-portal-screen .ep-payslip,
+:root[data-theme="dark"] #employee-portal-screen .ep-payslip table,
+:root[data-theme="dark"] #employee-portal-screen .ep-payslip td,
+:root[data-theme="dark"] #employee-portal-screen .ep-payslip th {
+  background: transparent;
+  color: #f1f5f9;
+  border-color: #334155;
 }
 
 /* Drawer body — flip from white to dark */

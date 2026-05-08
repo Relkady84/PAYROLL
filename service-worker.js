@@ -10,7 +10,7 @@
  * Version bump = bump CACHE_VERSION below.
  */
 
-const CACHE_VERSION = 'v43-2026-05-08-microsoft-btn-rectangular';
+const CACHE_VERSION = 'v44-2026-05-08-portal-darkmode-and-payslip-period';
 const CACHE_SHELL   = `payroll-shell-${CACHE_VERSION}`;
 const CACHE_RUNTIME = `payroll-runtime-${CACHE_VERSION}`;
 

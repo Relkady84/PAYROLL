@@ -1428,10 +1428,12 @@ function generatePaySlipPDF() {
   doc.setFont('helvetica', 'normal');
   doc.text('Pay Slip', 14, 22);
 
-  doc.setTextColor(0);
+  // Period + Issued — stay white because the header background is dark blue
   doc.setFontSize(10);
+  doc.setTextColor(255);
   doc.text(`Period: ${monthLabel}`, 196, 13, { align: 'right' });
   doc.text(`Issued: ${new Date().toLocaleDateString()}`, 196, 22, { align: 'right' });
+  doc.setTextColor(0);   // reset for the rest of the document
 
   // Employee info
   let yPos = 42;
