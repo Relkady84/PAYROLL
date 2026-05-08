@@ -734,6 +734,37 @@ textarea.ep-input {
   cursor: not-allowed !important;
 }
 
+/* Year header rows in pay-slip picker — light slate so they're visible on
+   the dark dropdown background */
+.ep-payslip-year-btn:hover { background: #eff6ff !important; }
+:root[data-theme="dark"] .ep-payslip-year-btn {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+:root[data-theme="dark"] .ep-payslip-year-btn:hover {
+  background: #1e3a8a !important;
+  border-color: #3b82f6 !important;
+}
+:root[data-theme="dark"] .ep-payslip-year-btn small { color: #94a3b8 !important; }
+
+/* Calendar / month / time picker icon — bulletproof white-on-dark.
+   Some Edge / Safari builds ignore filter on the pseudo-element, so we add
+   accent-color and color-scheme: dark on the parent input as well. */
+:root[data-theme="dark"] #employee-portal-screen input[type="date"],
+:root[data-theme="dark"] #employee-portal-screen input[type="month"],
+:root[data-theme="dark"] #employee-portal-screen input[type="time"] {
+  color-scheme: dark !important;
+  accent-color: #3b82f6;
+}
+:root[data-theme="dark"] #employee-portal-screen input[type="date"]::-webkit-calendar-picker-indicator,
+:root[data-theme="dark"] #employee-portal-screen input[type="month"]::-webkit-calendar-picker-indicator,
+:root[data-theme="dark"] #employee-portal-screen input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) !important;
+  opacity: 0.9 !important;
+  cursor: pointer !important;
+}
+
 /* Drawer body — flip from white to dark */
 :root[data-theme="dark"] .ep-drawer {
   background: #1e293b;

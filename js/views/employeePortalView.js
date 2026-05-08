@@ -1258,15 +1258,16 @@ function renderPaySlipDatePickerMenu() {
     const isMonthSel = _paySlipMonth.startsWith(year + '-');
 
     html += `
-      <div style="margin-bottom:2px;">
+      <div class="ep-payslip-year-row" style="margin-bottom:4px;">
         <button type="button" data-pstoggle="${year}"
+          class="ep-payslip-year-btn"
           style="display:flex;width:100%;align-items:center;justify-content:space-between;
-                 padding:7px 10px;border:none;background:transparent;cursor:pointer;
-                 font-family:inherit;font-size:0.9rem;border-radius:6px;
+                 padding:9px 12px;border:1.5px solid #e2e8f0;background:#f8fafc;cursor:pointer;
+                 font-family:inherit;font-size:0.92rem;border-radius:8px;
                  color:${isMonthSel ? '#1e40af' : '#1e293b'};
-                 font-weight:${isMonthSel ? '600' : '500'};">
-          <span>${year}${isMonthSel ? ` <small style="color:#64748b;">(${payslipMonthLabel(_paySlipMonth)})</small>` : ''}</span>
-          <span style="font-size:0.7rem;color:#94a3b8;">${isExpanded ? '▼' : '▶'}</span>
+                 font-weight:${isMonthSel ? '700' : '600'};">
+          <span>${year}${isMonthSel ? ` <small style="color:#64748b;font-weight:500;">(${payslipMonthLabel(_paySlipMonth)})</small>` : ''}</span>
+          <span style="font-size:0.75rem;color:#94a3b8;">${isExpanded ? '▼' : '▶'}</span>
         </button>
         ${isExpanded ? `
           <div style="padding:4px 10px 6px 14px;">
