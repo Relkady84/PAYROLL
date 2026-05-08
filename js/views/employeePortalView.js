@@ -27,7 +27,13 @@ import {
   getIssuedPaySlipMonthsFor,
   getPaySlipPublishersFor,
   publishPaySlipMonthFor,
-  unpublishPaySlipMonthFor
+  unpublishPaySlipMonthFor,
+  startOwnAbsenceRequestsLiveSync,
+  stopOwnAbsenceRequestsLiveSync,
+  startAnnouncementsLiveSyncFor,
+  stopAnnouncementsLiveSyncFor,
+  getMyReadAnnouncements,
+  markAnnouncementsRead
 } from '../data/store.js';
 import {
   ABSENCE_CATEGORIES,
@@ -55,6 +61,8 @@ let _companyLogo = '';
 let _quickLinks  = null;        // [{ label, url, icon }, ...] from company metadata, or defaults
 let _issuedMonths = [];          // pay-slip months published by the financial manager (sorted asc)
 let _isPublisher  = false;        // true if THIS user can publish pay slips
+let _announcements = [];           // company-wide announcements (live)
+let _readAnnouncementIds = [];      // ids this user has already seen
 let _settings    = null;
 let _calendar    = null;
 let _roleRegistry = null;
@@ -210,6 +218,20 @@ export async function renderEmployeePortal({ user, companyId, employeeId }) {
   }
 
   await loadOwnAbsenceRequests(companyId, employeeId);
+  // Real-time listener so admin approvals/rejections appear here instantly.
+  startOwnAbsenceRequestsLiveSync(companyId, employeeId, () => {
+    // Re-render the current section so status pills + cancel buttons reflect
+    // the latest server state. draw() reads from the in-memory cache that the
+    // listener just refreshed.
+    draw();
+  });
+
+  // Announcements — load my read list + start a live listener for new posts
+  try { _readAnnouncementIds = await getMyReadAnnouncements(user.uid); } catch { _readAnnouncementIds = []; }
+  startAnnouncementsLiveSyncFor(companyId, list => {
+    _announcements = list;
+    draw();
+  });
   // Pre-fetch the academic year covering the current pay-slip month so the breakdown is correct on first render
   await findAcademicYearForMonth();
   // Load private notes (only this user can read them)
@@ -240,11 +262,34 @@ function draw() {
 }
 
 function renderSection() {
-  if (_section === 'payslip')    return paySlipSectionHTML();
-  if (_section === 'attendance') return attendanceSectionHTML();
-  if (_section === 'notes')      return notesSectionHTML();
+  if (_section === 'payslip')      return paySlipSectionHTML();
+  if (_section === 'attendance')   return attendanceSectionHTML();
+  if (_section === 'notes')        return notesSectionHTML();
+  if (_section === 'announcements')return announcementsSectionHTML();
   if (_section === 'publish' && _isPublisher) return publishSectionHTML();
   return homeSectionHTML();
+}
+
+function unreadAnnouncementCount() {
+  return _announcements.filter(a => !_readAnnouncementIds.includes(a.id)).length;
+}
+
+function announcementsDrawerItemHTML() {
+  const unread = unreadAnnouncementCount();
+  const badge  = unread > 0
+    ? `<span class="ep-drawer-badge" style="margin-left:auto;background:#dc2626;color:#fff;
+            font-size:0.66rem;font-weight:700;padding:2px 7px;border-radius:999px;
+            min-width:20px;text-align:center;">${unread > 99 ? '99+' : unread}</span>`
+    : '';
+  return `
+    <button class="ep-drawer-item ${_section === 'announcements' ? 'active' : ''}"
+            data-section="announcements"
+            style="position:relative;">
+      <span class="ep-drawer-icon">📢</span>
+      <span>Announcements</span>
+      ${badge}
+    </button>
+  `;
 }
 
 // ── Header (with burger button) ──────────────────────────
@@ -276,10 +321,11 @@ function headerHTML() {
 }
 
 function sectionTitle(section) {
-  if (section === 'payslip')    return t('portal.payslip_title');
-  if (section === 'attendance') return t('portal.attendance_title');
-  if (section === 'notes')      return t('portal.notes_title');
-  if (section === 'publish')    return 'Publish Pay Slips';
+  if (section === 'payslip')       return t('portal.payslip_title');
+  if (section === 'attendance')    return t('portal.attendance_title');
+  if (section === 'notes')         return t('portal.notes_title');
+  if (section === 'announcements') return 'Announcements';
+  if (section === 'publish')       return 'Publish Pay Slips';
   return t('portal.title');
 }
 
@@ -345,6 +391,7 @@ function drawerHTML() {
         ${item('attendance', '📅', t('portal.drawer.attendance'))}
         ${item('payslip',    '💰', t('portal.drawer.payslip'))}
         ${item('notes',      '🔐', t('portal.drawer.notes'))}
+        ${announcementsDrawerItemHTML()}
         ${_isPublisher ? item('publish', '📢', 'Publish Pay Slips') : ''}
       </nav>
 
@@ -904,6 +951,71 @@ function historySectionHTML() {
 }
 
 // ── Section: NOTES (private personal notes) ──────────────
+// ── Section: ANNOUNCEMENTS ────────────────────────────────
+function announcementsSectionHTML() {
+  // Mark all current announcements as read shortly after render — fire-and-forget
+  setTimeout(() => {
+    const unreadIds = _announcements
+      .filter(a => !_readAnnouncementIds.includes(a.id))
+      .map(a => a.id);
+    if (unreadIds.length && _user?.uid) {
+      markAnnouncementsRead(_user.uid, unreadIds)
+        .then(() => {
+          _readAnnouncementIds = Array.from(new Set([..._readAnnouncementIds, ...unreadIds]));
+          // Refresh the drawer so the badge clears
+          const drawer = document.getElementById('ep-drawer');
+          if (drawer) drawer.outerHTML = drawerHTML();
+          bindDrawerEvents();
+        })
+        .catch(e => console.warn('Could not mark announcements read:', e));
+    }
+  }, 600);
+
+  if (!_announcements.length) {
+    return `
+      <section class="ep-card">
+        <div class="ep-card-title">📢 Announcements</div>
+        <div class="ep-empty" style="padding:24px 12px;">
+          <div class="ep-empty-icon">📭</div>
+          <div class="ep-empty-text">No announcements yet</div>
+          <div class="ep-empty-sub">When your administrator posts news, it'll show up here.</div>
+        </div>
+      </section>
+    `;
+  }
+
+  return `
+    <section class="ep-card">
+      <div class="ep-card-title">📢 Announcements</div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:6px;">
+        ${_announcements.map(a => {
+          const isUnread = !_readAnnouncementIds.includes(a.id);
+          const stamp = a.createdAt ? new Date(a.createdAt).toLocaleString() : '';
+          return `
+            <article style="padding:14px 16px;background:${isUnread ? 'linear-gradient(180deg,#eff6ff,#dbeafe)' : 'linear-gradient(180deg,#fff,#f8fafc)'};
+                            border:1px solid ${isUnread ? '#bfdbfe' : '#e2e8f0'};
+                            border-left:4px solid ${isUnread ? '#2563eb' : '#94a3b8'};
+                            border-radius:10px;">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+                <div style="font-weight:700;color:#1e293b;font-size:0.98rem;flex:1;min-width:0;">
+                  ${esc(a.title)}
+                </div>
+                ${isUnread ? `<span style="font-size:0.6rem;background:#2563eb;color:#fff;
+                              padding:2px 7px;border-radius:999px;font-weight:700;flex-shrink:0;">NEW</span>` : ''}
+              </div>
+              ${stamp ? `<div style="font-size:0.7rem;color:#64748b;margin-top:3px;">
+                ${esc(stamp)}${a.createdBy ? ' · ' + esc(a.createdBy) : ''}
+              </div>` : ''}
+              <div style="margin-top:10px;font-size:0.88rem;color:#1e293b;
+                          white-space:pre-wrap;line-height:1.5;">${esc(a.body)}</div>
+            </article>
+          `;
+        }).join('')}
+      </div>
+    </section>
+  `;
+}
+
 // ── Section: PUBLISH (only visible to designated publishers) ─────
 function publishSectionHTML() {
   // Show last 12 months back from today, plus current — newest first.
@@ -1643,6 +1755,8 @@ function bindSignOut() {
   const btn = document.getElementById('ep-signout');
   if (!btn) return;
   btn.addEventListener('click', async () => {
+    stopOwnAbsenceRequestsLiveSync();   // tear down listener before sign-out
+    stopAnnouncementsLiveSyncFor();
     await signOutUser();
   });
 }

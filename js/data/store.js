@@ -495,6 +495,30 @@ export async function loadOwnAbsenceRequests(companyId, employeeId) {
   }
 }
 
+// ── Real-time listener for the employee portal ──────────────
+// Streams the signed-in employee's own requests so status changes (approved /
+// rejected by admin) appear instantly in the portal — no refresh needed.
+let _ownAbsenceUnsub = null;
+
+export function startOwnAbsenceRequestsLiveSync(companyId, employeeId, onChange) {
+  stopOwnAbsenceRequestsLiveSync();
+  if (!companyId || !employeeId) return;
+  const ref = collection(db, 'companies', companyId, 'absenceRequests');
+  const q   = query(ref, where('employeeId', '==', employeeId));
+  _ownAbsenceUnsub = onSnapshot(
+    q,
+    snap => {
+      _absenceRequests = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+      try { onChange && onChange(_absenceRequests); } catch (e) { console.error(e); }
+    },
+    err => console.warn('Own absence requests live sync error:', err)
+  );
+}
+
+export function stopOwnAbsenceRequestsLiveSync() {
+  if (_ownAbsenceUnsub) { _ownAbsenceUnsub(); _ownAbsenceUnsub = null; }
+}
+
 // Direct write for employee portal (uses companyId param since _companyId
 // may not be set in the employee-portal flow).
 export async function addOwnAbsenceRequest(companyId, request) {
@@ -532,6 +556,98 @@ export async function setCompanyBackupSchedule(schedule) {
 
 export async function recordBackupTaken() {
   await updateCompanyMetadata({ lastBackupAt: Date.now() });
+}
+
+// ── Announcements ─────────────────────────────────────────
+// /companies/{X}/announcements/{annId} — admin posts news to staff.
+// Fields: { title, body, createdAt, createdBy, pinned? }
+
+export async function addAnnouncement(data) {
+  const ref = await addDoc(companyCol('announcements'), {
+    title:     String(data.title || '').trim(),
+    body:      String(data.body  || '').trim(),
+    createdAt: Date.now(),
+    createdBy: data.createdBy || ''
+  });
+  return ref.id;
+}
+
+export async function deleteAnnouncement(annId) {
+  await deleteDoc(companyDoc('announcements', annId));
+}
+
+export async function getAnnouncements() {
+  const snap = await getDocs(companyCol('announcements'));
+  return snap.docs
+    .map(d => ({ ...d.data(), id: d.id }))
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+}
+
+// Read-only helper for the employee portal (uses companyId param).
+export async function getAnnouncementsFor(companyId) {
+  const snap = await getDocs(collection(db, 'companies', companyId, 'announcements'));
+  return snap.docs
+    .map(d => ({ ...d.data(), id: d.id }))
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+}
+
+// Live sync — admin app
+let _announcementsUnsub = null;
+const _announcementsListeners = new Set();
+
+export function onAnnouncementsChange(cb) {
+  _announcementsListeners.add(cb);
+  return () => _announcementsListeners.delete(cb);
+}
+
+export function startAnnouncementsLiveSync() {
+  if (!_companyId || _announcementsUnsub) return;
+  _announcementsUnsub = onSnapshot(
+    companyCol('announcements'),
+    snap => {
+      const list = snap.docs
+        .map(d => ({ ...d.data(), id: d.id }))
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      _announcementsListeners.forEach(cb => { try { cb(list); } catch (e) { console.error(e); } });
+    },
+    err => console.warn('Announcements live sync error:', err)
+  );
+}
+export function stopAnnouncementsLiveSync() {
+  if (_announcementsUnsub) { _announcementsUnsub(); _announcementsUnsub = null; }
+}
+
+// Live sync — employee portal (companyId param)
+let _portalAnnouncementsUnsub = null;
+export function startAnnouncementsLiveSyncFor(companyId, onChange) {
+  stopAnnouncementsLiveSyncFor();
+  if (!companyId) return;
+  _portalAnnouncementsUnsub = onSnapshot(
+    collection(db, 'companies', companyId, 'announcements'),
+    snap => {
+      const list = snap.docs
+        .map(d => ({ ...d.data(), id: d.id }))
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      try { onChange && onChange(list); } catch (e) { console.error(e); }
+    },
+    err => console.warn('Portal announcements live sync error:', err)
+  );
+}
+export function stopAnnouncementsLiveSyncFor() {
+  if (_portalAnnouncementsUnsub) { _portalAnnouncementsUnsub(); _portalAnnouncementsUnsub = null; }
+}
+
+// Per-user "read" tracking — stored on the user's own /users/{uid} doc.
+export async function getMyReadAnnouncements(uid) {
+  const snap = await getDoc(doc(db, 'users', uid));
+  const data = snap.exists() ? snap.data() : null;
+  return Array.isArray(data?.readAnnouncements) ? [...data.readAnnouncements] : [];
+}
+export async function markAnnouncementsRead(uid, ids) {
+  if (!uid || !Array.isArray(ids) || !ids.length) return;
+  const existing = await getMyReadAnnouncements(uid);
+  const merged   = Array.from(new Set([...existing, ...ids]));
+  await setDoc(doc(db, 'users', uid), { readAnnouncements: merged }, { merge: true });
 }
 
 // ── Pay-slip issuing (financial-manager workflow) ─────────

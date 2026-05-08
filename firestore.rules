@@ -151,6 +151,13 @@ service cloud.firestore {
       allow read: if isEmployeeOf(companyId);
     }
 
+    // ── /companies/{companyId}/announcements/{annId} ─────────
+    // Owners (covered by parent rule) post / edit / delete.
+    // Employees of the company can read all announcements.
+    match /companies/{companyId}/announcements/{annId} {
+      allow read: if isEmployeeOf(companyId);
+    }
+
     // ── /companies/{companyId}/absenceRequests/{requestId} ───
     // Owners (covered by parent rule above) have full access.
     // Employees can: read their own, create new pending requests, delete own pending.

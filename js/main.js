@@ -9,6 +9,7 @@ import { render as renderAbsenceRequests } from './views/absenceRequestsView.js'
 import { renderOnboarding }             from './views/onboardingView.js';
 import { renderSuperAdmin }             from './views/superAdminView.js';
 import { renderEmployeePortal }         from './views/employeePortalView.js';
+import { render as renderAnnouncements } from './views/announcementsView.js';
 import { _applySidebarLogo, applyDisplayColors } from './views/settingsView.js';
 import {
   initStore, setCompanyId,
@@ -16,7 +17,8 @@ import {
   getCompanyMetadata, lookupEmployeeByEmail,
   SUPER_ADMIN_EMAIL,
   startAbsenceRequestsLiveSync, stopAbsenceRequestsLiveSync, onAbsenceRequestsChange,
-  getAbsenceRequests
+  getAbsenceRequests,
+  startAnnouncementsLiveSync, stopAnnouncementsLiveSync
 } from './data/store.js';
 import { onAuthChanged, signInWithGoogle, signInWithMicrosoft, signOutUser } from './auth.js';
 import { t, getLanguage, setLanguage, SUPPORTED_LANGUAGES, applyTranslationsToDOM } from './i18n.js';
@@ -29,6 +31,7 @@ register('#payroll',           () => renderPayroll('#app-content'));
 register('#settings',          () => renderSettings('#app-content'));
 register('#reports',           () => renderReports('#app-content'));
 register('#absence-requests',  () => renderAbsenceRequests('#app-content'));
+register('#announcements',     () => renderAnnouncements('#app-content'));
 
 // ── Sidebar toggle — desktop collapse + mobile overlay ────
 function initSidebarToggle() {
@@ -166,6 +169,7 @@ async function showApp(user, { isSuperAdmin = false, companyName = null } = {}) 
   //    flashes when something pending arrives.
   try {
     startAbsenceRequestsLiveSync();
+    startAnnouncementsLiveSync();
     onAbsenceRequestsChange(() => {
       refreshPendingBadge();
       // Re-render the currently-active route if it cares about absence data
@@ -315,6 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
   onAuthChanged(async user => {
     if (!user) {
       stopAbsenceRequestsLiveSync();   // don't leak listeners across sessions
+      stopAnnouncementsLiveSync();
       showLogin();
       return;
     }

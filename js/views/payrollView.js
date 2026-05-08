@@ -16,6 +16,7 @@ let _sortDir       = 'asc';
 let _daysWorked    = {};       // manual overrides (empId -> days)
 let _selectedMonth = null;     // 'YYYY-MM' — default current month
 let _expandedYear  = null;     // for the date picker dropdown
+let _issuedCache   = [];       // sorted list of published months (cached when picker opens)
 
 const PAYROLL_MONTH_OPTIONS = [
   { v: '01', l: 'Jan' }, { v: '02', l: 'Feb' }, { v: '03', l: 'Mar' },
@@ -229,13 +230,15 @@ export function render(selector) {
   const dateBtn  = document.getElementById('pr-date-btn');
   const dateMenu = document.getElementById('pr-date-menu');
   if (dateBtn && dateMenu) {
-    dateBtn.addEventListener('click', e => {
+    dateBtn.addEventListener('click', async e => {
       e.stopPropagation();
       if (dateMenu.style.display === 'block') {
         dateMenu.style.display = 'none';
       } else {
         // Default expanded year = current selection's year
         if (!_expandedYear && _selectedMonth) _expandedYear = _selectedMonth.slice(0, 4);
+        // Refresh the cache so green ticks reflect the latest published list
+        try { _issuedCache = await getIssuedPaySlipMonths(); } catch { _issuedCache = []; }
         renderPayrollDateMenu(container);
         dateMenu.style.display = 'block';
       }
@@ -368,20 +371,34 @@ function renderPayrollDateMenu(container) {
         ${isExpanded ? `
           <div style="padding:4px 10px 6px 14px;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;">
             ${PAYROLL_MONTH_OPTIONS.map(m => {
-              const code = `${year}-${m.v}`;
-              const sel = _selectedMonth === code;
+              const code       = `${year}-${m.v}`;
+              const sel        = _selectedMonth === code;
+              const isPublished = _issuedCache.includes(code);
+              // Color logic:
+              //   selected         → blue (always wins)
+              //   published        → green tint
+              //   neither          → white
+              const border = sel ? '#2563eb' : (isPublished ? '#86efac' : '#e2e8f0');
+              const bg     = sel ? '#dbeafe' : (isPublished ? '#dcfce7' : '#fff');
+              const color  = sel ? '#1e40af' : (isPublished ? '#166534' : '#1e293b');
               return `
                 <button type="button" data-pr-pick="${code}"
-                  style="padding:6px 4px;border:1.5px solid ${sel ? '#2563eb' : '#e2e8f0'};
-                         background:${sel ? '#dbeafe' : '#fff'};
-                         color:${sel ? '#1e40af' : '#1e293b'};
+                  title="${isPublished ? 'Published — visible to employees' : 'Not yet published'}"
+                  style="position:relative;padding:6px 4px;border:1.5px solid ${border};
+                         background:${bg};color:${color};
                          border-radius:5px;font-family:inherit;font-size:0.78rem;
-                         font-weight:${sel ? '600' : '500'};cursor:pointer;">
-                  ${m.l}
+                         font-weight:${sel || isPublished ? '600' : '500'};cursor:pointer;">
+                  ${m.l}${isPublished ? ` <span style="font-size:0.6rem;">✓</span>` : ''}
                 </button>
               `;
             }).join('')}
           </div>
+          ${(_issuedCache.some(ym => ym.startsWith(year + '-'))) ? `
+            <div style="padding:2px 14px 6px;font-size:0.68rem;color:#166534;display:flex;align-items:center;gap:6px;">
+              <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#dcfce7;border:1.5px solid #86efac;"></span>
+              <span>= published</span>
+            </div>
+          ` : ''}
         ` : ''}
       </div>
     `;
