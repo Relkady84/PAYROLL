@@ -1402,12 +1402,16 @@ function renderHistDatePickerMenu() {
     if (!map[y]) map[y] = new Set();
     map[y].add(m);
   }
-  const years = Object.keys(map).sort();
 
-  if (!years.length) {
-    menu.innerHTML = `<div style="padding:10px;color:#94a3b8;font-size:0.82rem;">No requests submitted yet.</div>`;
-    return;
+  // Always include the current year and the previous year so the picker
+  // shows them even if the user has no requests yet — and as a side effect
+  // 2027, 2028, … appear automatically as the calendar advances.
+  const curYear = new Date().getFullYear();
+  for (const y of [String(curYear), String(curYear - 1)]) {
+    if (!map[y]) map[y] = new Set();
   }
+
+  const years = Object.keys(map).sort();
 
   let html = `
     <button type="button" data-hpick="all"
