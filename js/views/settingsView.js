@@ -465,9 +465,12 @@ export async function render(selector) {
             </button>
           </div>
 
-          <div style="margin-top:18px;padding:12px;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;font-size:0.82rem;">
-            <strong>💡 ${esc(t('settings.backup.tip_title'))}</strong><br>
-            ${esc(t('settings.backup.tip_body'))}
+          <div class="alert alert-warning" style="margin-top:18px;font-size:0.82rem;">
+            <span>💡</span>
+            <span>
+              <strong>${esc(t('settings.backup.tip_title'))}</strong><br>
+              ${esc(t('settings.backup.tip_body'))}
+            </span>
           </div>
         </div>
       </div>
