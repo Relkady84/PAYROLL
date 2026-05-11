@@ -173,10 +173,12 @@ service cloud.firestore {
         && request.resource.data.employeeId == myEmployeeId()
         && request.resource.data.status in ['pending', 'pending_supervisor', 'pending_financier'];
 
-      // Employees may cancel their own request only while still pending at any step
+      // Employees may cancel their own request only WHILE still awaiting the
+      // supervisor. After supervisor approval (pending_financier), the request
+      // is committed and only admin can override.
       allow delete: if isEmployeeOf(companyId)
         && resource.data.employeeId == myEmployeeId()
-        && resource.data.status in ['pending', 'pending_supervisor', 'pending_financier'];
+        && resource.data.status in ['pending', 'pending_supervisor'];
 
       // Supervisor approval — transition pending_supervisor → pending_financier or rejected_supervisor.
       // Only the assigned supervisor can do this, and only the supervisor-review fields may change.

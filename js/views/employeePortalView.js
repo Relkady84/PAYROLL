@@ -1042,9 +1042,10 @@ function requestItemHTML(r) {
   const type    = r.type || 'absence';
   const cat     = type === 'permanence' ? '🎯 Permanence (+1 day)' : (CATEGORY_LABELS[r.category] || r.category);
   const status  = r.status || 'pending';
-  // Any "still pending" state means the request hasn't been finalized yet,
-  // so the employee can still cancel it.
-  const canCancel = status === 'pending' || status === 'pending_supervisor' || status === 'pending_financier';
+  // Employee can cancel ONLY while still awaiting their supervisor.
+  // Once the supervisor approves (status = pending_financier), the request is
+  // committed and only an admin can reject/override.
+  const canCancel = status === 'pending' || status === 'pending_supervisor';
   // Map any rejected state to the existing red pill style for consistent CSS.
   const isRejected = status === 'rejected' || status === 'rejected_supervisor' || status === 'rejected_financier';
   const isPendingAny = status === 'pending' || status === 'pending_supervisor' || status === 'pending_financier';

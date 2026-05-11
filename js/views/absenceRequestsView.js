@@ -463,11 +463,15 @@ function drawList() {
               ✓ Approved by supervisor (${esc(r.supervisorReviewedBy)})
             </div>` : ''}
         ` : `
-          <div style="font-size:0.75rem;color:var(--color-text-muted);">
-            ${r.reviewedBy ? `by ${esc(r.reviewedBy)}` : ''}<br>
+          <div style="font-size:0.75rem;color:var(--color-text-muted);line-height:1.4;">
+            ${r.reviewedBy ? `by ${esc(r.reviewedBy)}` : ''}${r.reviewedBy && r.reviewedAt ? '<br>' : ''}
             ${r.reviewedAt ? formatHumanDate(new Date(r.reviewedAt).toISOString().slice(0,10)) : ''}
             ${r.reviewNotes ? `<br><em>"${esc(r.reviewNotes)}"</em>` : ''}
           </div>
+          <button class="btn btn-secondary btn-sm" data-action="undo" data-id="${esc(r.id)}"
+            style="margin-top:6px;font-size:0.75rem;padding:4px 10px;">
+            ↶ Undo
+          </button>
         `}
       </td>
     </tr>
@@ -480,6 +484,7 @@ function drawList() {
 }
 
 function handleReview(action, id) {
+  if (action === 'undo') return handleUndo(id);
   const status = action === 'approve' ? 'approved' : 'rejected';
   const titleVerb = action === 'approve' ? 'Approve' : 'Reject';
   const requests = getAbsenceRequests();
@@ -525,6 +530,41 @@ function handleReview(action, id) {
       }
     }
   );
+}
+
+/** Revert an approved or rejected request back to pending_financier so the
+ *  Service Financier can re-decide. Audit fields are cleared. */
+async function handleUndo(id) {
+  const req = getAbsenceRequests().find(r => r.id === id);
+  if (!req) return;
+  const wasApproved = req.status === 'approved';
+  const verb = wasApproved ? 'approval' : 'rejection';
+
+  if (!confirm(
+    `Undo the ${verb} for ${req.employeeName}'s ${req.type || 'absence'} on ${formatHumanDate(req.date)}?\n\n` +
+    `The request will move back to "Pending — Service Financier" so you can decide again.`
+  )) return;
+
+  // Decide what state to revert to:
+  //  - If the request went through a supervisor (had supervisorReviewedBy) →
+  //    pending_financier (their approval still counts; only the final step is undone)
+  //  - Otherwise (legacy single-step) → pending
+  const revertTo = req.supervisorReviewedBy ? 'pending_financier' : 'pending';
+
+  try {
+    await updateAbsenceRequest(id, {
+      status:      revertTo,
+      reviewedBy:  null,
+      reviewedAt:  null,
+      reviewNotes: ''
+    });
+    showToast(`${wasApproved ? 'Approval' : 'Rejection'} undone — request is back in your queue.`, 'info');
+    drawTabs();
+    drawList();
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to undo. Try again.', 'error');
+  }
 }
 
 // ── Helpers ─────────────────────────────────────────────
