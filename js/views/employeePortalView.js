@@ -72,6 +72,7 @@ let _announcements = [];           // company-wide announcements (live)
 let _readAnnouncementIds = [];      // announcement ids this user has already seen
 let _seenPaySlipMonths   = [];      // pay-slip months this user has already seen
 let _supervisorRequests = [];       // requests assigned to me as supervisor (live)
+let _lastSubmission = null;          // { type, message, supervisorEmail, timestamp } — shown as a big success card
 let _settings    = null;
 let _calendar    = null;
 let _roleRegistry = null;
@@ -559,20 +560,21 @@ function unseenPaySlipMonths() {
   return _issuedMonths.filter(m => !_seenPaySlipMonths.includes(m));
 }
 function totalNotificationCount() {
-  return unreadAnnouncementCount() + unseenPaySlipMonths().length;
+  return unreadAnnouncementCount() + unseenPaySlipMonths().length + supervisorPendingCount();
 }
 
 function notificationPanelHTML() {
   if (!_bellOpen) return '';
   const unread = visibleAnnouncements().filter(a => !_readAnnouncementIds.includes(a.id));
   const unseenMonths = unseenPaySlipMonths();
-  const empty = !unread.length && !unseenMonths.length;
+  const pendingSup = _supervisorRequests.filter(r => r.status === 'pending_supervisor');
+  const empty = !unread.length && !unseenMonths.length && !pendingSup.length;
 
   return `
     <div id="ep-bell-panel" class="ep-bell-panel">
       <div class="ep-bell-panel-header">
         <span style="font-weight:700;">🔔 Notifications</span>
-        ${!empty ? `<button type="button" id="ep-bell-mark-all" style="background:none;border:none;
+        ${(unread.length || unseenMonths.length) ? `<button type="button" id="ep-bell-mark-all" style="background:none;border:none;
                        color:#2563eb;font-size:0.78rem;cursor:pointer;font-family:inherit;
                        font-weight:600;">Mark all as read</button>` : ''}
       </div>
@@ -584,6 +586,18 @@ function notificationPanelHTML() {
             <div style="font-size:0.78rem;margin-top:2px;">No new updates right now.</div>
           </div>
         ` : `
+          ${pendingSup.length ? `
+            <div class="ep-bell-section-label">👥 Team Approvals</div>
+            ${pendingSup.map(r => `
+              <button type="button" class="ep-bell-item" data-bell-go="approvals">
+                <span class="ep-bell-item-icon" style="background:#fef3c7;">👥</span>
+                <span class="ep-bell-item-text">
+                  <span class="ep-bell-item-title">${esc(r.employeeName || r.employeeEmail || 'Employee')} requests ${esc(r.type === 'permanence' ? 'permanence' : 'an absence')}</span>
+                  <span class="ep-bell-item-sub">${esc(formatHumanDate(r.date))} · awaiting your review</span>
+                </span>
+              </button>
+            `).join('')}
+          ` : ''}
           ${unseenMonths.length ? `
             <div class="ep-bell-section-label">💰 Pay Slip</div>
             ${unseenMonths.map(ym => `
@@ -839,11 +853,50 @@ function attendanceSectionHTML() {
     return tabsHTML + historySectionHTML();
   }
 
-  // Request tab — show both forms (Absence + Permanence)
+  // Request tab — show "just submitted" confirmation if applicable, else the forms
   return `
     ${tabsHTML}
+    ${lastSubmissionCardHTML()}
     ${absenceFormCardHTML()}
     ${permanenceFormCardHTML()}
+  `;
+}
+
+/** Big green confirmation card shown above the forms after a successful submit.
+ *  Stays visible until the user dismisses it or submits another request. */
+function lastSubmissionCardHTML() {
+  if (!_lastSubmission) return '';
+  const supEmail = _lastSubmission.supervisorEmail;
+  const supName = supEmail ? supervisorDisplayName(supEmail) : 'the Service Financier';
+  const dateLabel = formatHumanDate(_lastSubmission.date);
+  const typeLabel = _lastSubmission.type === 'permanence' ? 'permanence' : 'absence';
+  return `
+    <section class="ep-card" id="ep-last-submission"
+      style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);border:1.5px solid #86efac;">
+      <div style="display:flex;align-items:flex-start;gap:14px;">
+        <div style="font-size:2.2rem;line-height:1;color:#16a34a;">✓</div>
+        <div style="flex:1;">
+          <div style="font-weight:800;font-size:1.05rem;color:#14532d;line-height:1.3;">
+            Request submitted successfully
+          </div>
+          <div style="font-size:0.9rem;color:#166534;margin-top:6px;line-height:1.5;">
+            Your <strong>${esc(typeLabel)} request for ${esc(dateLabel)}</strong> has been sent
+            to <strong>${esc(supName)}</strong> for approval.
+            You'll be notified here as soon as a decision is made.
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+            <button type="button" class="ep-btn" id="ep-last-sub-dismiss"
+              style="background:#16a34a;color:#fff;border:none;font-size:0.85rem;padding:8px 14px;">
+              Submit another
+            </button>
+            <button type="button" class="ep-btn" id="ep-last-sub-history"
+              style="background:#fff;color:#14532d;border:1.5px solid #86efac;font-size:0.85rem;padding:8px 14px;">
+              View history
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
   `;
 }
 
@@ -989,17 +1042,39 @@ function requestItemHTML(r) {
   const type    = r.type || 'absence';
   const cat     = type === 'permanence' ? '🎯 Permanence (+1 day)' : (CATEGORY_LABELS[r.category] || r.category);
   const status  = r.status || 'pending';
+  // Any "still pending" state means the request hasn't been finalized yet,
+  // so the employee can still cancel it.
+  const canCancel = status === 'pending' || status === 'pending_supervisor' || status === 'pending_financier';
+  // Map any rejected state to the existing red pill style for consistent CSS.
+  const isRejected = status === 'rejected' || status === 'rejected_supervisor' || status === 'rejected_financier';
+  const isPendingAny = status === 'pending' || status === 'pending_supervisor' || status === 'pending_financier';
+  const pillStatusClass = isRejected ? 'rejected' : isPendingAny ? 'pending' : status;
+  // Friendly progress hint under the date
+  let progressHint = '';
+  if (status === 'pending_supervisor') {
+    progressHint = `<div style="font-size:0.7rem;color:#92400e;margin-top:2px;">⏳ Waiting for supervisor approval</div>`;
+  } else if (status === 'pending_financier') {
+    progressHint = `<div style="font-size:0.7rem;color:#92400e;margin-top:2px;">⏳ Supervisor approved · waiting for Service Financier</div>`;
+  } else if (status === 'rejected_supervisor') {
+    progressHint = `<div style="font-size:0.7rem;color:#991b1b;margin-top:2px;">✗ Rejected by supervisor</div>`;
+  } else if (status === 'rejected_financier') {
+    progressHint = `<div style="font-size:0.7rem;color:#991b1b;margin-top:2px;">✗ Rejected by Service Financier</div>`;
+  }
   return `
     <div class="ep-request" data-id="${esc(r.id)}" data-type="${esc(type)}">
       <div class="ep-request-row">
         <div class="ep-request-date">${esc(dateStr)}</div>
-        <span class="ep-status ep-status-${esc(status)}">${esc(STATUS_LABELS[status] || status)}</span>
+        <span class="ep-status ep-status-${pillStatusClass}">${esc(STATUS_LABELS[status] || status)}</span>
       </div>
+      ${progressHint}
       <div class="ep-request-cat">${esc(cat)}</div>
       ${r.reason ? `<div class="ep-request-reason">"${esc(r.reason)}"</div>` : ''}
+      ${r.supervisorNotes ? `<div class="ep-request-review"><strong>Supervisor note:</strong> ${esc(r.supervisorNotes)}</div>` : ''}
       ${r.reviewNotes ? `<div class="ep-request-review"><strong>Admin note:</strong> ${esc(r.reviewNotes)}</div>` : ''}
-      ${status === 'pending' ? `
-        <button class="ep-btn ep-btn-ghost ep-btn-sm" data-action="cancel">Cancel</button>
+      ${canCancel ? `
+        <button class="ep-btn ep-btn-ghost ep-btn-sm" data-action="cancel" style="margin-top:8px;">
+          ↩ Cancel this request
+        </button>
       ` : ''}
     </div>
   `;
@@ -1866,6 +1941,22 @@ function bindSectionEvents() {
       bindFormEvents();
       bindPermanenceEvents();
       bindListEvents();
+      // "Just submitted" card actions
+      const dismissBtn = document.getElementById('ep-last-sub-dismiss');
+      if (dismissBtn) {
+        dismissBtn.addEventListener('click', () => {
+          _lastSubmission = null;
+          draw();
+        });
+      }
+      const historyBtn = document.getElementById('ep-last-sub-history');
+      if (historyBtn) {
+        historyBtn.addEventListener('click', () => {
+          _lastSubmission = null;
+          _attendanceTab = 'history';
+          draw();
+        });
+      }
     } else if (_attendanceTab === 'history') {
       bindHistoryEvents();
       bindListEvents();
@@ -1920,6 +2011,8 @@ function bindFormEvents() {
       const msg = submissionConfirmationMessage(supervisorEmail, 'absence');
       showToast(msg, 'success');
       showInlineSuccess(msg);
+      // Persistent confirmation card — replaces the form until the user dismisses or submits another.
+      _lastSubmission = { type: 'absence', message: msg, supervisorEmail, date: data.date, timestamp: Date.now() };
       draw();
     } catch (err) {
       console.error(err);
@@ -2105,6 +2198,7 @@ function bindPermanenceEvents() {
       const msg = submissionConfirmationMessage(supervisorEmail, 'permanence');
       showToast(msg, 'success');
       showInlineSuccess(msg);
+      _lastSubmission = { type: 'permanence', message: msg, supervisorEmail, date: data.date, timestamp: Date.now() };
       draw();
     } catch (err) {
       console.error(err);
