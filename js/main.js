@@ -22,7 +22,7 @@ import {
 } from './data/store.js';
 import { onAuthChanged, signInWithGoogle, signInWithMicrosoft, signOutUser } from './auth.js';
 import { t, getLanguage, setLanguage, SUPPORTED_LANGUAGES, applyTranslationsToDOM } from './i18n.js';
-import { APP_MODE, IS_PORTAL_MODE, IS_SCOPED_URL, SCOPED_COMPANY_ID, getCompanyAdminURL } from './appMode.js';
+import { APP_MODE, IS_PORTAL_MODE, IS_SCOPED_URL, SCOPED_COMPANY_ID, getCompanyAdminURL, getCompanyPortalURL } from './appMode.js';
 import './pwa.js';   // self-registers the service worker + install prompt
 
 // Register routes — admin routes are skipped in portal mode so an owner who
@@ -453,6 +453,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Returning EMPLOYEE — show employee portal
       if (userRecord?.role === 'employee' && userRecord.employeeOf) {
+        // Auto-redirect to the company's branded portal URL if not already there.
+        // Keeps URL bar in sync with content (e.g. signed in at admin URL → goes to portal URL).
+        const portalUrl = getCompanyPortalURL(userRecord.employeeOf);
+        if (portalUrl && window.location.origin !== portalUrl) {
+          window.location.replace(portalUrl);
+          return;
+        }
         hideLoader();
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('app-shell').style.display    = 'none';
@@ -514,6 +521,12 @@ document.addEventListener('DOMContentLoaded', () => {
           email:      user.email,
           name:       user.displayName || user.email
         });
+        // Auto-redirect to the company's branded portal URL if not already there.
+        const portalUrl = getCompanyPortalURL(lookup.companyId);
+        if (portalUrl && window.location.origin !== portalUrl) {
+          window.location.replace(portalUrl);
+          return;
+        }
         hideLoader();
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('app-shell').style.display    = 'none';

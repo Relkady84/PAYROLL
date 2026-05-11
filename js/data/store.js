@@ -650,6 +650,20 @@ export async function markAnnouncementsRead(uid, ids) {
   await setDoc(doc(db, 'users', uid), { readAnnouncements: merged }, { merge: true });
 }
 
+// Per-user pay-slip "seen" tracking — same model as readAnnouncements, but for
+// published pay-slip months. Lives in Firestore so it syncs across devices.
+export async function getMySeenPaySlipMonths(uid) {
+  const snap = await getDoc(doc(db, 'users', uid));
+  const data = snap.exists() ? snap.data() : null;
+  return Array.isArray(data?.seenPaySlipMonths) ? [...data.seenPaySlipMonths] : [];
+}
+export async function markPaySlipMonthsSeen(uid, months) {
+  if (!uid || !Array.isArray(months) || !months.length) return;
+  const existing = await getMySeenPaySlipMonths(uid);
+  const merged   = Array.from(new Set([...existing, ...months]));
+  await setDoc(doc(db, 'users', uid), { seenPaySlipMonths: merged }, { merge: true });
+}
+
 // ── Pay-slip issuing (financial-manager workflow) ─────────
 // Stored at /companies/{X}/metadata/info under field:
 //   issuedPaySlipMonths: ['2026-04', '2026-05', ...]  (sorted ascending)

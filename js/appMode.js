@@ -83,6 +83,21 @@ export function getCompanyAdminURL(companyId) {
   return COMPANY_ADMIN_URL[companyId] || null;
 }
 
+/**
+ * companyId → preferred staff-portal URL (origin only, no trailing slash).
+ *
+ * When an employee signs in anywhere other than their portal URL, the auth
+ * flow redirects them here so the URL bar always reflects what they're
+ * looking at.
+ */
+const COMPANY_PORTAL_URL = {
+  'RQBKHGV5_1776006868157': 'https://portal.lycee-montaigne.edu.lb',
+};
+
+export function getCompanyPortalURL(companyId) {
+  return COMPANY_PORTAL_URL[companyId] || null;
+}
+
 // Apply a body class so CSS can react if needed
 try {
   document.body.classList.add(`app-mode-${APP_MODE}`);

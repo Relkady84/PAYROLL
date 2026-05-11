@@ -1,7 +1,6 @@
 import { getEmployees, addEmployee, updateEmployee, getRoleRegistry } from '../data/store.js';
 import { createEmployee, validateEmployee, EMPLOYEE_TYPES, DEFAULT_EMPLOYEE_SCHEDULE } from '../models/employee.js';
 import { DOW_LABELS } from '../models/calendar.js';
-import { findRole } from '../models/role.js';
 import { openModal, closeModal } from './components/modal.js';
 import { showToast } from './components/toast.js';
 
@@ -26,15 +25,17 @@ function buildFormHTML(employee = null) {
             type="number" min="18" max="100" placeholder="30" value="${e.age || ''}">
         </div>
         <div class="form-group">
-          <label class="form-label" for="ef-role">Role <span class="required">*</span></label>
-          <select class="form-control" id="ef-role" name="role">
-            ${getRoleRegistry().roles.map(r => {
-              const selected = (e.role && e.role === r.id)
-                            || (!e.role && e.employeeType === r.taxCategory && r.builtin);
-              return `<option value="${r.id}" data-tax="${r.taxCategory}" ${selected ? 'selected' : ''}>${r.name}${r.taxCategory !== r.id ? ` (${r.taxCategory} tax)` : ''}</option>`;
-            }).join('')}
+          <label class="form-label" for="ef-type">Type <span class="required">*</span></label>
+          <select class="form-control" id="ef-type" name="employeeType">
+            <option value="Teacher" ${(e.employeeType || 'Teacher') === 'Teacher' ? 'selected' : ''}>Teacher</option>
+            <option value="Admin"   ${e.employeeType === 'Admin' ? 'selected' : ''}>Administrator</option>
           </select>
-          <span class="form-hint">Add custom roles in Settings → School Calendar → Roles.</span>
+          <span class="form-hint">Tax category — drives tax & NFS rates.</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="ef-role">Role <span class="required">*</span></label>
+          <select class="form-control" id="ef-role" name="role"></select>
+          <span class="form-hint">Specific position. Add custom roles in Settings → Academic Year & Roles.</span>
         </div>
         <div class="form-group form-full">
           <label class="form-label" for="ef-homeLocation">Home Location <span class="required">*</span></label>
@@ -112,6 +113,35 @@ const SCHEDULE_PRESETS = {
   ttf:  [2, 4],
   six:  [1, 2, 3, 4, 5, 6]
 };
+
+/** Fill the Role dropdown with roles whose taxCategory matches the selected Type.
+ *  If currentRoleId still matches an option in the filtered list, keep it selected.
+ *  Otherwise auto-pick the first option. */
+function renderRoleOptions(type, currentRoleId) {
+  const sel = document.getElementById('ef-role');
+  if (!sel) return;
+  const roles = getRoleRegistry().roles.filter(r => r.taxCategory === type);
+  if (!roles.length) {
+    sel.innerHTML = `<option value="">(no ${type} roles — add one in Settings)</option>`;
+    return;
+  }
+  const stillValid = currentRoleId && roles.some(r => r.id === currentRoleId);
+  const pickedId   = stillValid ? currentRoleId : roles[0].id;
+  sel.innerHTML = roles.map(r => `
+    <option value="${r.id}" ${r.id === pickedId ? 'selected' : ''}>${r.name}</option>
+  `).join('');
+}
+
+/** Wire the Type dropdown so changing it refilters Role. */
+function bindTypeRoleCascade(initialRoleId) {
+  const typeSel = document.getElementById('ef-type');
+  if (!typeSel) return;
+  // Initial render — match the type to the role registry
+  renderRoleOptions(typeSel.value, initialRoleId);
+  typeSel.addEventListener('change', () => {
+    renderRoleOptions(typeSel.value, null);   // null → auto-pick first role
+  });
+}
 
 function renderScheduleChecks(selected) {
   const wrap = document.getElementById('ef-schedule-checks');
@@ -192,6 +222,7 @@ export function openAddModal(onSaved) {
   // Modal renders synchronously, so the form DOM is now in place
   renderScheduleChecks([...DEFAULT_EMPLOYEE_SCHEDULE]);
   bindScheduleControls();
+  bindTypeRoleCascade(null);   // new employee → auto-pick first role for the default type
 }
 
 export function openEditModal(id, onSaved) {
@@ -207,17 +238,20 @@ export function openEditModal(id, onSaved) {
     : [...DEFAULT_EMPLOYEE_SCHEDULE];
   renderScheduleChecks(initialSchedule);
   bindScheduleControls();
+  bindTypeRoleCascade(employee.role || null);   // preserve role on edit
 }
 
 function handleSubmit(existingId, onSaved) {
   const form = document.getElementById('employee-form');
   if (!form) return;
 
-  const roleSelect = form.querySelector('#ef-role');
-  const roleId     = roleSelect.value;
-  const role       = findRole(getRoleRegistry(), roleId);
-  // Tax category is inherited from the role (Teacher or Admin)
-  const taxCategory = role?.taxCategory || 'Teacher';
+  // Type and Role are now independent dropdowns. Role is filtered by Type
+  // in the UI so they always stay consistent — but we trust Type directly
+  // since the user explicitly picked it.
+  const typeSelect  = form.querySelector('#ef-type');
+  const roleSelect  = form.querySelector('#ef-role');
+  const taxCategory = typeSelect.value === 'Admin' ? 'Admin' : 'Teacher';
+  const roleId      = roleSelect.value;
 
   const daysOverrideRaw = form.querySelector('#ef-defaultDaysPerMonth').value.trim();
 

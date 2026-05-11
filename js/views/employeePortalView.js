@@ -33,7 +33,9 @@ import {
   startAnnouncementsLiveSyncFor,
   stopAnnouncementsLiveSyncFor,
   getMyReadAnnouncements,
-  markAnnouncementsRead
+  markAnnouncementsRead,
+  getMySeenPaySlipMonths,
+  markPaySlipMonthsSeen
 } from '../data/store.js';
 import {
   ABSENCE_CATEGORIES,
@@ -62,7 +64,8 @@ let _quickLinks  = null;        // [{ label, url, icon }, ...] from company meta
 let _issuedMonths = [];          // pay-slip months published by the financial manager (sorted asc)
 let _isPublisher  = false;        // true if THIS user can publish pay slips
 let _announcements = [];           // company-wide announcements (live)
-let _readAnnouncementIds = [];      // ids this user has already seen
+let _readAnnouncementIds = [];      // announcement ids this user has already seen
+let _seenPaySlipMonths   = [];      // pay-slip months this user has already seen
 let _settings    = null;
 let _calendar    = null;
 let _roleRegistry = null;
@@ -228,6 +231,8 @@ export async function renderEmployeePortal({ user, companyId, employeeId }) {
 
   // Announcements — load my read list + start a live listener for new posts
   try { _readAnnouncementIds = await getMyReadAnnouncements(user.uid); } catch { _readAnnouncementIds = []; }
+  // Pay-slip seen list (from Firestore — syncs across devices)
+  try { _seenPaySlipMonths   = await getMySeenPaySlipMonths(user.uid); } catch { _seenPaySlipMonths = []; }
   startAnnouncementsLiveSyncFor(companyId, list => {
     _announcements = list;
     draw();
@@ -349,22 +354,22 @@ function headerHTML() {
 // ── Notification system (bell + dropdown panel) ──────────
 let _bellOpen = false;
 
-function getSeenPaySlipMonths() {
+// Pay-slip "seen" state lives in Firestore (synced via _seenPaySlipMonths).
+// This helper persists newly-seen months and updates the in-memory cache so
+// the bell badge refreshes immediately on the current page.
+async function markPaySlipMonthsSeenLocal(months) {
+  if (!_user?.uid || !Array.isArray(months) || !months.length) return;
+  const newOnes = months.filter(m => !_seenPaySlipMonths.includes(m));
+  if (!newOnes.length) return;
+  _seenPaySlipMonths = Array.from(new Set([..._seenPaySlipMonths, ...newOnes]));
   try {
-    const raw = localStorage.getItem('seen-payslip-months');
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-function markPaySlipMonthsSeen(months) {
-  try {
-    const existing = getSeenPaySlipMonths();
-    const merged   = Array.from(new Set([...existing, ...months]));
-    localStorage.setItem('seen-payslip-months', JSON.stringify(merged));
-  } catch {}
+    await markPaySlipMonthsSeen(_user.uid, newOnes);
+  } catch (e) {
+    console.warn('Could not save seen pay-slip months:', e);
+  }
 }
 function unseenPaySlipMonths() {
-  const seen = getSeenPaySlipMonths();
-  return _issuedMonths.filter(m => !seen.includes(m));
+  return _issuedMonths.filter(m => !_seenPaySlipMonths.includes(m));
 }
 function totalNotificationCount() {
   return unreadAnnouncementCount() + unseenPaySlipMonths().length;
@@ -804,8 +809,10 @@ async function findAcademicYearForMonth(yearId) {
 function paySlipSectionHTML() {
   // Viewing the section = those months are no longer "new" to this user
   setTimeout(() => {
-    if (_issuedMonths.length) markPaySlipMonthsSeen(_issuedMonths);
-  }, 0);
+    if (_issuedMonths.length) {
+      markPaySlipMonthsSeenLocal(_issuedMonths).then(() => draw());
+    }
+  }, 600);
 
   // No issued pay slips yet → show a friendly empty state, no picker
   if (!_issuedMonths.length) {
@@ -1069,7 +1076,9 @@ function historySectionHTML() {
 function announcementsSectionHTML() {
   const list = visibleAnnouncements();
 
-  // Mark visible announcements as read shortly after render — fire-and-forget
+  // Mark visible announcements as read shortly after render — fire-and-forget.
+  // After persisting to Firestore, re-render the FULL portal so every badge
+  // (bell, drawer, home quick-action pill) reflects the new state.
   setTimeout(() => {
     const unreadIds = list
       .filter(a => !_readAnnouncementIds.includes(a.id))
@@ -1078,10 +1087,7 @@ function announcementsSectionHTML() {
       markAnnouncementsRead(_user.uid, unreadIds)
         .then(() => {
           _readAnnouncementIds = Array.from(new Set([..._readAnnouncementIds, ...unreadIds]));
-          // Refresh the drawer so the badge clears
-          const drawer = document.getElementById('ep-drawer');
-          if (drawer) drawer.outerHTML = drawerHTML();
-          bindDrawerEvents();
+          draw();
         })
         .catch(e => console.warn('Could not mark announcements read:', e));
     }
@@ -1448,7 +1454,7 @@ function bindGlobalEvents() {
             _readAnnouncementIds = Array.from(new Set([..._readAnnouncementIds, ...visibleUnread]));
           } catch (e) { console.warn('mark-all read failed:', e); }
         }
-        markPaySlipMonthsSeen(_issuedMonths);
+        await markPaySlipMonthsSeenLocal(_issuedMonths);
         _bellOpen = false;
         draw();
       });
@@ -1456,12 +1462,12 @@ function bindGlobalEvents() {
 
     // Item clicks → navigate
     document.querySelectorAll('[data-bell-go]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const target = btn.dataset.bellGo;
         const month  = btn.dataset.bellMonth;
         if (target === 'payslip' && month) {
           _paySlipMonth = month;
-          markPaySlipMonthsSeen([month]);
+          await markPaySlipMonthsSeenLocal([month]);
         }
         _section = target;
         _bellOpen = false;
