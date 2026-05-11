@@ -22,7 +22,7 @@ import {
 } from './data/store.js';
 import { onAuthChanged, signInWithGoogle, signInWithMicrosoft, signOutUser } from './auth.js';
 import { t, getLanguage, setLanguage, SUPPORTED_LANGUAGES, applyTranslationsToDOM } from './i18n.js';
-import { APP_MODE, IS_PORTAL_MODE, IS_SCOPED_URL, SCOPED_COMPANY_ID } from './appMode.js';
+import { APP_MODE, IS_PORTAL_MODE, IS_SCOPED_URL, SCOPED_COMPANY_ID, getCompanyAdminURL } from './appMode.js';
 import './pwa.js';   // self-registers the service worker + install prompt
 
 // Register routes — admin routes are skipped in portal mode so an owner who
@@ -480,6 +480,13 @@ document.addEventListener('DOMContentLoaded', () => {
           hideLoader();
           showWrongAppNotice('wrong-company');
           return;
+        }
+        // Auto-redirect to the owner's branded admin URL if they signed in at
+        // the generic URL. Keeps the URL bar in sync with the data loaded.
+        const brandedUrl = getCompanyAdminURL(userRecord.companyId);
+        if (brandedUrl && window.location.origin !== brandedUrl) {
+          window.location.replace(brandedUrl);
+          return;   // stop processing — page is reloading at the branded URL
         }
         setCompanyId(userRecord.companyId);
         showLoader('Loading payroll data…');

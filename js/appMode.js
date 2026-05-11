@@ -65,6 +65,24 @@ export function getScopedCompanyId() {
 export const SCOPED_COMPANY_ID = getScopedCompanyId();
 export const IS_SCOPED_URL    = !!SCOPED_COMPANY_ID;
 
+/**
+ * companyId → preferred admin URL (origin only, no trailing slash).
+ *
+ * When an owner signs in at the generic URL (payroll-10a48.web.app), the auth
+ * flow redirects them to their company's branded admin URL so the URL bar
+ * always reflects which company is loaded. One line per school.
+ *
+ * If a company has no branded URL configured here, no redirect happens — the
+ * owner stays on whatever URL they signed in at.
+ */
+const COMPANY_ADMIN_URL = {
+  'RQBKHGV5_1776006868157': 'https://payroll.lycee-montaigne.edu.lb',
+};
+
+export function getCompanyAdminURL(companyId) {
+  return COMPANY_ADMIN_URL[companyId] || null;
+}
+
 // Apply a body class so CSS can react if needed
 try {
   document.body.classList.add(`app-mode-${APP_MODE}`);
