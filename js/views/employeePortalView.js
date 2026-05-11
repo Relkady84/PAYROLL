@@ -231,11 +231,23 @@ export async function renderEmployeePortal({ user, companyId, employeeId }) {
   }
 
   await loadOwnAbsenceRequests(companyId, employeeId);
+  // Snapshot of statuses before each sync — used to detect transitions and
+  // show the employee a notification when their request advances or is decided.
+  let _prevStatusById = Object.fromEntries(
+    getAbsenceRequests().map(r => [r.id, r.status])
+  );
   // Real-time listener so admin approvals/rejections appear here instantly.
-  startOwnAbsenceRequestsLiveSync(companyId, employeeId, () => {
+  startOwnAbsenceRequestsLiveSync(companyId, employeeId, (latest) => {
+    // Detect status changes since the last snapshot
+    for (const r of latest) {
+      const prev = _prevStatusById[r.id];
+      if (prev && prev !== r.status) {
+        notifyStatusChange(r, prev);
+      }
+    }
+    _prevStatusById = Object.fromEntries(latest.map(r => [r.id, r.status]));
     // Re-render the current section so status pills + cancel buttons reflect
-    // the latest server state. draw() reads from the in-memory cache that the
-    // listener just refreshed.
+    // the latest server state.
     draw();
   });
 
@@ -363,8 +375,82 @@ function showInlineSuccess(message) {
     document.head.appendChild(st);
   }
   document.body.appendChild(banner);
-  // Auto-dismiss after 5 seconds
-  setTimeout(() => { banner.remove(); }, 5000);
+  // Auto-dismiss after 10 seconds (longer than a toast)
+  setTimeout(() => { banner.remove(); }, 10000);
+}
+
+/** Translate a status change into a user-friendly notification + show it.
+ *  Called when the live listener detects one of THIS user's requests changed. */
+function notifyStatusChange(request, prevStatus) {
+  const dateStr = formatHumanDate(request.date);
+  const typeLabel = request.type === 'permanence' ? 'permanence request' : 'absence request';
+  const ctx = `${typeLabel} for ${dateStr}`;
+
+  let message = '';
+  let tone = 'info';
+  switch (request.status) {
+    case 'pending_financier':
+      message = `Your supervisor approved your ${ctx}. It's now with the Service Financier for final approval.`;
+      tone = 'success';
+      break;
+    case 'approved':
+      message = `🎉 Your ${ctx} was fully approved.`;
+      tone = 'success';
+      break;
+    case 'rejected_supervisor':
+      message = `Your ${ctx} was rejected by your supervisor.${request.supervisorNotes ? ' Reason: "' + request.supervisorNotes + '"' : ''}`;
+      tone = 'error';
+      break;
+    case 'rejected_financier':
+    case 'rejected':
+      message = `Your ${ctx} was rejected by the Service Financier.${request.reviewNotes ? ' Reason: "' + request.reviewNotes + '"' : ''}`;
+      tone = 'error';
+      break;
+    default:
+      return;   // no notification for other transitions
+  }
+  try {
+    showToast(message, tone === 'success' ? 'success' : (tone === 'error' ? 'error' : 'info'));
+  } catch {}
+  showInlineNotification(message, tone);
+}
+
+/** Show a notification banner for an arbitrary message + tone.
+ *  Used when an existing request's status changes (supervisor approved, etc.). */
+function showInlineNotification(message, tone = 'info') {
+  const palette = tone === 'success'
+    ? { bg: 'linear-gradient(135deg, #dcfce7, #bbf7d0)', border: '#86efac', text: '#14532d', icon: '✓' }
+    : tone === 'error'
+    ? { bg: 'linear-gradient(135deg, #fee2e2, #fecaca)', border: '#fca5a5', text: '#991b1b', icon: '✕' }
+    : { bg: 'linear-gradient(135deg, #dbeafe, #bfdbfe)', border: '#93c5fd', text: '#1e3a8a', icon: 'ℹ' };
+  const existing = document.getElementById('ep-inline-success');
+  if (existing) existing.remove();
+  const banner = document.createElement('div');
+  banner.id = 'ep-inline-success';
+  banner.setAttribute('role', 'status');
+  banner.style.cssText = `
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+    z-index: 1500; max-width: 92vw; width: 480px;
+    background: ${palette.bg};
+    color: ${palette.text};
+    border: 1.5px solid ${palette.border};
+    border-radius: 12px;
+    padding: 12px 16px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    font-size: 0.92rem;
+    font-weight: 600;
+    display: flex; align-items: flex-start; gap: 10px;
+    animation: ep-success-slide 0.25s ease-out;
+  `;
+  banner.innerHTML = `
+    <span style="font-size:1.3rem;line-height:1;">${palette.icon}</span>
+    <span style="flex:1;line-height:1.45;">${esc(message)}</span>
+    <button type="button" style="background:none;border:none;color:${palette.text};
+      font-size:1.1rem;cursor:pointer;padding:0 4px;line-height:1;"
+      onclick="this.parentElement.remove()">✕</button>
+  `;
+  document.body.appendChild(banner);
+  setTimeout(() => { banner.remove(); }, 10000);
 }
 
 /** Build the toast message shown after a successful submission, naming
