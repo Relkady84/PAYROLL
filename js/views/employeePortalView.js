@@ -305,6 +305,34 @@ function lookupSupervisorEmail() {
   return (role?.supervisorEmail || '').toLowerCase();
 }
 
+/** Find an employee's display name by email — used so the confirmation toast
+ *  says "Sent to Raed El Kady" instead of "Sent to raed.elkady@…". */
+function supervisorDisplayName(email) {
+  if (!email) return '';
+  // Try the live employee list (loaded via _employee… not directly available
+  // in the portal, so we use the request that just got created instead).
+  // For now, just titleize the local part of the email as a fallback.
+  // (If the supervisor is a registered employee in another module's cache, we
+  // could look them up, but employees list isn't pre-loaded for portal users.)
+  const local = String(email).split('@')[0] || email;
+  return local
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
+}
+
+/** Build the toast message shown after a successful submission, naming
+ *  the approver. */
+function submissionConfirmationMessage(supervisorEmail, type = 'absence') {
+  const typeLabel = type === 'permanence' ? 'permanence request' : 'absence request';
+  if (supervisorEmail) {
+    const name = supervisorDisplayName(supervisorEmail);
+    return `Your ${typeLabel} has been sent to ${name} for approval.`;
+  }
+  return `Your ${typeLabel} has been sent to the Service Financier for approval.`;
+}
+
 function visibleAnnouncements() {
   const myType = _employee?.employeeType || '';
   return _announcements.filter(a => {
@@ -734,11 +762,39 @@ function absenceFormCardHTML() {
 
         <div id="ep-form-errors" class="ep-errors"></div>
 
+        ${supervisorPreviewHTML()}
+
         <button type="submit" class="ep-btn ep-btn-primary">
           ${esc(t('portal.absence.submit'))}
         </button>
       </form>
     </section>
+  `;
+}
+
+/** Small banner shown above the submit button — tells the employee
+ *  exactly where their request will be routed. */
+function supervisorPreviewHTML() {
+  const supEmail = lookupSupervisorEmail();
+  if (!supEmail) {
+    return `
+      <div style="margin:10px 0;padding:10px 12px;background:#fef3c7;color:#92400e;
+                  border:1px solid #fde68a;border-radius:8px;font-size:0.82rem;
+                  display:flex;align-items:center;gap:8px;">
+        <span>ℹ</span>
+        <span>This will be sent directly to the <strong>Service Financier</strong> for approval
+          (your role has no supervisor assigned).</span>
+      </div>
+    `;
+  }
+  const name = supervisorDisplayName(supEmail);
+  return `
+    <div style="margin:10px 0;padding:10px 12px;background:#dbeafe;color:#1e40af;
+                border:1px solid #bfdbfe;border-radius:8px;font-size:0.82rem;
+                display:flex;align-items:center;gap:8px;">
+      <span>📩</span>
+      <span>This will be sent to <strong>${esc(name)}</strong> for approval first.</span>
+    </div>
   `;
 }
 
@@ -763,6 +819,8 @@ function permanenceFormCardHTML() {
           placeholder="${esc(t('portal.permanence.placeholder'))}"></textarea>
 
         <div id="ep-perm-form-errors" class="ep-errors"></div>
+
+        ${supervisorPreviewHTML()}
 
         <button type="submit" class="ep-btn ep-btn-primary">
           ${esc(t('portal.permanence.submit'))}
@@ -1728,7 +1786,7 @@ function bindFormEvents() {
       const supervisorEmail = lookupSupervisorEmail();
       const req = createAbsenceRequest(data, _employee, { supervisorEmail });
       await addOwnAbsenceRequest(_companyId, req);
-      showToast(t('portal.absence.submitted'), 'success');
+      showToast(submissionConfirmationMessage(supervisorEmail, 'absence'), 'success');
       draw();
     } catch (err) {
       console.error(err);
@@ -1911,7 +1969,7 @@ function bindPermanenceEvents() {
       const supervisorEmail = lookupSupervisorEmail();
       const req = createAbsenceRequest(data, _employee, { supervisorEmail });
       await addOwnAbsenceRequest(_companyId, req);
-      showToast(t('portal.permanence.submitted'), 'success');
+      showToast(submissionConfirmationMessage(supervisorEmail, 'permanence'), 'success');
       draw();
     } catch (err) {
       console.error(err);
