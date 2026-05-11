@@ -461,14 +461,21 @@ export async function render(selector) {
               <table class="data-table" id="role-table">
                 <thead>
                   <tr>
+                    <th style="width:96px;">Order</th>
                     <th>Role name</th>
-                    <th style="width:140px;">Type</th>
+                    <th style="width:120px;">Type</th>
+                    <th style="min-width:220px;">Supervisor email</th>
                     <th style="width:100px;">Action</th>
                   </tr>
                 </thead>
                 <tbody id="role-tbody"></tbody>
               </table>
             </div>
+            <span class="form-hint" style="font-size:0.78rem;color:var(--color-text-muted);">
+              💡 Drag a row (or use ↑ / ↓) to reorder. Type a supervisor email in the cell — it saves
+              automatically when you click away. Leave empty if the role has no supervisor
+              (e.g. Service Financier, Principal).
+            </span>
             <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;">
               <div style="flex:1 1 200px;">
                 <label class="form-label">Add role — name</label>
@@ -2174,25 +2181,63 @@ function initTypesSection() {
 
 // ── Roles section logic ────────────────────────────────────
 function initRolesSection() {
+  /** Persist the current order of custom roles to Firestore. */
+  async function saveReorder(newOrderOfCustomRoleIds) {
+    const reg = getRoleRegistry();
+    const byId = Object.fromEntries(reg.roles.map(r => [r.id, r]));
+    // Keep built-ins first (Teacher, Administrator), then custom roles in the new order
+    const builtins = reg.roles.filter(r => r.builtin);
+    const reordered = newOrderOfCustomRoleIds.map(id => byId[id]).filter(Boolean);
+    reg.roles = [...builtins, ...reordered];
+    try {
+      await saveRoleRegistry(reg);
+    } catch (e) {
+      console.error('Failed to save role order:', e);
+      showToast('Could not save new order — try again.', 'error');
+    }
+  }
+
   function renderRoleTable() {
     const registry = getRoleRegistry();
     const tbody = document.getElementById('role-tbody');
     // Hide built-in entries (Teacher / Administrator) — they live in the Types section now
     const visibleRoles = registry.roles.filter(r => !r.builtin);
     if (!visibleRoles.length) {
-      tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--color-text-muted);padding:18px;">
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--color-text-muted);padding:18px;">
         No custom roles yet. Add one below (e.g. "Teacher Primaire", "Service Financier").
       </td></tr>`;
       return;
     }
-    tbody.innerHTML = visibleRoles.map(r => `
-      <tr>
+    tbody.innerHTML = visibleRoles.map((r, i) => `
+      <tr draggable="true" data-role-id="${esc(r.id)}" style="cursor:grab;">
+        <td style="width:96px;white-space:nowrap;">
+          <span class="role-drag-handle" title="Drag to reorder"
+            style="display:inline-block;padding:4px 6px;color:#94a3b8;cursor:grab;user-select:none;">⋮⋮</span>
+          <button class="btn btn-secondary btn-sm" data-role-up="${esc(r.id)}"
+            ${i === 0 ? 'disabled' : ''} title="Move up"
+            style="padding:2px 7px;font-size:0.8rem;">↑</button>
+          <button class="btn btn-secondary btn-sm" data-role-down="${esc(r.id)}"
+            ${i === visibleRoles.length - 1 ? 'disabled' : ''} title="Move down"
+            style="padding:2px 7px;font-size:0.8rem;">↓</button>
+        </td>
         <td><strong>${esc(r.name)}</strong></td>
         <td><span class="badge badge-${r.taxCategory === 'Teacher' ? 'teacher' : 'admin'}">${esc(r.taxCategory)}</span></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="email" class="form-control role-supervisor-input"
+              data-role-sup="${esc(r.id)}"
+              value="${esc(r.supervisorEmail || '')}"
+              placeholder="(no supervisor)"
+              style="font-size:0.85rem;padding:6px 8px;flex:1;">
+            <span class="role-supervisor-status" data-role-sup-status="${esc(r.id)}"
+              style="font-size:0.85rem;color:#10b981;min-width:16px;"></span>
+          </div>
+        </td>
         <td><button class="btn btn-danger btn-sm" data-del-role="${esc(r.id)}">🗑</button></td>
       </tr>
     `).join('');
 
+    // ── Delete handlers ─────────────────────────────────────
     tbody.querySelectorAll('[data-del-role]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.delRole;
@@ -2207,6 +2252,114 @@ function initRolesSection() {
           console.error(e);
           showToast('Failed to delete role.', 'error');
         }
+      });
+    });
+
+    // ── Supervisor email — save on blur (or Enter) ───────────────────
+    tbody.querySelectorAll('.role-supervisor-input').forEach(input => {
+      // Don't let drag-and-drop hijack clicks inside the input
+      input.addEventListener('mousedown', e => e.stopPropagation());
+      input.addEventListener('dragstart', e => { e.preventDefault(); e.stopPropagation(); });
+      // Save on blur or Enter
+      const save = async () => {
+        const id    = input.dataset.roleSup;
+        const value = input.value.trim().toLowerCase();
+        // Validate email format (or allow empty)
+        if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+          input.style.borderColor = '#dc2626';
+          showToast('Invalid email format — supervisor not saved.', 'warning');
+          return;
+        }
+        input.style.borderColor = '';
+        const reg = getRoleRegistry();
+        const role = reg.roles.find(r => r.id === id);
+        if (!role) return;
+        // No-op if unchanged
+        const current = role.supervisorEmail || '';
+        if (current.toLowerCase() === value) return;
+        if (value) role.supervisorEmail = value;
+        else delete role.supervisorEmail;
+        try {
+          await saveRoleRegistry(reg);
+          // Flash green checkmark briefly
+          const statusEl = tbody.querySelector(`[data-role-sup-status="${CSS.escape(id)}"]`);
+          if (statusEl) {
+            statusEl.textContent = '✓';
+            setTimeout(() => { statusEl.textContent = ''; }, 1600);
+          }
+        } catch (e) {
+          console.error('Failed to save supervisor email:', e);
+          showToast('Could not save supervisor email.', 'error');
+        }
+      };
+      input.addEventListener('blur', save);
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+      });
+    });
+
+    // ── Up / Down button handlers (mobile + accessibility fallback) ─────
+    function moveBy(roleId, delta) {
+      const ids = visibleRoles.map(r => r.id);
+      const idx = ids.indexOf(roleId);
+      const newIdx = idx + delta;
+      if (idx < 0 || newIdx < 0 || newIdx >= ids.length) return;
+      [ids[idx], ids[newIdx]] = [ids[newIdx], ids[idx]];
+      saveReorder(ids).then(renderRoleTable);
+    }
+    tbody.querySelectorAll('[data-role-up]').forEach(b => {
+      b.addEventListener('click', () => moveBy(b.dataset.roleUp, -1));
+    });
+    tbody.querySelectorAll('[data-role-down]').forEach(b => {
+      b.addEventListener('click', () => moveBy(b.dataset.roleDown, +1));
+    });
+
+    // ── HTML5 drag-and-drop (desktop) ───────────────────────
+    let _draggingId = null;
+    tbody.querySelectorAll('tr[draggable="true"]').forEach(row => {
+      row.addEventListener('dragstart', e => {
+        _draggingId = row.dataset.roleId;
+        row.style.opacity = '0.4';
+        e.dataTransfer.effectAllowed = 'move';
+        // Some browsers require setData() for dragstart to fire properly
+        try { e.dataTransfer.setData('text/plain', _draggingId); } catch {}
+      });
+      row.addEventListener('dragend', () => {
+        row.style.opacity = '';
+        // Clear any leftover highlights
+        tbody.querySelectorAll('tr').forEach(r => {
+          r.style.borderTop = '';
+          r.style.borderBottom = '';
+        });
+        _draggingId = null;
+      });
+      row.addEventListener('dragover', e => {
+        e.preventDefault();   // required to enable drop
+        if (!_draggingId || row.dataset.roleId === _draggingId) return;
+        // Highlight the edge the row will be inserted at
+        const rect = row.getBoundingClientRect();
+        const isAbove = (e.clientY - rect.top) < rect.height / 2;
+        tbody.querySelectorAll('tr').forEach(r => {
+          r.style.borderTop = '';
+          r.style.borderBottom = '';
+        });
+        row.style[isAbove ? 'borderTop' : 'borderBottom'] = '3px solid #2563eb';
+      });
+      row.addEventListener('drop', e => {
+        e.preventDefault();
+        if (!_draggingId || row.dataset.roleId === _draggingId) return;
+        const ids = visibleRoles.map(r => r.id);
+        const fromIdx = ids.indexOf(_draggingId);
+        let toIdx = ids.indexOf(row.dataset.roleId);
+        if (fromIdx < 0 || toIdx < 0) return;
+        const rect = row.getBoundingClientRect();
+        const dropAbove = (e.clientY - rect.top) < rect.height / 2;
+        // Remove the dragged id, insert at the correct position
+        ids.splice(fromIdx, 1);
+        if (fromIdx < toIdx) toIdx--;   // shift since we removed an earlier item
+        const insertAt = dropAbove ? toIdx : toIdx + 1;
+        ids.splice(insertAt, 0, _draggingId);
+        saveReorder(ids).then(renderRoleTable);
       });
     });
   }
