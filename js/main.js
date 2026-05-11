@@ -22,7 +22,7 @@ import {
 } from './data/store.js';
 import { onAuthChanged, signInWithGoogle, signInWithMicrosoft, signOutUser } from './auth.js';
 import { t, getLanguage, setLanguage, SUPPORTED_LANGUAGES, applyTranslationsToDOM } from './i18n.js';
-import { APP_MODE, IS_PORTAL_MODE } from './appMode.js';
+import { APP_MODE, IS_PORTAL_MODE, IS_SCOPED_URL, SCOPED_COMPANY_ID } from './appMode.js';
 import './pwa.js';   // self-registers the service worker + install prompt
 
 // Register routes — admin routes are skipped in portal mode so an owner who
@@ -148,12 +148,15 @@ async function showApp(user, { isSuperAdmin = false, companyName = null } = {}) 
     applyDisplayColors(displayColors);
   } catch (e) { console.warn('Company metadata setup:', e); }
 
-  // 4. Super-admin controls
+  // 4. Super-admin controls — only show on the generic (non-scoped) URL.
+  //    On a branded URL like payroll.lycee-montaigne.edu.lb the picker is
+  //    intentionally hidden — the URL is locked to one company.
   try {
     const saSection = document.getElementById('super-admin-nav-section');
     const saBtn     = document.getElementById('switch-company-btn');
-    if (saSection) saSection.style.display = isSuperAdmin ? '' : 'none';
-    if (saBtn)     saBtn.style.display     = isSuperAdmin ? '' : 'none';
+    const showSA    = isSuperAdmin && !IS_SCOPED_URL;
+    if (saSection) saSection.style.display = showSA ? '' : 'none';
+    if (saBtn)     saBtn.style.display     = showSA ? '' : 'none';
   } catch (e) { console.warn('Super-admin controls:', e); }
 
   // 5. CRITICAL — show the app shell. Must run no matter what.
@@ -220,18 +223,29 @@ function showLogin() {
 }
 
 /** Shown when someone signs in via the wrong front door.
- *  reason='admin'   → an owner/superadmin hit the portal URL
- *  reason='unknown' → an unrecognized account hit the portal URL
+ *  reason='admin'         → an owner/superadmin hit the portal URL
+ *  reason='unknown'       → an unrecognized account hit the portal URL
+ *  reason='wrong-company' → an owner of company A hit company B's branded URL
  */
 function showWrongAppNotice(reason) {
-  const adminURL = window.location.protocol + '//payroll-10a48.web.app';
-  const isOwner  = reason === 'admin';
-  const title    = isOwner ? 'This is the staff portal' : 'Account not recognized';
-  const body     = isOwner
+  const centralURL = window.location.protocol + '//payroll-10a48.web.app';
+  const isOwner   = reason === 'admin';
+  const isWrongCo = reason === 'wrong-company';
+
+  const title = isOwner
+    ? 'This is the staff portal'
+    : isWrongCo
+      ? 'This URL is for another company'
+      : 'Account not recognized';
+
+  const body = isOwner
     ? 'You signed in with an admin / owner account. The staff portal is for employees only — please use the admin app instead.'
-    : 'Your email isn\'t linked to an employee account in this company. Ask your administrator to add you, or sign in with a different account.';
-  const cta = isOwner
-    ? `<a href="${adminURL}" style="display:inline-block;margin-top:14px;padding:10px 16px;
+    : isWrongCo
+      ? 'This branded URL is reserved for a specific company, and your account belongs to a different one. Use the central admin URL to access your own company.'
+      : 'Your email isn\'t linked to an employee account in this company. Ask your administrator to add you, or sign in with a different account.';
+
+  const cta = isOwner || isWrongCo
+    ? `<a href="${centralURL}" style="display:inline-block;margin-top:14px;padding:10px 16px;
          background:#2563eb;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">
          Open the admin app →
        </a>`
@@ -255,7 +269,7 @@ function showWrongAppNotice(reason) {
   host.innerHTML = `
     <div style="max-width:420px;background:#fff;border-radius:16px;padding:36px 32px;text-align:center;
                 box-shadow:0 25px 50px rgba(0,0,0,0.3);">
-      <div style="font-size:42px;margin-bottom:10px;">${isOwner ? '🛡️' : '🚫'}</div>
+      <div style="font-size:42px;margin-bottom:10px;">${isOwner ? '🛡️' : isWrongCo ? '🚪' : '🚫'}</div>
       <div style="font-size:1.3rem;font-weight:700;color:#1e293b;margin-bottom:8px;">${title}</div>
       <div style="font-size:0.92rem;color:#64748b;line-height:1.5;">${body}</div>
       ${cta}
@@ -412,6 +426,21 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         }
 
+        // SCOPED URL (e.g. payroll.lycee-montaigne.edu.lb): skip the company
+        // picker and auto-load THAT specific company. The branded URL is a
+        // lane — even super admin gets scoped here.
+        if (IS_SCOPED_URL && SCOPED_COMPANY_ID) {
+          setCompanyId(SCOPED_COMPANY_ID);
+          showLoader('Loading payroll data…');
+          await initStore();
+          hideLoader();
+          await showApp(user, { isSuperAdmin: true });
+          if (!appInitialized) { initRouter(); appInitialized = true; }
+          else window.dispatchEvent(new HashChangeEvent('hashchange'));
+          return;
+        }
+
+        // Generic admin URL → company picker
         hideLoader();
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('app-shell').style.display    = 'none';
@@ -443,6 +472,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (IS_PORTAL_MODE) {
           hideLoader();
           showWrongAppNotice('admin');
+          return;
+        }
+        // LANE-LOCK: branded URL is for a specific company, but this owner
+        // belongs to a DIFFERENT company. Show wrong-app notice.
+        if (IS_SCOPED_URL && userRecord.companyId !== SCOPED_COMPANY_ID) {
+          hideLoader();
+          showWrongAppNotice('wrong-company');
           return;
         }
         setCompanyId(userRecord.companyId);

@@ -5,7 +5,8 @@
  */
 
 import { createEmployee, validateEmployee } from '../models/employee.js';
-import { mergeEmployees } from '../data/store.js';
+import { mergeEmployees, getRoleRegistry } from '../data/store.js';
+import { findRole } from '../models/role.js';
 
 // Column name → employee model key mappings (case-insensitive)
 const COLUMN_MAP = {
@@ -20,6 +21,9 @@ const COLUMN_MAP = {
   'employee type':    'employeeType',
   'employeetype':     'employeeType',
   'type':             'employeeType',
+  'role':             'role',
+  'job role':         'role',
+  'position':         'role',
   'base salary (lbp)': 'baseSalaryLBP',
   'base salary':      'baseSalaryLBP',
   'basesalarylbp':    'baseSalaryLBP',
@@ -44,6 +48,16 @@ function mapRow(rawRow) {
   return out;
 }
 
+// Case-insensitive role lookup against the company's role registry.
+// Returns the canonical role object (id, name, taxCategory) or null.
+function resolveRoleCell(value, registry) {
+  if (!value || !registry || !Array.isArray(registry.roles)) return null;
+  const needle = String(value).trim().toLowerCase();
+  return registry.roles.find(r => (r.id || '').toLowerCase()   === needle)
+      || registry.roles.find(r => (r.name || '').toLowerCase() === needle)
+      || null;
+}
+
 // forceType: if set ('Teacher' or 'Admin'), overrides the type column in every row.
 // This lets users import a CSV that has no "Type" column at all.
 function processRows(rawRows, onSuccess, onError, forceType = null) {
@@ -52,13 +66,32 @@ function processRows(rawRows, onSuccess, onError, forceType = null) {
     return;
   }
 
-  const errors = [];
-  const valid  = [];
+  const errors   = [];
+  const warnings = [];
+  const valid    = [];
+  const registry = getRoleRegistry();
 
   rawRows.forEach((raw, i) => {
     if (!raw || Object.values(raw).every(v => !v)) return; // skip blank rows
     const mapped = mapRow(raw);
+
+    // Role resolution — if the row has a "Role" cell, look it up in the
+    // company's role registry. Match by id or by name, case-insensitive.
+    // When a role is matched, auto-derive employeeType from its tax category
+    // (so the user doesn't have to provide BOTH Role and Type — one is enough).
+    if (mapped.role) {
+      const resolved = resolveRoleCell(mapped.role, registry);
+      if (resolved) {
+        mapped.role         = resolved.id;
+        mapped.employeeType = resolved.taxCategory;
+      } else {
+        warnings.push(`Row ${i + 2}: role "${mapped.role}" not found in your role registry — saved as a custom label.`);
+        // Keep the raw role text — admin can clean it up later.
+      }
+    }
+
     if (forceType) mapped.employeeType = forceType;
+
     const errs = validateEmployee(mapped);
     if (errs.length) {
       errors.push(`Row ${i + 2}: ${errs.join(' ')}`);
@@ -78,6 +111,11 @@ function processRows(rawRows, onSuccess, onError, forceType = null) {
 
   if (errors.length) {
     onError(`${valid.length} imported, ${errors.length} rows had errors and were skipped.`);
+  } else if (warnings.length) {
+    onError(`${valid.length} imported successfully. Heads up:\n` +
+      warnings.slice(0, 5).join('\n') +
+      (warnings.length > 5 ? `\n…and ${warnings.length - 5} more.` : '') +
+      `\n\nFix by adding the role in Settings → Academic Year & Roles, then re-importing — or editing each employee individually.`);
   } else {
     onSuccess(valid.length);
   }

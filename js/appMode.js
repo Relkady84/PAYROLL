@@ -35,6 +35,36 @@ export const APP_MODE = detectMode();
 export const IS_PORTAL_MODE = APP_MODE === 'portal';
 export const IS_ADMIN_MODE  = APP_MODE === 'admin';
 
+/**
+ * Hostname → Firestore companyId map.
+ *
+ * Each entry locks a branded URL to a specific tenant. When a super admin
+ * visits one of these hostnames, they skip the company picker and land
+ * directly in that company's app. When an owner of company A tries to
+ * visit company B's branded URL, they see a "wrong app" notice.
+ *
+ * Add a new line per school as you onboard them.
+ */
+const HOSTNAME_COMPANY_MAP = {
+  // Lycée Montaigne (Lebanon)
+  'portal.lycee-montaigne.edu.lb':  'RQBKHGV5_1776006868157',
+  'payroll.lycee-montaigne.edu.lb': 'RQBKHGV5_1776006868157',
+};
+
+/**
+ * Returns the companyId this hostname is locked to, or null if the
+ * hostname is the generic (e.g., payroll-10a48.web.app) entry point.
+ */
+export function getScopedCompanyId() {
+  try {
+    const host = (window.location.hostname || '').toLowerCase();
+    return HOSTNAME_COMPANY_MAP[host] || null;
+  } catch { return null; }
+}
+
+export const SCOPED_COMPANY_ID = getScopedCompanyId();
+export const IS_SCOPED_URL    = !!SCOPED_COMPANY_ID;
+
 // Apply a body class so CSS can react if needed
 try {
   document.body.classList.add(`app-mode-${APP_MODE}`);
