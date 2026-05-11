@@ -35,7 +35,11 @@ import {
   getMyReadAnnouncements,
   markAnnouncementsRead,
   getMySeenPaySlipMonths,
-  markPaySlipMonthsSeen
+  markPaySlipMonthsSeen,
+  startSupervisorRequestsLiveSync,
+  stopSupervisorRequestsLiveSync,
+  supervisorApproveRequest,
+  supervisorRejectRequest
 } from '../data/store.js';
 import {
   ABSENCE_CATEGORIES,
@@ -63,9 +67,11 @@ let _companyLogo = '';
 let _quickLinks  = null;        // [{ label, url, icon }, ...] from company metadata, or defaults
 let _issuedMonths = [];          // pay-slip months published by the financial manager (sorted asc)
 let _isPublisher  = false;        // true if THIS user can publish pay slips
+let _isSupervisor = false;        // true if THIS user is supervisor of at least one role
 let _announcements = [];           // company-wide announcements (live)
 let _readAnnouncementIds = [];      // announcement ids this user has already seen
 let _seenPaySlipMonths   = [];      // pay-slip months this user has already seen
+let _supervisorRequests = [];       // requests assigned to me as supervisor (live)
 let _settings    = null;
 let _calendar    = null;
 let _roleRegistry = null;
@@ -209,6 +215,10 @@ export async function renderEmployeePortal({ user, companyId, employeeId }) {
   _isPublisher  = Array.isArray(publishers) &&
                   user?.email &&
                   publishers.map(e => String(e).toLowerCase()).includes(user.email.toLowerCase());
+  // Supervisor = my email appears as supervisorEmail on at least one role
+  _isSupervisor = user?.email && Array.isArray(roleRegistry?.roles) &&
+                  roleRegistry.roles.some(r =>
+                    (r.supervisorEmail || '').toLowerCase() === user.email.toLowerCase());
   // Default to the LATEST issued month so employees land on something they can read.
   // If nothing is issued yet, leave _paySlipMonth as-is — the UI shows an empty state.
   if (_issuedMonths.length) {
@@ -237,6 +247,15 @@ export async function renderEmployeePortal({ user, companyId, employeeId }) {
     _announcements = list;
     draw();
   });
+
+  // If this user is a supervisor for any role, start a live listener for
+  // requests assigned to them.
+  if (_isSupervisor) {
+    startSupervisorRequestsLiveSync(companyId, user.email, list => {
+      _supervisorRequests = list;
+      draw();
+    });
+  }
   // Pre-fetch the academic year covering the current pay-slip month so the breakdown is correct on first render
   await findAcademicYearForMonth();
   // Load private notes (only this user can read them)
@@ -271,12 +290,21 @@ function renderSection() {
   if (_section === 'attendance')   return attendanceSectionHTML();
   if (_section === 'notes')        return notesSectionHTML();
   if (_section === 'announcements')return announcementsSectionHTML();
+  if (_section === 'approvals' && _isSupervisor) return supervisorApprovalsSectionHTML();
   if (_section === 'publish' && _isPublisher) return publishSectionHTML();
   return homeSectionHTML();
 }
 
 /** Returns only announcements whose audience matches THIS employee's type
  *  (or 'all' / undefined for legacy posts). */
+/** Look up the supervisor email for the signed-in employee via their role. */
+function lookupSupervisorEmail() {
+  if (!_employee?.role || !_roleRegistry?.roles) return '';
+  const role = _roleRegistry.roles.find(r => r.id === _employee.role)
+            || _roleRegistry.roles.find(r => r.name === _employee.role);
+  return (role?.supervisorEmail || '').toLowerCase();
+}
+
 function visibleAnnouncements() {
   const myType = _employee?.employeeType || '';
   return _announcements.filter(a => {
@@ -432,6 +460,7 @@ function sectionTitle(section) {
   if (section === 'attendance')    return t('portal.attendance_title');
   if (section === 'notes')         return t('portal.notes_title');
   if (section === 'announcements') return 'Announcements';
+  if (section === 'approvals')     return 'Team Approvals';
   if (section === 'publish')       return 'Publish Pay Slips';
   return t('portal.title');
 }
@@ -499,6 +528,7 @@ function drawerHTML() {
         ${item('payslip',    '💰', t('portal.drawer.payslip'))}
         ${item('notes',      '🔐', t('portal.drawer.notes'))}
         ${announcementsDrawerItemHTML()}
+        ${_isSupervisor ? supervisorDrawerItemHTML() : ''}
         ${_isPublisher ? item('publish', '📢', 'Publish Pay Slips') : ''}
       </nav>
 
@@ -1072,6 +1102,125 @@ function historySectionHTML() {
 }
 
 // ── Section: NOTES (private personal notes) ──────────────
+// ── Supervisor: drawer item + "Team Approvals" section ────
+function supervisorPendingCount() {
+  return _supervisorRequests.filter(r => r.status === 'pending_supervisor').length;
+}
+
+function supervisorDrawerItemHTML() {
+  const pending = supervisorPendingCount();
+  const badge = pending > 0
+    ? `<span class="ep-drawer-badge" style="margin-left:auto;background:#dc2626;color:#fff;
+            font-size:0.66rem;font-weight:700;padding:2px 7px;border-radius:999px;
+            min-width:20px;text-align:center;">${pending > 99 ? '99+' : pending}</span>`
+    : '';
+  return `
+    <button class="ep-drawer-item ${_section === 'approvals' ? 'active' : ''}"
+            data-section="approvals" style="position:relative;">
+      <span class="ep-drawer-icon">👥</span>
+      <span>Team Approvals</span>
+      ${badge}
+    </button>
+  `;
+}
+
+function supervisorApprovalsSectionHTML() {
+  const pending  = _supervisorRequests.filter(r => r.status === 'pending_supervisor');
+  const decided  = _supervisorRequests.filter(r => r.status !== 'pending_supervisor');
+
+  return `
+    <section class="ep-card">
+      <div class="ep-card-title">👥 Team Approvals</div>
+      <div class="ep-card-sub">
+        Requests from staff in roles where you're the supervisor. Approve or reject — approved
+        requests then go to the Service Financier for final review.
+      </div>
+
+      <div style="margin-top:14px;">
+        <h3 style="font-size:0.95rem;margin:0 0 8px;">⏳ Awaiting your review (${pending.length})</h3>
+        ${pending.length ? pending.map(r => supervisorRequestCardHTML(r, true)).join('')
+          : `<div class="ep-empty" style="padding:18px 12px;">
+              <div class="ep-empty-icon">✨</div>
+              <div class="ep-empty-text">All caught up</div>
+              <div class="ep-empty-sub">No requests waiting for your approval.</div>
+            </div>`}
+      </div>
+
+      ${decided.length ? `
+        <div style="margin-top:20px;">
+          <h3 style="font-size:0.95rem;margin:0 0 8px;color:var(--color-text-muted);">📋 Recent decisions</h3>
+          ${decided.slice(0, 20).map(r => supervisorRequestCardHTML(r, false)).join('')}
+        </div>
+      ` : ''}
+    </section>
+  `;
+}
+
+function supervisorRequestCardHTML(r, showActions) {
+  const dateStr  = formatHumanDate(r.date);
+  const typeIcon = r.type === 'permanence' ? '🎯' : '🚫';
+  const catLabel = r.type === 'permanence' ? 'Permanence (+1 day)'
+                                           : (CATEGORY_LABELS[r.category] || r.category || 'Absence');
+  const statusPill = {
+    pending_supervisor:  '<span class="ep-status ep-status-pending">⏳ Awaiting you</span>',
+    pending_financier:   '<span class="ep-status ep-status-approved">✓ Forwarded to financier</span>',
+    approved:            '<span class="ep-status ep-status-approved">✓ Approved (final)</span>',
+    rejected_supervisor: '<span class="ep-status ep-status-rejected">✗ Rejected by you</span>',
+    rejected_financier:  '<span class="ep-status ep-status-rejected">✗ Rejected by financier</span>',
+  }[r.status] || `<span class="ep-status">${esc(r.status)}</span>`;
+
+  return `
+    <div class="ep-request" data-sup-req="${esc(r.id)}" style="margin-bottom:8px;">
+      <div class="ep-request-row" style="margin-bottom:4px;">
+        <div>
+          <div class="ep-request-date">${esc(r.employeeName || r.employeeEmail || 'Employee')}</div>
+          <div style="font-size:0.78rem;color:#64748b;margin-top:2px;">${typeIcon} ${esc(catLabel)} · ${esc(dateStr)}</div>
+        </div>
+        ${statusPill}
+      </div>
+      ${r.reason ? `<div class="ep-request-reason">"${esc(r.reason)}"</div>` : ''}
+      ${r.supervisorNotes ? `<div class="ep-request-review"><strong>Your note:</strong> ${esc(r.supervisorNotes)}</div>` : ''}
+      ${showActions ? `
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button class="ep-btn ep-btn-primary" data-sup-action="approve" data-sup-id="${esc(r.id)}"
+            style="flex:1;background:#16a34a;border-color:#16a34a;">✓ Approve</button>
+          <button class="ep-btn" data-sup-action="reject" data-sup-id="${esc(r.id)}"
+            style="flex:1;background:#fee2e2;color:#991b1b;border:1.5px solid #fecaca;">✗ Reject</button>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function bindSupervisorSectionEvents() {
+  document.querySelectorAll('[data-sup-action]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id     = btn.dataset.supId;
+      const action = btn.dataset.supAction;
+      const verb   = action === 'approve' ? 'approve' : 'reject';
+      const notes  = (action === 'reject')
+        ? (prompt('Optional — reason for rejection (visible to the employee):') || '')
+        : '';
+      if (action === 'reject' && notes === null) return;   // cancelled
+      if (!confirm(`Are you sure you want to ${verb} this request?`)) return;
+      btn.disabled = true;
+      try {
+        if (action === 'approve') {
+          await supervisorApproveRequest(_companyId, id, _user.email, '');
+          showToast('Approved — forwarded to Service Financier.', 'success');
+        } else {
+          await supervisorRejectRequest(_companyId, id, _user.email, notes);
+          showToast('Request rejected. The employee will be notified.', 'info');
+        }
+      } catch (e) {
+        console.error(e);
+        showToast('Failed to save decision. Try again.', 'error');
+        btn.disabled = false;
+      }
+    });
+  });
+}
+
 // ── Section: ANNOUNCEMENTS ────────────────────────────────
 function announcementsSectionHTML() {
   const list = visibleAnnouncements();
@@ -1538,6 +1687,8 @@ function bindSectionEvents() {
     bindNotesEvents();
   } else if (_section === 'publish' && _isPublisher) {
     bindPublishSectionEvents();
+  } else if (_section === 'approvals' && _isSupervisor) {
+    bindSupervisorSectionEvents();
   }
 }
 
@@ -1574,7 +1725,8 @@ function bindFormEvents() {
     submitBtn.textContent = 'Submitting…';
 
     try {
-      const req = createAbsenceRequest(data, _employee);
+      const supervisorEmail = lookupSupervisorEmail();
+      const req = createAbsenceRequest(data, _employee, { supervisorEmail });
       await addOwnAbsenceRequest(_companyId, req);
       showToast(t('portal.absence.submitted'), 'success');
       draw();
@@ -1756,7 +1908,8 @@ function bindPermanenceEvents() {
     submitBtn.textContent = 'Submitting…';
 
     try {
-      const req = createAbsenceRequest(data, _employee);
+      const supervisorEmail = lookupSupervisorEmail();
+      const req = createAbsenceRequest(data, _employee, { supervisorEmail });
       await addOwnAbsenceRequest(_companyId, req);
       showToast(t('portal.permanence.submitted'), 'success');
       draw();
@@ -1926,6 +2079,7 @@ function bindSignOut() {
   btn.addEventListener('click', async () => {
     stopOwnAbsenceRequestsLiveSync();   // tear down listener before sign-out
     stopAnnouncementsLiveSyncFor();
+    stopSupervisorRequestsLiveSync();
     await signOutUser();
   });
 }

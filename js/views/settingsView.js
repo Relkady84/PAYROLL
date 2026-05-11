@@ -6,7 +6,8 @@ import {
   saveAcademicYear, setCurrentAcademicYear, deleteAcademicYear,
   getRoleRegistry, saveRoleRegistry,
   setCompanyBackupSchedule, recordBackupTaken, buildCompanyBackup,
-  setPaySlipPublishers
+  setPaySlipPublishers,
+  getEmployees
 } from '../data/store.js';
 import { openRestoreOverlay } from './backupRestoreView.js';
 import { validateSettings, normalizeSettings, denormalizeSettings } from '../models/settings.js';
@@ -472,9 +473,8 @@ export async function render(selector) {
               </table>
             </div>
             <span class="form-hint" style="font-size:0.78rem;color:var(--color-text-muted);">
-              💡 Drag a row (or use ↑ / ↓) to reorder. Type a supervisor email in the cell — it saves
-              automatically when you click away. Leave empty if the role has no supervisor
-              (e.g. Service Financier, Principal).
+              💡 Drag a row (or use ↑ / ↓) to reorder. Click the Supervisor cell, search by name,
+              then click an employee to assign — saves automatically. Use ✕ to clear (no supervisor).
             </span>
             <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;">
               <div style="flex:1 1 200px;">
@@ -2179,6 +2179,16 @@ function initTypesSection() {
   renderTypeTable();
 }
 
+// Pretty display value for a supervisor email — shows "First Last (email)"
+// if the email matches an employee on file, otherwise the bare email.
+function supervisorDisplayValue(email) {
+  if (!email) return '';
+  const emp = getEmployees().find(e => (e.email || '').toLowerCase() === email.toLowerCase());
+  if (!emp) return email;
+  const fullName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim();
+  return fullName ? `${fullName} (${email})` : email;
+}
+
 // ── Roles section logic ────────────────────────────────────
 function initRolesSection() {
   /** Persist the current order of custom roles to Firestore. */
@@ -2223,14 +2233,26 @@ function initRolesSection() {
         <td><strong>${esc(r.name)}</strong></td>
         <td><span class="badge badge-${r.taxCategory === 'Teacher' ? 'teacher' : 'admin'}">${esc(r.taxCategory)}</span></td>
         <td>
-          <div style="display:flex;align-items:center;gap:6px;">
-            <input type="email" class="form-control role-supervisor-input"
+          <div style="position:relative;display:flex;align-items:center;gap:6px;">
+            <input type="text" class="form-control role-supervisor-input"
               data-role-sup="${esc(r.id)}"
-              value="${esc(r.supervisorEmail || '')}"
-              placeholder="(no supervisor)"
+              data-current-email="${esc(r.supervisorEmail || '')}"
+              value="${esc(supervisorDisplayValue(r.supervisorEmail))}"
+              placeholder="Search employee by name…"
+              autocomplete="off"
               style="font-size:0.85rem;padding:6px 8px;flex:1;">
+            ${r.supervisorEmail
+              ? `<button type="button" class="btn btn-secondary btn-sm role-supervisor-clear"
+                   data-role-sup-clear="${esc(r.id)}" title="Clear"
+                   style="padding:2px 8px;font-size:0.8rem;">✕</button>`
+              : ''}
             <span class="role-supervisor-status" data-role-sup-status="${esc(r.id)}"
               style="font-size:0.85rem;color:#10b981;min-width:16px;"></span>
+            <div class="role-supervisor-dropdown" data-role-sup-dd="${esc(r.id)}"
+              style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;
+                     background:#fff;border:1.5px solid var(--color-border);border-radius:6px;
+                     box-shadow:0 6px 18px rgba(0,0,0,0.12);max-height:240px;overflow-y:auto;
+                     margin-top:2px;font-size:0.85rem;"></div>
           </div>
         </td>
         <td><button class="btn btn-danger btn-sm" data-del-role="${esc(r.id)}">🗑</button></td>
@@ -2255,46 +2277,107 @@ function initRolesSection() {
       });
     });
 
-    // ── Supervisor email — save on blur (or Enter) ───────────────────
+    // ── Supervisor picker — search employees by name + assign on click ─────
     tbody.querySelectorAll('.role-supervisor-input').forEach(input => {
+      const roleId = input.dataset.roleSup;
+      const dropdown = tbody.querySelector(`[data-role-sup-dd="${CSS.escape(roleId)}"]`);
+
       // Don't let drag-and-drop hijack clicks inside the input
       input.addEventListener('mousedown', e => e.stopPropagation());
       input.addEventListener('dragstart', e => { e.preventDefault(); e.stopPropagation(); });
-      // Save on blur or Enter
-      const save = async () => {
-        const id    = input.dataset.roleSup;
-        const value = input.value.trim().toLowerCase();
-        // Validate email format (or allow empty)
-        if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-          input.style.borderColor = '#dc2626';
-          showToast('Invalid email format — supervisor not saved.', 'warning');
+
+      const renderDropdown = (query) => {
+        const employees = getEmployees().filter(e => e.email);
+        const q = (query || '').toLowerCase().trim();
+        const filtered = q
+          ? employees.filter(e =>
+              (`${e.firstName} ${e.lastName}`.toLowerCase().includes(q)) ||
+              (e.email || '').toLowerCase().includes(q))
+          : employees;
+        const sliced = filtered.slice(0, 30);   // cap for performance
+
+        if (!sliced.length) {
+          dropdown.innerHTML = `<div style="padding:10px;color:#94a3b8;font-size:0.82rem;">
+            ${q ? `No employee matches "${esc(q)}"` : 'No employees with email on file.'}
+          </div>`;
+        } else {
+          dropdown.innerHTML = sliced.map(emp => `
+            <div class="role-sup-option" data-emp-email="${esc(emp.email)}"
+              style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;
+                     display:flex;justify-content:space-between;align-items:center;gap:10px;">
+              <div style="flex:1;min-width:0;">
+                <div style="font-weight:600;color:#1e293b;
+                            white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                  ${esc(`${emp.firstName} ${emp.lastName}`.trim() || emp.email)}
+                </div>
+                <div style="font-size:0.74rem;color:#64748b;
+                            white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(emp.email)}</div>
+              </div>
+            </div>
+          `).join('');
+          dropdown.querySelectorAll('.role-sup-option').forEach(opt => {
+            opt.addEventListener('mouseenter', () => opt.style.background = '#f1f5f9');
+            opt.addEventListener('mouseleave', () => opt.style.background = '');
+            opt.addEventListener('mousedown', e => {
+              // mousedown (not click) so it fires BEFORE the input's blur handler closes the dropdown
+              e.preventDefault();
+              const email = opt.dataset.empEmail;
+              selectSupervisor(email);
+            });
+          });
+        }
+        dropdown.style.display = 'block';
+      };
+
+      const closeDropdown = () => { dropdown.style.display = 'none'; };
+
+      const selectSupervisor = async (email) => {
+        const reg = getRoleRegistry();
+        const role = reg.roles.find(r => r.id === roleId);
+        if (!role) return;
+        const normalized = (email || '').toLowerCase();
+        if ((role.supervisorEmail || '') === normalized) {
+          closeDropdown();
           return;
         }
-        input.style.borderColor = '';
-        const reg = getRoleRegistry();
-        const role = reg.roles.find(r => r.id === id);
-        if (!role) return;
-        // No-op if unchanged
-        const current = role.supervisorEmail || '';
-        if (current.toLowerCase() === value) return;
-        if (value) role.supervisorEmail = value;
+        if (normalized) role.supervisorEmail = normalized;
         else delete role.supervisorEmail;
         try {
           await saveRoleRegistry(reg);
-          // Flash green checkmark briefly
-          const statusEl = tbody.querySelector(`[data-role-sup-status="${CSS.escape(id)}"]`);
-          if (statusEl) {
-            statusEl.textContent = '✓';
-            setTimeout(() => { statusEl.textContent = ''; }, 1600);
-          }
+          closeDropdown();
+          renderRoleTable();   // re-render so the input value + ✕ button reflect the change
         } catch (e) {
-          console.error('Failed to save supervisor email:', e);
-          showToast('Could not save supervisor email.', 'error');
+          console.error('Failed to save supervisor:', e);
+          showToast('Could not save supervisor.', 'error');
         }
       };
-      input.addEventListener('blur', save);
+
+      input.addEventListener('focus', () => renderDropdown(''));
+      input.addEventListener('input', () => renderDropdown(input.value));
+      input.addEventListener('blur', () => {
+        // Delay so clicks on dropdown options register first
+        setTimeout(closeDropdown, 150);
+      });
       input.addEventListener('keydown', e => {
-        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+        if (e.key === 'Escape') { closeDropdown(); input.blur(); }
+      });
+    });
+
+    // Clear-supervisor button
+    tbody.querySelectorAll('[data-role-sup-clear]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.roleSupClear;
+        const reg = getRoleRegistry();
+        const role = reg.roles.find(r => r.id === id);
+        if (!role) return;
+        delete role.supervisorEmail;
+        try {
+          await saveRoleRegistry(reg);
+          renderRoleTable();
+        } catch (e) {
+          console.error(e);
+          showToast('Could not clear supervisor.', 'error');
+        }
       });
     });
 

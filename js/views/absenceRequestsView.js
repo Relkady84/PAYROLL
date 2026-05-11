@@ -177,10 +177,15 @@ export function render(selector) {
 
 function drawTabs() {
   const all = getAbsenceRequests();
+  // Treat new two-step statuses as pending/rejected so admin sees everything
+  // in their familiar tabs. Supervisor-pending requests show up under "pending"
+  // too — admin can override by approving directly.
+  const isPendingAny = s => s === 'pending' || s === 'pending_supervisor' || s === 'pending_financier';
+  const isRejectedAny = s => s === 'rejected' || s === 'rejected_supervisor' || s === 'rejected_financier';
   const counts = {
-    pending:  all.filter(r => r.status === 'pending').length,
+    pending:  all.filter(r => isPendingAny(r.status)).length,
     approved: all.filter(r => r.status === 'approved').length,
-    rejected: all.filter(r => r.status === 'rejected').length
+    rejected: all.filter(r => isRejectedAny(r.status)).length
   };
 
   const tabsEl = document.getElementById('ar-tabs');
@@ -329,7 +334,14 @@ function renderDatePickerMenu() {
 function drawList() {
   const search = (document.getElementById('ar-search')?.value || '').toLowerCase().trim();
 
-  let rows = getAbsenceRequests().filter(r => r.status === _activeTab);
+  // Match the active tab against any related status (e.g. "pending" matches
+  // pending, pending_supervisor, pending_financier).
+  const matchesTab = (status) => {
+    if (_activeTab === 'pending')  return status === 'pending' || status === 'pending_supervisor' || status === 'pending_financier';
+    if (_activeTab === 'rejected') return status === 'rejected' || status === 'rejected_supervisor' || status === 'rejected_financier';
+    return status === _activeTab;   // 'approved'
+  };
+  let rows = getAbsenceRequests().filter(r => matchesTab(r.status));
 
   // Type filter
   if (_filterType !== 'all') {
@@ -435,7 +447,7 @@ function drawList() {
       <td style="max-width:240px;">${r.reason ? `<em>${esc(r.reason)}</em>` : '<span style="color:var(--color-text-muted);">—</span>'}</td>
       <td><span class="badge badge-${esc(r.status)}">${esc(STATUS_LABELS[r.status])}</span></td>
       <td>
-        ${r.status === 'pending' ? `
+        ${(r.status === 'pending' || r.status === 'pending_supervisor' || r.status === 'pending_financier') ? `
           <div class="action-btns">
             <button class="btn btn-success btn-sm" data-action="approve" data-id="${esc(r.id)}">✓ Approve</button>
             <button class="btn btn-danger btn-sm" data-action="reject" data-id="${esc(r.id)}">✕ Reject</button>

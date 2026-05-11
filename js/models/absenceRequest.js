@@ -8,10 +8,21 @@ export const CATEGORY_LABELS = {
 };
 
 export const STATUS_LABELS = {
-  pending:  'Pending',
-  approved: 'Approved',
-  rejected: 'Rejected'
+  pending:              'Pending',                    // legacy — pre-two-step
+  pending_supervisor:   'Awaiting supervisor',
+  pending_financier:    'Awaiting Service Financier',
+  approved:             'Approved',
+  rejected:             'Rejected',                   // legacy
+  rejected_supervisor:  'Rejected by supervisor',
+  rejected_financier:   'Rejected by Service Financier'
 };
+
+// Helpers to classify a status into one of the high-level buckets
+export function isPending(status)      { return status === 'pending' || status === 'pending_supervisor' || status === 'pending_financier'; }
+export function isAwaitingSupervisor(s){ return s === 'pending_supervisor'; }
+export function isAwaitingFinancier(s) { return s === 'pending_financier' || s === 'pending'; }
+export function isApprovedFinal(s)     { return s === 'approved'; }
+export function isRejected(s)          { return s === 'rejected' || s === 'rejected_supervisor' || s === 'rejected_financier'; }
 
 // Request types — 'absence' subtracts a day; 'permanence' adds a day.
 // Permanence: an employee worked on a day that's normally non-working
@@ -97,8 +108,14 @@ export function validateAbsenceRequest(data) {
  * Build a clean request object for storage.
  * Supports both absence and permanence types.
  */
-export function createAbsenceRequest(data, employee) {
+export function createAbsenceRequest(data, employee, options = {}) {
   const type = REQUEST_TYPES.includes(data.type) ? data.type : 'absence';
+  // Two-step routing: if a supervisor email is provided (looked up from the
+  // employee's role), the request starts in pending_supervisor. Otherwise it
+  // skips straight to pending_financier (e.g. for Service Financier, Principal,
+  // or any role that has no supervisor configured).
+  const supervisorEmail = (options.supervisorEmail || '').trim().toLowerCase();
+  const status = supervisorEmail ? 'pending_supervisor' : 'pending_financier';
   return {
     employeeId:    employee.id,
     employeeEmail: String(employee.email || '').trim().toLowerCase(),
@@ -107,8 +124,14 @@ export function createAbsenceRequest(data, employee) {
     type,                                                   // 'absence' or 'permanence'
     category:      type === 'absence' ? data.category : null,
     reason:        String(data.reason || '').trim(),
-    status:        'pending',
+    status,
+    supervisorEmail: supervisorEmail || null,                // denormalized for fast supervisor portal lookup
     requestedAt:   Date.now(),
+    // Supervisor review
+    supervisorReviewedBy:  null,
+    supervisorReviewedAt:  null,
+    supervisorNotes:       '',
+    // Financier / final review
     reviewedBy:    null,
     reviewedAt:    null,
     reviewNotes:   ''

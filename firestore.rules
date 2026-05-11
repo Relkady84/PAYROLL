@@ -161,19 +161,31 @@ service cloud.firestore {
     // ── /companies/{companyId}/absenceRequests/{requestId} ───
     // Owners (covered by parent rule above) have full access.
     // Employees can: read their own, create new pending requests, delete own pending.
+    // Supervisors (employees whose email matches resource.data.supervisorEmail)
+    // can also read assigned requests and approve/reject them at the supervisor step.
     match /companies/{companyId}/absenceRequests/{requestId} {
       allow read: if isEmployeeOf(companyId)
-        && resource.data.employeeId == myEmployeeId();
+        && (resource.data.employeeId == myEmployeeId()
+            || resource.data.supervisorEmail == request.auth.token.email);
 
+      // Submission — initial status is supervisor or financier depending on role
       allow create: if isEmployeeOf(companyId)
         && request.resource.data.employeeId == myEmployeeId()
-        && request.resource.data.status == 'pending';
+        && request.resource.data.status in ['pending', 'pending_supervisor', 'pending_financier'];
 
+      // Employees may cancel their own request only while still pending at any step
       allow delete: if isEmployeeOf(companyId)
         && resource.data.employeeId == myEmployeeId()
-        && resource.data.status == 'pending';
+        && resource.data.status in ['pending', 'pending_supervisor', 'pending_financier'];
 
-      // Employees cannot update (only delete pending or admin can update).
+      // Supervisor approval — transition pending_supervisor → pending_financier or rejected_supervisor.
+      // Only the assigned supervisor can do this, and only the supervisor-review fields may change.
+      allow update: if isEmployeeOf(companyId)
+        && resource.data.supervisorEmail == request.auth.token.email
+        && resource.data.status == 'pending_supervisor'
+        && request.resource.data.status in ['pending_financier', 'rejected_supervisor']
+        && request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['status', 'supervisorReviewedBy', 'supervisorReviewedAt', 'supervisorNotes']);
     }
 
     // Super admin can list all company root documents

@@ -495,6 +495,48 @@ export async function loadOwnAbsenceRequests(companyId, employeeId) {
   }
 }
 
+// ── Supervisor: read + decide on requests assigned to me ─────
+// Used by supervisors (employees whose email appears as role.supervisorEmail).
+// Firestore rules enforce that the caller is the assigned supervisor.
+
+let _supervisorUnsub = null;
+
+export function startSupervisorRequestsLiveSync(companyId, supervisorEmail, onChange) {
+  stopSupervisorRequestsLiveSync();
+  if (!companyId || !supervisorEmail) return;
+  const ref = collection(db, 'companies', companyId, 'absenceRequests');
+  const q   = query(ref, where('supervisorEmail', '==', supervisorEmail.toLowerCase()));
+  _supervisorUnsub = onSnapshot(
+    q,
+    snap => {
+      const list = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+      try { onChange && onChange(list); } catch (e) { console.error(e); }
+    },
+    err => console.warn('Supervisor requests live sync error:', err)
+  );
+}
+export function stopSupervisorRequestsLiveSync() {
+  if (_supervisorUnsub) { _supervisorUnsub(); _supervisorUnsub = null; }
+}
+
+export async function supervisorApproveRequest(companyId, requestId, reviewerEmail, notes = '') {
+  await updateDoc(doc(db, 'companies', companyId, 'absenceRequests', requestId), {
+    status:                'pending_financier',
+    supervisorReviewedBy:  reviewerEmail,
+    supervisorReviewedAt:  Date.now(),
+    supervisorNotes:       String(notes || '')
+  });
+}
+
+export async function supervisorRejectRequest(companyId, requestId, reviewerEmail, notes = '') {
+  await updateDoc(doc(db, 'companies', companyId, 'absenceRequests', requestId), {
+    status:                'rejected_supervisor',
+    supervisorReviewedBy:  reviewerEmail,
+    supervisorReviewedAt:  Date.now(),
+    supervisorNotes:       String(notes || '')
+  });
+}
+
 // ── Real-time listener for the employee portal ──────────────
 // Streams the signed-in employee's own requests so status changes (approved /
 // rejected by admin) appear instantly in the portal — no refresh needed.
