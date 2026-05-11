@@ -171,6 +171,7 @@ export function render(selector) {
               <tr>
                 <th class="sortable" data-key="firstName">${t('payroll.col.name')} <span class="sort-icon">↕</span></th>
                 <th class="sortable" data-key="employeeType">${t('payroll.col.type')} <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-key="role">Role <span class="sort-icon">↕</span></th>
                 <th class="sortable" data-key="daysWorked">${t('payroll.col.transport_days')} <span class="sort-icon">↕</span></th>
                 <th class="sortable" data-key="baseSalaryLBP">${t('payroll.col.base_salary_lbp')} <span class="sort-icon">↕</span></th>
                 <th class="sortable" data-key="baseSalaryUSD">${t('payroll.col.base_salary_usd')} <span class="sort-icon">↕</span></th>
@@ -486,7 +487,7 @@ function renderRows(container) {
 
   if (!rows.length) {
     tbody.innerHTML = `
-      <tr><td colspan="13">
+      <tr><td colspan="14">
         <div class="table-empty">
           <div class="table-empty-icon">📋</div>
           <p>${_filterType !== 'all' ? 'No employees match this filter.' : 'No employees found. Add employees first.'}</p>
@@ -522,6 +523,7 @@ function renderRows(container) {
     <tr>
       <td><strong>${esc(r.firstName)} ${esc(r.lastName)}</strong></td>
       <td><span class="badge badge-${r.employeeType === 'Teacher' ? 'teacher' : 'admin'}">${r.employeeType === 'Admin' ? 'Admin' : 'Teacher'}</span></td>
+      <td style="font-size:0.85rem;color:var(--color-text-secondary);">${esc(r.role || '—')}</td>
       <td>
         <div style="display:inline-flex;align-items:center;gap:4px;">
           <input type="number" class="days-input" min="0" max="31" data-emp-id="${esc(r.id)}" value="${r.daysWorked}" style="width:52px;text-align:center;" oninput="if(this.value.length>2)this.value=this.value.slice(0,2)">
@@ -547,7 +549,7 @@ function renderRows(container) {
   const totals = calculateTotals(rows);
   const totalsRow = `
     <tr class="totals-row">
-      <td colspan="3"><strong>TOTALS (${rows.length})</strong></td>
+      <td colspan="4"><strong>TOTALS (${rows.length})</strong></td>
       <td>${fmt(totals.baseSalaryLBP)} ل.ل</td>
       <td>${fmtUSD(totals.baseSalaryUSD)}</td>
       <td>${fmt(totals.transportPerDayLBP)} ل.ل</td>

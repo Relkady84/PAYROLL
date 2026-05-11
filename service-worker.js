@@ -10,7 +10,7 @@
  * Version bump = bump CACHE_VERSION below.
  */
 
-const CACHE_VERSION = 'v74-2026-05-08-periods-by-role-not-type';
+const CACHE_VERSION = 'v75-2026-05-08-payroll-table-role-column';
 const CACHE_SHELL   = `payroll-shell-${CACHE_VERSION}`;
 const CACHE_RUNTIME = `payroll-runtime-${CACHE_VERSION}`;
 
