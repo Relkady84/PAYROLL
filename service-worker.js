@@ -10,7 +10,7 @@
  * Version bump = bump CACHE_VERSION below.
  */
 
-const CACHE_VERSION = 'v80-2026-05-08-prominent-submitted-confirmation-card';
+const CACHE_VERSION = 'v81-2026-05-08-bell-supervisor-history-cancel';
 const CACHE_SHELL   = `payroll-shell-${CACHE_VERSION}`;
 const CACHE_RUNTIME = `payroll-runtime-${CACHE_VERSION}`;
 
