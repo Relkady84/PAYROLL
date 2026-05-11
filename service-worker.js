@@ -10,7 +10,7 @@
  * Version bump = bump CACHE_VERSION below.
  */
 
-const CACHE_VERSION = 'v68-2026-05-08-notification-seen-state-persist';
+const CACHE_VERSION = 'v69-2026-05-08-sticky-tabs-and-types-section';
 const CACHE_SHELL   = `payroll-shell-${CACHE_VERSION}`;
 const CACHE_RUNTIME = `payroll-runtime-${CACHE_VERSION}`;
 

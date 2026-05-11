@@ -40,8 +40,11 @@ export async function render(selector) {
       </div>
     </div>
 
-    <!-- Settings tabs -->
-    <div id="settings-tabs" style="display:flex;flex-wrap:wrap;gap:4px;padding:0 20px;margin:0 0 16px;border-bottom:2px solid var(--color-border);">
+    <!-- Settings tabs (sticky so they stay visible while scrolling) -->
+    <div id="settings-tabs"
+      style="display:flex;flex-wrap:wrap;gap:4px;padding:8px 20px 0;margin:0 0 16px;
+             border-bottom:2px solid var(--color-border);background:var(--color-bg);
+             position:sticky;top:0;z-index:50;box-shadow:0 2px 4px rgba(0,0,0,0.04);">
       <button type="button" class="settings-tab" data-tab="company">${esc(t('settings.tab.company'))}</button>
       <button type="button" class="settings-tab" data-tab="display">${esc(t('settings.tab.display'))}</button>
       <button type="button" class="settings-tab" data-tab="calendar">${esc(t('settings.tab.calendar'))}</button>
@@ -412,15 +415,54 @@ export async function render(selector) {
             <!-- Filled by JS -->
           </div>
 
+          <!-- Types management (tax categories) -->
+          <div class="settings-section" style="margin-top:24px;">
+            <div class="settings-section-title">Types</div>
+            <div class="alert alert-info" style="margin-bottom:10px;font-size:0.85rem;">
+              <span>ℹ</span>
+              <span>Types are tax categories — they drive the tax & NFS rates an employee pays.
+                Teacher and Administrator are built-in. Add new types here (e.g. Contractor)
+                if your school has employees taxed differently. Tax / NFS rates per type are managed
+                in <strong>Global Configuration</strong>.</span>
+            </div>
+            <div class="table-wrapper" style="margin-bottom:10px;">
+              <table class="data-table" id="type-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th style="width:120px;">Tax %</th>
+                    <th style="width:120px;">NFS %</th>
+                    <th style="width:100px;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="type-tbody"></tbody>
+              </table>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;">
+              <div style="flex:1 1 200px;">
+                <label class="form-label">Add type — name</label>
+                <input type="text" class="form-control" id="type-add-name" maxlength="40"
+                  placeholder="e.g., Contractor">
+              </div>
+              <button type="button" class="btn btn-secondary" id="type-add-btn">+ Add type</button>
+            </div>
+            <div id="type-add-error" style="font-size:0.78rem;color:var(--color-danger);margin-top:6px;min-height:18px;"></div>
+          </div>
+
           <!-- Roles management -->
           <div class="settings-section" style="margin-top:24px;">
             <div class="settings-section-title">Roles</div>
+            <div class="alert alert-info" style="margin-bottom:10px;font-size:0.85rem;">
+              <span>ℹ</span>
+              <span>Roles describe job positions (Teacher Primaire, Service Financier, Vie Scolaire…).
+                Each role is linked to a Type so the right tax/NFS rates apply.</span>
+            </div>
             <div class="table-wrapper" style="margin-bottom:10px;">
               <table class="data-table" id="role-table">
                 <thead>
                   <tr>
-                    <th>Name</th>
-                    <th style="width:140px;">Tax category</th>
+                    <th>Role name</th>
+                    <th style="width:140px;">Type</th>
                     <th style="width:100px;">Action</th>
                   </tr>
                 </thead>
@@ -434,16 +476,12 @@ export async function render(selector) {
                   placeholder="e.g., Service Financier">
               </div>
               <div style="flex:0 0 160px;">
-                <label class="form-label">Tax category</label>
-                <select class="form-control" id="role-add-tax">
-                  ${TAX_CATEGORIES.map(t => `<option value="${t}">${t}</option>`).join('')}
-                </select>
+                <label class="form-label">Type</label>
+                <select class="form-control" id="role-add-tax"></select>
               </div>
               <button type="button" class="btn btn-secondary" id="role-add-btn">+ Add role</button>
             </div>
             <div id="role-add-error" style="font-size:0.78rem;color:var(--color-danger);margin-top:6px;min-height:18px;"></div>
-            <span class="form-hint">Built-in roles (Teacher, Administrator) cannot be deleted. Custom roles
-              like "Service Financier" inherit their tax/NFS rates from the chosen tax category.</span>
           </div>
 
         </div>
@@ -868,6 +906,8 @@ export async function render(selector) {
 
   // ── Academic Year & Roles ──────────────────────────────
   initAcademicYearSection();
+  initTypesSection();
+  refreshRoleTypeDropdown();   // populate the role-add Type dropdown with all types
   initRolesSection();
 
   // ── Backup ─────────────────────────────────────────────
@@ -2024,23 +2064,132 @@ function openYearCreatorModal(onCreate) {
   );
 }
 
+// ── Types section logic (tax categories) ──────────────────
+// Returns the union of built-in TAX_CATEGORIES (Teacher, Admin) + any custom
+// types the user has added via settings.customTypes.
+function getAllTypes() {
+  const settings = getSettings();
+  const custom = Array.isArray(settings.customTypes) ? settings.customTypes : [];
+  return Array.from(new Set([...TAX_CATEGORIES, ...custom]));
+}
+
+// Re-populate the "Type" dropdown when adding a role with the live list of types.
+function refreshRoleTypeDropdown() {
+  const sel = document.getElementById('role-add-tax');
+  if (!sel) return;
+  const types = getAllTypes();
+  sel.innerHTML = types.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+}
+
+function initTypesSection() {
+  const tbody  = document.getElementById('type-tbody');
+  const nameIn = document.getElementById('type-add-name');
+  const addBtn = document.getElementById('type-add-btn');
+  const errEl  = document.getElementById('type-add-error');
+  if (!tbody || !addBtn) return;
+
+  function renderTypeTable() {
+    const settings = getSettings();
+    const builtins = TAX_CATEGORIES;
+    const custom   = Array.isArray(settings.customTypes) ? settings.customTypes : [];
+    const all = [...builtins, ...custom];
+
+    tbody.innerHTML = all.map(typeName => {
+      const isBuiltin = builtins.includes(typeName);
+      const taxRate = ((settings.taxRates?.[typeName] || 0) * 100).toFixed(1) + '%';
+      const nfsRate = ((settings.nfsRates?.[typeName] || 0) * 100).toFixed(1) + '%';
+      return `
+        <tr>
+          <td>
+            <strong>${esc(typeName)}</strong>
+            ${isBuiltin ? ' <span class="badge" style="background:#f1f5f9;color:#64748b;font-size:0.65rem;">built-in</span>' : ''}
+          </td>
+          <td><span style="font-family:monospace;">${taxRate}</span></td>
+          <td><span style="font-family:monospace;">${nfsRate}</span></td>
+          <td>
+            ${isBuiltin
+              ? '<span style="font-size:0.75rem;color:var(--color-text-muted);">—</span>'
+              : `<button class="btn btn-danger btn-sm" data-del-type="${esc(typeName)}" title="Remove this type">🗑</button>`}
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    tbody.querySelectorAll('[data-del-type]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const typeName = btn.dataset.delType;
+        // Block deletion if any role references this type
+        const usedBy = getRoleRegistry().roles.filter(r => r.taxCategory === typeName);
+        if (usedBy.length) {
+          alert(`Cannot remove "${typeName}" — it's used by ${usedBy.length} role(s): ${usedBy.map(r => r.name).join(', ')}.\n\nDelete or reassign those roles first.`);
+          return;
+        }
+        if (!confirm(`Remove the "${typeName}" type? Its tax & NFS rates will also be cleared.`)) return;
+        try {
+          const s = getSettings();
+          const newCustom = (s.customTypes || []).filter(t => t !== typeName);
+          const newTax    = { ...s.taxRates }; delete newTax[typeName];
+          const newNfs    = { ...s.nfsRates }; delete newNfs[typeName];
+          await saveSettings({ ...s, customTypes: newCustom, taxRates: newTax, nfsRates: newNfs });
+          showToast(`Type "${typeName}" removed.`, 'info');
+          renderTypeTable();
+          refreshRoleTypeDropdown();
+        } catch (e) {
+          console.error(e);
+          showToast('Failed to remove type.', 'error');
+        }
+      });
+    });
+  }
+
+  addBtn.addEventListener('click', async () => {
+    errEl.textContent = '';
+    const name = nameIn.value.trim();
+    if (!name) { errEl.textContent = 'Type name is required.'; return; }
+    if (name.length > 40) { errEl.textContent = 'Type name is too long (max 40 chars).'; return; }
+    const existing = getAllTypes();
+    if (existing.some(t => t.toLowerCase() === name.toLowerCase())) {
+      errEl.textContent = `Type "${name}" already exists.`;
+      return;
+    }
+    try {
+      const s = getSettings();
+      const newCustom = [...(s.customTypes || []), name];
+      // Initialize tax / NFS rates to 0 — user can adjust them in Global Configuration
+      const newTax = { ...s.taxRates, [name]: 0 };
+      const newNfs = { ...s.nfsRates, [name]: 0 };
+      await saveSettings({ ...s, customTypes: newCustom, taxRates: newTax, nfsRates: newNfs });
+      nameIn.value = '';
+      showToast(`Type "${name}" added. Set its tax/NFS rates in Global Configuration.`, 'success');
+      renderTypeTable();
+      refreshRoleTypeDropdown();
+    } catch (e) {
+      console.error(e);
+      errEl.textContent = 'Failed to add type. Try again.';
+    }
+  });
+
+  renderTypeTable();
+}
+
 // ── Roles section logic ────────────────────────────────────
 function initRolesSection() {
   function renderRoleTable() {
     const registry = getRoleRegistry();
     const tbody = document.getElementById('role-tbody');
-    if (!registry.roles.length) {
-      tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--color-text-muted);">No roles defined.</td></tr>`;
+    // Hide built-in entries (Teacher / Administrator) — they live in the Types section now
+    const visibleRoles = registry.roles.filter(r => !r.builtin);
+    if (!visibleRoles.length) {
+      tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--color-text-muted);padding:18px;">
+        No custom roles yet. Add one below (e.g. "Teacher Primaire", "Service Financier").
+      </td></tr>`;
       return;
     }
-    tbody.innerHTML = registry.roles.map(r => `
+    tbody.innerHTML = visibleRoles.map(r => `
       <tr>
-        <td><strong>${esc(r.name)}</strong>${r.builtin ? ' <span class="badge" style="background:#f1f5f9;color:#64748b;font-size:0.65rem;">built-in</span>' : ''}</td>
+        <td><strong>${esc(r.name)}</strong></td>
         <td><span class="badge badge-${r.taxCategory === 'Teacher' ? 'teacher' : 'admin'}">${esc(r.taxCategory)}</span></td>
-        <td>
-          ${r.builtin ? '<span style="font-size:0.75rem;color:var(--color-text-muted);">—</span>'
-                     : `<button class="btn btn-danger btn-sm" data-del-role="${esc(r.id)}">🗑</button>`}
-        </td>
+        <td><button class="btn btn-danger btn-sm" data-del-role="${esc(r.id)}">🗑</button></td>
       </tr>
     `).join('');
 
