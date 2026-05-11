@@ -1803,7 +1803,24 @@ function initAcademicYearSection() {
     const wrap = document.getElementById('ay-role-periods');
     edited.rolePeriods = edited.rolePeriods || {};
 
-    wrap.innerHTML = roleRegistry.roles.map(role => {
+    // Show only CUSTOM roles. Built-in entries (Teacher, Administrator) are
+    // tax categories, not actual job roles — their active periods are meaningless.
+    // Working days now come from each custom role's own period.
+    const customRoles = roleRegistry.roles.filter(r => !r.builtin);
+
+    if (!customRoles.length) {
+      wrap.innerHTML = `
+        <div class="alert alert-warning" style="margin:0;">
+          <span>⚠</span>
+          <span>No custom roles yet. Go to <strong>Roles</strong> (below) and add roles like
+            "Teacher Primaire", "Service Financier", etc. — then come back here to set their
+            active periods.</span>
+        </div>
+      `;
+      return;
+    }
+
+    wrap.innerHTML = customRoles.map(role => {
       const periods = edited.rolePeriods[role.id] || [];
       const periodsHtml = periods.length
         ? periods.map((p, idx) => periodRowHTML(role.id, idx, p)).join('')
@@ -2046,7 +2063,8 @@ function openYearCreatorModal(onCreate) {
       </div>
       <div class="alert alert-info">
         <span>ℹ</span>
-        <span>The year will be named automatically (e.g., <strong>${suggestion.yearId}</strong>) and start with default Mon–Fri active periods for built-in roles.</span>
+        <span>The year will be named automatically (e.g., <strong>${suggestion.yearId}</strong>).
+          Default Mon–Fri active periods will be created for every custom role you've defined.</span>
       </div>
     `,
     {
@@ -2060,9 +2078,11 @@ function openYearCreatorModal(onCreate) {
         }
         const yearId = generateYearId(startDate);
         const year = makeAcademicYear({ yearId, startDate, endDate, isCurrent: false });
-        // Initialize role periods using the start/end as the default active range
-        for (const roleId of Object.keys(year.rolePeriods)) {
-          year.rolePeriods[roleId] = [{ from: startDate, to: endDate, schedule: [1,2,3,4,5] }];
+        // Seed default Mon–Fri active periods for every custom role.
+        const customRoles = getRoleRegistry().roles.filter(r => !r.builtin);
+        year.rolePeriods = {};
+        for (const role of customRoles) {
+          year.rolePeriods[role.id] = [{ from: startDate, to: endDate, schedule: [1,2,3,4,5] }];
         }
         closeModal();
         onCreate(year);

@@ -19,10 +19,11 @@
 
 import { DEFAULT_CALENDAR } from './calendar.js';
 
-export const DEFAULT_ACTIVE_PERIODS = {
-  Teacher:       [{ from: '', to: '', schedule: [1, 2, 3, 4, 5] }],
-  Administrator: [{ from: '', to: '', schedule: [1, 2, 3, 4, 5] }]
-};
+// New academic years start with NO role periods. Active periods are configured
+// per-custom-role in Settings → Academic Year & Roles. The built-in Teacher /
+// Administrator entries used to live here but they're tax categories, not roles
+// — working days now come from each custom role's own period.
+export const DEFAULT_ACTIVE_PERIODS = {};
 
 /**
  * Generate a yearId from a start date.
