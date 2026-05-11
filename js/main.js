@@ -22,16 +22,20 @@ import {
 } from './data/store.js';
 import { onAuthChanged, signInWithGoogle, signInWithMicrosoft, signOutUser } from './auth.js';
 import { t, getLanguage, setLanguage, SUPPORTED_LANGUAGES, applyTranslationsToDOM } from './i18n.js';
+import { APP_MODE, IS_PORTAL_MODE } from './appMode.js';
 import './pwa.js';   // self-registers the service worker + install prompt
 
-// Register all routes
-register('#dashboard',         () => renderDashboard('#app-content'));
-register('#employees',         () => renderEmployees('#app-content'));
-register('#payroll',           () => renderPayroll('#app-content'));
-register('#settings',          () => renderSettings('#app-content'));
-register('#reports',           () => renderReports('#app-content'));
-register('#absence-requests',  () => renderAbsenceRequests('#app-content'));
-register('#announcements',     () => renderAnnouncements('#app-content'));
+// Register routes — admin routes are skipped in portal mode so an owner who
+// accidentally lands on the portal URL can't navigate into the admin sections.
+if (!IS_PORTAL_MODE) {
+  register('#dashboard',         () => renderDashboard('#app-content'));
+  register('#employees',         () => renderEmployees('#app-content'));
+  register('#payroll',           () => renderPayroll('#app-content'));
+  register('#settings',          () => renderSettings('#app-content'));
+  register('#reports',           () => renderReports('#app-content'));
+  register('#absence-requests',  () => renderAbsenceRequests('#app-content'));
+  register('#announcements',     () => renderAnnouncements('#app-content'));
+}
 
 // ── Sidebar toggle — desktop collapse + mobile overlay ────
 function initSidebarToggle() {
@@ -215,6 +219,54 @@ function showLogin() {
   document.getElementById('app-shell').style.display         = 'none';
 }
 
+/** Shown when someone signs in via the wrong front door.
+ *  reason='admin'   → an owner/superadmin hit the portal URL
+ *  reason='unknown' → an unrecognized account hit the portal URL
+ */
+function showWrongAppNotice(reason) {
+  const adminURL = window.location.protocol + '//payroll-10a48.web.app';
+  const isOwner  = reason === 'admin';
+  const title    = isOwner ? 'This is the staff portal' : 'Account not recognized';
+  const body     = isOwner
+    ? 'You signed in with an admin / owner account. The staff portal is for employees only — please use the admin app instead.'
+    : 'Your email isn\'t linked to an employee account in this company. Ask your administrator to add you, or sign in with a different account.';
+  const cta = isOwner
+    ? `<a href="${adminURL}" style="display:inline-block;margin-top:14px;padding:10px 16px;
+         background:#2563eb;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">
+         Open the admin app →
+       </a>`
+    : `<button id="wrong-app-signout" style="margin-top:14px;padding:10px 16px;background:#fff;
+         color:#1e293b;border:1.5px solid #e2e8f0;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:600;">
+         Sign out
+       </button>`;
+
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-shell').style.display    = 'none';
+  const ep = document.getElementById('employee-portal-screen');
+  if (ep) ep.style.display = 'none';
+
+  let host = document.getElementById('wrong-app-notice');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'wrong-app-notice';
+    host.style.cssText = 'position:fixed;inset:0;background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 100%);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;';
+    document.body.appendChild(host);
+  }
+  host.innerHTML = `
+    <div style="max-width:420px;background:#fff;border-radius:16px;padding:36px 32px;text-align:center;
+                box-shadow:0 25px 50px rgba(0,0,0,0.3);">
+      <div style="font-size:42px;margin-bottom:10px;">${isOwner ? '🛡️' : '🚫'}</div>
+      <div style="font-size:1.3rem;font-weight:700;color:#1e293b;margin-bottom:8px;">${title}</div>
+      <div style="font-size:0.92rem;color:#64748b;line-height:1.5;">${body}</div>
+      ${cta}
+    </div>
+  `;
+  host.style.display = 'flex';
+
+  const out = document.getElementById('wrong-app-signout');
+  if (out) out.addEventListener('click', () => signOutUser());
+}
+
 function showLoader(msg = 'Loading payroll data…') {
   document.getElementById('loader-msg').textContent    = msg;
   document.getElementById('app-loader').style.display  = 'flex';
@@ -263,6 +315,20 @@ document.addEventListener('DOMContentLoaded', () => {
   applyTranslationsToDOM();
   // Render language picker on login screen
   initLoginLangPicker();
+
+  // Portal mode: hide the Google sign-in (only available in admin mode)
+  if (IS_PORTAL_MODE) {
+    const wrap = document.getElementById('google-signin-wrapper');
+    if (wrap) wrap.style.display = 'none';
+    // Also tighten the subtitle so it reads correctly for staff
+    const sub = document.querySelector('#login-screen .login-sub');
+    if (sub) sub.textContent = 'Sign in with your school Microsoft account';
+    const title = document.querySelector('#login-screen .login-title');
+    if (title) title.textContent = 'Staff Portal';
+    // Swap the app icon to match
+    const logo = document.querySelector('#login-screen .login-logo');
+    if (logo) logo.textContent = '🏫';
+  }
 
   document.getElementById('google-signin-btn').addEventListener('click', async () => {
     try {
@@ -332,6 +398,12 @@ document.addEventListener('DOMContentLoaded', () => {
       // Identified by email in firestore.rules — no need to write role here.
       // Just ensure a basic user record exists for app metadata.
       if (user.email === SUPER_ADMIN_EMAIL) {
+        // PORTAL MODE: super admin landed on portal URL. Block and redirect.
+        if (IS_PORTAL_MODE) {
+          hideLoader();
+          showWrongAppNotice('admin');
+          return;
+        }
         const userRecord = await getUserRecord(user.uid);
         if (!userRecord) {
           await createUserRecord(user.uid, {
@@ -366,6 +438,13 @@ document.addEventListener('DOMContentLoaded', () => {
       // Returning OWNER — load their company
       // (treat any existing record with companyId as owner for backward compat)
       if (userRecord?.companyId && userRecord.role !== 'employee') {
+        // PORTAL MODE: an owner landed on the portal URL by mistake.
+        // Don't load the admin app. Show a polite redirect screen instead.
+        if (IS_PORTAL_MODE) {
+          hideLoader();
+          showWrongAppNotice('admin');
+          return;
+        }
         setCompanyId(userRecord.companyId);
         showLoader('Loading payroll data…');
         await initStore();
@@ -404,6 +483,13 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       // Otherwise — first-time owner: show onboarding to create their company
+      // PORTAL MODE: an unknown user landing on the portal isn't an employee.
+      // Don't auto-onboard them as an owner — that creates orphan accounts.
+      if (IS_PORTAL_MODE) {
+        hideLoader();
+        showWrongAppNotice('unknown');
+        return;
+      }
       hideLoader();
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('app-shell').style.display    = 'none';

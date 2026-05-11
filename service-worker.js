@@ -10,7 +10,7 @@
  * Version bump = bump CACHE_VERSION below.
  */
 
-const CACHE_VERSION = 'v61-2026-05-08-portal-notification-bell';
+const CACHE_VERSION = 'v62-2026-05-08-portal-admin-app-split';
 const CACHE_SHELL   = `payroll-shell-${CACHE_VERSION}`;
 const CACHE_RUNTIME = `payroll-runtime-${CACHE_VERSION}`;
 
@@ -27,6 +27,7 @@ const APP_SHELL = [
   '/css/responsive.css',
   '/css/employeePortal.css',
   '/js/main.js',
+  '/js/appMode.js',
   '/js/i18n.js',
   '/js/i18n/en.js',
   '/js/i18n/fr.js',
