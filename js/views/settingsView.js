@@ -2336,8 +2336,9 @@ function initRolesSection() {
             </div>
           `).join('');
           dropdown.querySelectorAll('.role-sup-option').forEach(opt => {
-            opt.addEventListener('mouseenter', () => opt.style.background = '#f1f5f9');
-            opt.addEventListener('mouseleave', () => opt.style.background = '');
+            // Use a class toggle for hover so the dark-mode CSS rule wins
+            opt.addEventListener('mouseenter', () => opt.classList.add('role-sup-option-hover'));
+            opt.addEventListener('mouseleave', () => opt.classList.remove('role-sup-option-hover'));
             opt.addEventListener('mousedown', e => {
               // mousedown (not click) so it fires BEFORE the input's blur handler closes the dropdown
               e.preventDefault();

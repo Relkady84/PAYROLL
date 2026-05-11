@@ -350,6 +350,37 @@
 }
 .ann-aud-opt:hover { border-color: var(--color-border-hover); }
 
+/* ── Supervisor employee picker dropdown (Roles table) ── */
+.role-supervisor-dropdown {
+  background: #fff;
+}
+.role-sup-option {
+  background: #fff;
+  color: #1e293b;
+}
+.role-sup-option > div > div:first-child {
+  color: #1e293b;
+}
+.role-sup-option > div > div:last-child {
+  color: #64748b;
+}
+
+:root[data-theme="dark"] .role-supervisor-dropdown {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5) !important;
+}
+:root[data-theme="dark"] .role-sup-option {
+  background: #1e293b !important;
+  border-bottom-color: #334155 !important;
+  color: #f1f5f9;
+}
+:root[data-theme="dark"] .role-sup-option > div > div:first-child { color: #f1f5f9 !important; }
+:root[data-theme="dark"] .role-sup-option > div > div:last-child  { color: #94a3b8 !important; }
+.role-sup-option-hover { background: #f1f5f9; }
+:root[data-theme="dark"] .role-sup-option:hover,
+:root[data-theme="dark"] .role-sup-option-hover { background: #334155 !important; }
+
 /* ── Stat Cards ── */
 .stat-cards {
   display: grid;
