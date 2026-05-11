@@ -1242,7 +1242,15 @@ function paySlipSectionHTML() {
 
 // ── Section: HISTORY ─────────────────────────────────────
 function historySectionHTML() {
-  const all = getAbsenceRequests();
+  // Defensive dedup: ensure no duplicate request rows even if the cache
+  // briefly contains both an optimistically-added entry and the server-confirmed
+  // version after a listener fires.
+  const seen = new Set();
+  const all = getAbsenceRequests().filter(r => {
+    if (!r.id || seen.has(r.id)) return false;
+    seen.add(r.id);
+    return true;
+  });
 
   // Apply status + category + date filters
   function filterRows(rows) {
