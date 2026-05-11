@@ -447,11 +447,21 @@ function drawList() {
       <td style="max-width:240px;">${r.reason ? `<em>${esc(r.reason)}</em>` : '<span style="color:var(--color-text-muted);">—</span>'}</td>
       <td><span class="badge badge-${esc(r.status)}">${esc(STATUS_LABELS[r.status])}</span></td>
       <td>
-        ${(r.status === 'pending' || r.status === 'pending_supervisor' || r.status === 'pending_financier') ? `
+        ${r.status === 'pending_supervisor' ? `
+          <div style="font-size:0.78rem;color:#92400e;background:#fef3c7;padding:6px 10px;
+                      border-radius:6px;border:1px solid #fde68a;line-height:1.4;">
+            ⏳ Awaiting supervisor<br>
+            <strong style="font-size:0.72rem;">${esc(r.supervisorEmail || 'unassigned')}</strong>
+          </div>
+        ` : (r.status === 'pending' || r.status === 'pending_financier') ? `
           <div class="action-btns">
             <button class="btn btn-success btn-sm" data-action="approve" data-id="${esc(r.id)}">✓ Approve</button>
             <button class="btn btn-danger btn-sm" data-action="reject" data-id="${esc(r.id)}">✕ Reject</button>
           </div>
+          ${r.supervisorReviewedBy ? `
+            <div style="font-size:0.7rem;color:#166534;margin-top:4px;">
+              ✓ Approved by supervisor (${esc(r.supervisorReviewedBy)})
+            </div>` : ''}
         ` : `
           <div style="font-size:0.75rem;color:var(--color-text-muted);">
             ${r.reviewedBy ? `by ${esc(r.reviewedBy)}` : ''}<br>

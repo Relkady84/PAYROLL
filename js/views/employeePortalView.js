@@ -322,6 +322,51 @@ function supervisorDisplayName(email) {
     .join(' ');
 }
 
+/** Show a prominent inline success banner at the top of the portal —
+ *  more visible than a toast, auto-dismisses after 5 seconds. */
+function showInlineSuccess(message) {
+  // Remove any existing banner first
+  const existing = document.getElementById('ep-inline-success');
+  if (existing) existing.remove();
+  const banner = document.createElement('div');
+  banner.id = 'ep-inline-success';
+  banner.setAttribute('role', 'status');
+  banner.style.cssText = `
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+    z-index: 1500; max-width: 92vw; width: 480px;
+    background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+    color: #14532d;
+    border: 1.5px solid #86efac;
+    border-radius: 12px;
+    padding: 12px 16px;
+    box-shadow: 0 8px 24px rgba(22, 101, 52, 0.25);
+    font-size: 0.92rem;
+    font-weight: 600;
+    display: flex; align-items: flex-start; gap: 10px;
+    animation: ep-success-slide 0.25s ease-out;
+  `;
+  banner.innerHTML = `
+    <span style="font-size:1.3rem;line-height:1;">✓</span>
+    <span style="flex:1;line-height:1.45;">${esc(message)}</span>
+    <button type="button" style="background:none;border:none;color:#14532d;
+      font-size:1.1rem;cursor:pointer;padding:0 4px;line-height:1;"
+      onclick="this.parentElement.remove()">✕</button>
+  `;
+  // Inject the slide animation once
+  if (!document.getElementById('ep-inline-success-style')) {
+    const st = document.createElement('style');
+    st.id = 'ep-inline-success-style';
+    st.textContent = `@keyframes ep-success-slide {
+      from { transform: translate(-50%, -20px); opacity: 0; }
+      to   { transform: translate(-50%, 0); opacity: 1; }
+    }`;
+    document.head.appendChild(st);
+  }
+  document.body.appendChild(banner);
+  // Auto-dismiss after 5 seconds
+  setTimeout(() => { banner.remove(); }, 5000);
+}
+
 /** Build the toast message shown after a successful submission, naming
  *  the approver. */
 function submissionConfirmationMessage(supervisorEmail, type = 'absence') {
@@ -1786,7 +1831,9 @@ function bindFormEvents() {
       const supervisorEmail = lookupSupervisorEmail();
       const req = createAbsenceRequest(data, _employee, { supervisorEmail });
       await addOwnAbsenceRequest(_companyId, req);
-      showToast(submissionConfirmationMessage(supervisorEmail, 'absence'), 'success');
+      const msg = submissionConfirmationMessage(supervisorEmail, 'absence');
+      showToast(msg, 'success');
+      showInlineSuccess(msg);
       draw();
     } catch (err) {
       console.error(err);
@@ -1969,7 +2016,9 @@ function bindPermanenceEvents() {
       const supervisorEmail = lookupSupervisorEmail();
       const req = createAbsenceRequest(data, _employee, { supervisorEmail });
       await addOwnAbsenceRequest(_companyId, req);
-      showToast(submissionConfirmationMessage(supervisorEmail, 'permanence'), 'success');
+      const msg = submissionConfirmationMessage(supervisorEmail, 'permanence');
+      showToast(msg, 'success');
+      showInlineSuccess(msg);
       draw();
     } catch (err) {
       console.error(err);

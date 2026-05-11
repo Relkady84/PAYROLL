@@ -10,7 +10,7 @@
  * Version bump = bump CACHE_VERSION below.
  */
 
-const CACHE_VERSION = 'v77-2026-05-08-supervisor-confirmation-preview';
+const CACHE_VERSION = 'v78-2026-05-08-admin-gate-supervisor-step-inline-success';
 const CACHE_SHELL   = `payroll-shell-${CACHE_VERSION}`;
 const CACHE_RUNTIME = `payroll-runtime-${CACHE_VERSION}`;
 
