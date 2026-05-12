@@ -10,7 +10,7 @@
  * Version bump = bump CACHE_VERSION below.
  */
 
-const CACHE_VERSION = 'v88-2026-05-12-user-profile-card-modern';
+const CACHE_VERSION = 'v89-2026-05-12-portal-drawer-modern-floating-close';
 const CACHE_SHELL   = `payroll-shell-${CACHE_VERSION}`;
 const CACHE_RUNTIME = `payroll-runtime-${CACHE_VERSION}`;
 

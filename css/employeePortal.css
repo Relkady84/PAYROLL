@@ -396,38 +396,133 @@ textarea.ep-input {
 .ep-drawer.open { transform: translateX(0); }
 
 .ep-drawer-header {
-  background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+  background:
+    radial-gradient(ellipse at top left, rgba(59,130,246,0.25), transparent 60%),
+    linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
   color: #fff;
-  padding: 22px 18px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  padding: 22px 18px 18px;
+  position: relative;
 }
 
-.ep-drawer-avatar {
-  width: 44px;
-  height: 44px;
+/* Modern profile card inside the drawer header */
+.ep-drawer-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03));
+  border: 1px solid rgba(255,255,255,0.12);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.ep-drawer-avatar-modern {
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.18);
+  background: linear-gradient(135deg, #60a5fa 0%, #2563eb 60%, #1e3a8a 100%);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
+  font-size: 1.05rem;
   flex-shrink: 0;
+  box-shadow:
+    0 0 0 2px rgba(255,255,255,0.18),
+    0 4px 12px rgba(0,0,0,0.35);
+  position: relative;
+  letter-spacing: 0.03em;
+}
+/* Online indicator (green dot bottom-right) */
+.ep-drawer-avatar-modern::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #22c55e;
+  border: 2.5px solid #0f172a;
+  box-shadow: 0 0 0 1px rgba(34,197,94,0.5);
 }
 
 .ep-drawer-user { flex: 1; min-width: 0; }
 .ep-drawer-name {
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 1rem;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.01em;
+}
+.ep-drawer-meta {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.65);
+  margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.ep-drawer-meta {
-  font-size: 0.75rem;
-  color: rgba(255,255,255,0.7);
+.ep-drawer-role-pill {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.14);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+/* Floating transparent close button — positioned to the right of the drawer,
+   over the dimmed overlay. Not visually attached to the drawer header. */
+.ep-drawer-close-floating {
+  position: fixed;
+  top: 16px;
+  left: calc(280px + 18px);   /* drawer is 280px wide */
+  z-index: 110;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.10);
+  border: 1.5px solid rgba(255,255,255,0.25);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.7) rotate(-90deg);
+  transition: opacity 0.25s ease, transform 0.25s ease, background 0.15s, border-color 0.15s;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.ep-drawer-close-floating.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1) rotate(0deg);
+}
+.ep-drawer-close-floating:hover {
+  background: rgba(255,255,255,0.18);
+  border-color: rgba(255,255,255,0.4);
+}
+.ep-drawer-close-floating:active {
+  transform: scale(0.92);
+}
+/* On narrow phones (drawer at max-width 85vw), position by viewport instead */
+@media (max-width: 380px) {
+  .ep-drawer-close-floating {
+    left: auto;
+    right: 12px;
+  }
 }
 
 .ep-drawer-nav {

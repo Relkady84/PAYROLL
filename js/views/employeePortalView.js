@@ -681,18 +681,24 @@ function drawerHTML() {
 
   return `
     <div class="ep-drawer-overlay ${_drawerOpen ? 'open' : ''}" id="ep-drawer-overlay"></div>
+    <button id="ep-drawer-close" class="ep-drawer-close-floating ${_drawerOpen ? 'visible' : ''}"
+      aria-label="Close menu" title="Close menu">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
     <aside class="ep-drawer ${_drawerOpen ? 'open' : ''}" id="ep-drawer" aria-hidden="${!_drawerOpen}">
       <div class="ep-drawer-header">
-        <div class="ep-drawer-avatar">${initials(fullName)}</div>
-        <div class="ep-drawer-user">
-          <div class="ep-drawer-name">${esc(fullName)}</div>
-          <div class="ep-drawer-meta">${esc(typeLabel)}</div>
+        <div class="ep-drawer-profile">
+          <div class="ep-drawer-avatar-modern">${initials(fullName)}</div>
+          <div class="ep-drawer-user">
+            <div class="ep-drawer-name">${esc(fullName)}</div>
+            <div class="ep-drawer-meta">${esc(_employee.email || typeLabel)}</div>
+            <div class="ep-drawer-role-pill">${esc(typeLabel)}</div>
+          </div>
         </div>
-        <button id="ep-drawer-close" aria-label="Close menu"
-          style="background:rgba(255,255,255,0.12);color:#fff;border:none;
-                 width:34px;height:34px;border-radius:8px;font-size:1.1rem;
-                 cursor:pointer;font-family:inherit;flex-shrink:0;
-                 display:flex;align-items:center;justify-content:center;">×</button>
       </div>
 
       <nav class="ep-drawer-nav">
