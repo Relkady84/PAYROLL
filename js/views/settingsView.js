@@ -1909,7 +1909,7 @@ function initAcademicYearSection() {
     `).join('');
 
     return `
-      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;padding:8px 0;border-bottom:1px solid var(--color-border);">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;padding:10px 0;border-bottom:1px solid var(--color-border);position:relative;">
         <div style="flex:0 0 145px;">
           <label class="form-label" style="font-size:0.75rem;">From</label>
           <input type="date" class="form-control" data-period-input="${esc(roleId)}::${idx}::from" value="${esc(p.from || '')}">
@@ -1922,7 +1922,17 @@ function initAcademicYearSection() {
           <label class="form-label" style="font-size:0.75rem;">Schedule</label>
           <div style="display:flex;flex-wrap:wrap;gap:4px;">${dayChips}</div>
         </div>
-        <button type="button" class="btn btn-danger btn-sm" data-del-period="${esc(roleId)}::${idx}" title="Remove this period">🗑</button>
+        <button type="button" class="period-delete-btn" data-del-period="${esc(roleId)}::${idx}"
+          title="Remove this period" aria-label="Remove this period">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h18"/>
+            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            <line x1="10" y1="11" x2="10" y2="17"/>
+            <line x1="14" y1="11" x2="14" y2="17"/>
+          </svg>
+        </button>
       </div>
     `;
   }

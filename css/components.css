@@ -323,6 +323,45 @@
   color: #0e7490;
 }
 
+/* ── Active-period delete button (Settings → Roles → Active Periods) ── */
+.period-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1.5px solid var(--color-border);
+  background: var(--color-surface);
+  color: #94a3b8;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s, transform 0.05s;
+  flex-shrink: 0;
+  padding: 0;
+}
+.period-delete-btn:hover {
+  color: #dc2626;
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+.period-delete-btn:active {
+  transform: scale(0.94);
+}
+.period-delete-btn:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+:root[data-theme="dark"] .period-delete-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #94a3b8;
+}
+:root[data-theme="dark"] .period-delete-btn:hover {
+  color: #fca5a5;
+  border-color: #7f1d1d;
+  background: #450a0a;
+}
+
 /* ── Announcement audience radio chips ── */
 .ann-aud-opt {
   display: inline-flex;
