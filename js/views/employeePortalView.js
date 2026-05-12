@@ -681,23 +681,22 @@ function drawerHTML() {
 
   return `
     <div class="ep-drawer-overlay ${_drawerOpen ? 'open' : ''}" id="ep-drawer-overlay"></div>
-    <button id="ep-drawer-close" class="ep-drawer-close-floating ${_drawerOpen ? 'visible' : ''}"
-      aria-label="Close menu" title="Close menu">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-           stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="18" y1="6" x2="6" y2="18"/>
-        <line x1="6" y1="6" x2="18" y2="18"/>
-      </svg>
-    </button>
     <aside class="ep-drawer ${_drawerOpen ? 'open' : ''}" id="ep-drawer" aria-hidden="${!_drawerOpen}">
       <div class="ep-drawer-header">
         <div class="ep-drawer-profile">
           <div class="ep-drawer-avatar-modern">${initials(fullName)}</div>
           <div class="ep-drawer-user">
             <div class="ep-drawer-name">${esc(fullName)}</div>
-            <div class="ep-drawer-meta">${esc(_employee.email || typeLabel)}</div>
             <div class="ep-drawer-role-pill">${esc(typeLabel)}</div>
           </div>
+          <button id="ep-signout" class="ep-drawer-signout-modern" aria-label="Sign out" title="Sign out">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -713,7 +712,7 @@ function drawerHTML() {
 
       <div class="ep-drawer-footer">
         ${themePickerRowHTML()}
-        <div style="display:flex;justify-content:center;gap:6px;margin-bottom:10px;">
+        <div style="display:flex;justify-content:center;gap:6px;">
           ${SUPPORTED_LANGUAGES.map(lang => `
             <button type="button" data-lang="${lang.code}"
               style="padding:4px 10px;border:1.5px solid ${getLanguage() === lang.code ? '#2563eb' : '#e2e8f0'};
@@ -725,7 +724,6 @@ function drawerHTML() {
             </button>
           `).join('')}
         </div>
-        <button id="ep-signout" class="ep-link-btn">${esc(t('common.signout'))}</button>
       </div>
     </aside>
   `;

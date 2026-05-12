@@ -481,49 +481,35 @@ textarea.ep-input {
   border: 1px solid rgba(255,255,255,0.15);
 }
 
-/* Floating transparent close button — positioned to the right of the drawer,
-   over the dimmed overlay. Not visually attached to the drawer header. */
-.ep-drawer-close-floating {
-  position: fixed;
-  top: 16px;
-  left: calc(280px + 18px);   /* drawer is 280px wide */
-  z-index: 110;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.10);
-  border: 1.5px solid rgba(255,255,255,0.25);
-  color: #fff;
-  display: flex;
+/* Modern sign-out button — sits to the right of the profile in the drawer header */
+.ep-drawer-signout-modern {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.85);
   cursor: pointer;
-  opacity: 0;
-  visibility: hidden;
-  transform: scale(0.7) rotate(-90deg);
-  transition: opacity 0.25s ease, transform 0.25s ease, background 0.15s, border-color 0.15s;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
+  padding: 0;
 }
-.ep-drawer-close-floating.visible {
-  opacity: 1;
-  visibility: visible;
-  transform: scale(1) rotate(0deg);
+.ep-drawer-signout-modern:hover {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(252, 165, 165, 0.5);
+  color: #fff;
 }
-.ep-drawer-close-floating:hover {
-  background: rgba(255,255,255,0.18);
-  border-color: rgba(255,255,255,0.4);
-}
-.ep-drawer-close-floating:active {
+.ep-drawer-signout-modern:active {
   transform: scale(0.92);
 }
-/* On narrow phones (drawer at max-width 85vw), position by viewport instead */
-@media (max-width: 380px) {
-  .ep-drawer-close-floating {
-    left: auto;
-    right: 12px;
-  }
+.ep-drawer-signout-modern:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
 }
+.ep-drawer-signout-modern svg { pointer-events: none; }
 
 .ep-drawer-nav {
   flex: 1;
