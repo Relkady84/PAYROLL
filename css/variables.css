@@ -159,3 +159,79 @@
    dark blue/cyan, so the dark-tinted text becomes invisible. Force white. */
 :root[data-theme="dark"] .badge-teacher { color: #ffffff; }
 :root[data-theme="dark"] .badge-admin   { color: #ffffff; }
+
+/* Admin hierarchical date pickers — dark theme.
+   Covers: Payroll page (#pr-date-*), Attendance Requests (#ar-date-filter-*),
+   and the Calendar holidays year filter (#cal-year-filter-*). */
+:root[data-theme="dark"] #pr-date-btn,
+:root[data-theme="dark"] #ar-date-filter-btn,
+:root[data-theme="dark"] #cal-year-filter-btn {
+  background: #0f172a !important;
+  color: #f1f5f9 !important;
+  border-color: #334155 !important;
+}
+:root[data-theme="dark"] #pr-date-menu,
+:root[data-theme="dark"] #ar-date-filter-menu,
+:root[data-theme="dark"] #cal-year-filter-menu {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5) !important;
+}
+:root[data-theme="dark"] #pr-date-menu *,
+:root[data-theme="dark"] #ar-date-filter-menu *,
+:root[data-theme="dark"] #cal-year-filter-menu * { color: #f1f5f9; }
+:root[data-theme="dark"] #pr-date-menu small,
+:root[data-theme="dark"] #ar-date-filter-menu small,
+:root[data-theme="dark"] #cal-year-filter-menu small { color: #94a3b8 !important; }
+:root[data-theme="dark"] #pr-date-menu button:not([disabled]):hover,
+:root[data-theme="dark"] #ar-date-filter-menu button:not([disabled]):hover,
+:root[data-theme="dark"] #cal-year-filter-menu button:not([disabled]):hover {
+  background: #334155 !important;
+}
+:root[data-theme="dark"] #pr-date-menu button[disabled] {
+  background: #0f172a !important;
+  color: #475569 !important;
+  border-color: #334155 !important;
+  cursor: not-allowed !important;
+}
+/* Month-pick buttons (unselected, unpublished) — default to dark slate.
+   In the attendance-requests picker, buttons use the generic `data-pick`
+   attribute — we scope it to the menu via the descendant selector. */
+:root[data-theme="dark"] #pr-date-menu button[data-pr-pick],
+:root[data-theme="dark"] #ar-date-filter-menu button[data-pick] {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+/* Selected month — keep blue accent but darker for dark mode */
+:root[data-theme="dark"] #pr-date-menu button[data-pr-pick][style*="background:#dbeafe"],
+:root[data-theme="dark"] #ar-date-filter-menu button[data-pick][style*="background:#dbeafe"] {
+  background: #1e3a8a !important;
+  border-color: #3b82f6 !important;
+  color: #ffffff !important;
+}
+/* Published month — keep green accent but darker */
+:root[data-theme="dark"] #pr-date-menu button[data-pr-pick][style*="background:#dcfce7"] {
+  background: #052e16 !important;
+  border-color: #166534 !important;
+  color: #bbf7d0 !important;
+}
+/* Month-pick buttons (unselected, unpublished) — default to dark slate */
+:root[data-theme="dark"] #pr-date-menu button[data-pr-pick] {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+/* Selected month — keep blue accent but darker for dark mode */
+:root[data-theme="dark"] #pr-date-menu button[data-pr-pick][style*="background:#dbeafe"] {
+  background: #1e3a8a !important;
+  border-color: #3b82f6 !important;
+  color: #ffffff !important;
+}
+/* Published month — keep green accent but darker */
+:root[data-theme="dark"] #pr-date-menu button[data-pr-pick][style*="background:#dcfce7"] {
+  background: #052e16 !important;
+  border-color: #166534 !important;
+  color: #bbf7d0 !important;
+}

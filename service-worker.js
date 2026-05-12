@@ -10,7 +10,7 @@
  * Version bump = bump CACHE_VERSION below.
  */
 
-const CACHE_VERSION = 'v85-2026-05-12-prettier-period-delete-btn';
+const CACHE_VERSION = 'v87-2026-05-12-attendance-calendar-pickers-dark';
 const CACHE_SHELL   = `payroll-shell-${CACHE_VERSION}`;
 const CACHE_RUNTIME = `payroll-runtime-${CACHE_VERSION}`;
 
