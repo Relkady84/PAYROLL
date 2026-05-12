@@ -10,7 +10,7 @@
  * Version bump = bump CACHE_VERSION below.
  */
 
-const CACHE_VERSION = 'v87-2026-05-12-attendance-calendar-pickers-dark';
+const CACHE_VERSION = 'v88-2026-05-12-user-profile-card-modern';
 const CACHE_SHELL   = `payroll-shell-${CACHE_VERSION}`;
 const CACHE_RUNTIME = `payroll-runtime-${CACHE_VERSION}`;
 
